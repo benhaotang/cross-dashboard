@@ -10,12 +10,17 @@ import {
   Platform,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
+import { useTheme } from '../hooks/useTheme';
+import { ThemePreference } from '../theme';
 import * as keyring from '../services/keyring';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
+import * as cache from '../services/cache';
 
 export default function SettingsScreen() {
-  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, state } = useApp();
+  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setThemePreference, setLastSync, state } =
+    useApp();
+  const theme = useTheme();
 
   // CalDAV settings
   const [caldavServer, setCaldavServer] = useState('');
@@ -28,29 +33,24 @@ export default function SettingsScreen() {
   const [giteaRepos, setGiteaRepos] = useState('');
 
   // Status
-  const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>(
-    'unknown'
-  );
-  const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>(
-    'unknown'
-  );
+  const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
+  const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
 
   useEffect(() => {
     loadSettings();
   }, []);
 
   async function loadSettings() {
-    const [server, username, instance, repos] = await Promise.all([
+    const [server, username, instance] = await Promise.all([
       keyring.getCredential('caldav_server'),
       keyring.getCredential('caldav_username'),
       keyring.getCredential('gitea_instance'),
-      keyring.getCredential('gitea_token').then(() => state.giteaRepositories.join('\n')),
     ]);
 
     if (server) setCaldavServer(server);
     if (username) setCaldavUsername(username);
     if (instance) setGiteaInstance(instance);
-    if (repos) setGiteaRepos(repos);
+    if (state.giteaRepositories.length > 0) setGiteaRepos(state.giteaRepositories.join('\n'));
   }
 
   async function saveCalDav() {
@@ -123,6 +123,12 @@ export default function SettingsScreen() {
     showAlert('Cleared', 'All credentials have been removed');
   }
 
+  async function clearCachedData() {
+    await cache.clearCache();
+    setLastSync(null);
+    showAlert('Cleared', 'Cached data has been removed');
+  }
+
   function showAlert(title: string, message: string) {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
@@ -133,104 +139,154 @@ export default function SettingsScreen() {
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'success':
-        return '#4CAF50';
-      case 'error':
-        return '#F44336';
-      case 'testing':
-        return '#FF9800';
-      default:
-        return '#9E9E9E';
+      case 'success': return '#4CAF50';
+      case 'error': return '#F44336';
+      case 'testing': return '#FF9800';
+      default: return '#9E9E9E';
     }
   }
 
+  const themeOptions: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: 'System' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+
+  const c = theme.colors;
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
+    <ScrollView style={[styles.container, { backgroundColor: c.background }]}>
+      {/* Appearance */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Appearance</Text>
+        <Text style={[styles.label, { color: c.text }]}>Theme</Text>
+        <View style={styles.themeRow}>
+          {themeOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.themeButton,
+                { backgroundColor: c.filterChip },
+                state.themePreference === opt.value && { backgroundColor: c.primary },
+              ]}
+              onPress={() => setThemePreference(opt.value)}
+            >
+              <Text
+                style={[
+                  styles.themeButtonText,
+                  { color: state.themePreference === opt.value ? '#fff' : c.textSecondary },
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* CalDAV */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>CalDAV Settings</Text>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>CalDAV Settings</Text>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(caldavStatus) }]} />
         </View>
 
-        <Text style={styles.label}>Server URL</Text>
+        <Text style={[styles.label, { color: c.text }]}>Server URL</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={caldavServer}
           onChangeText={setCaldavServer}
           placeholder="https://caldav.example.com/dav"
+          placeholderTextColor={c.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        <Text style={styles.label}>Username</Text>
+        <Text style={[styles.label, { color: c.text }]}>Username</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={caldavUsername}
           onChangeText={setCaldavUsername}
           placeholder="username"
+          placeholderTextColor={c.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        <Text style={styles.label}>Password</Text>
+        <Text style={[styles.label, { color: c.text }]}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={caldavPassword}
           onChangeText={setCaldavPassword}
-          placeholder="********"
+          placeholder="••••••••"
+          placeholderTextColor={c.textTertiary}
           secureTextEntry
           autoCapitalize="none"
         />
 
-        <TouchableOpacity style={styles.button} onPress={saveCalDav}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalDav}>
           <Text style={styles.buttonText}>Save & Test CalDAV</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
+      {/* Gitea */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Gitea Settings</Text>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Gitea Settings</Text>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(giteaStatus) }]} />
         </View>
 
-        <Text style={styles.label}>Instance URL</Text>
+        <Text style={[styles.label, { color: c.text }]}>Instance URL</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={giteaInstance}
           onChangeText={setGiteaInstance}
           placeholder="https://gitea.example.com"
+          placeholderTextColor={c.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        <Text style={styles.label}>Personal Access Token</Text>
+        <Text style={[styles.label, { color: c.text }]}>Personal Access Token</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={giteaToken}
           onChangeText={setGiteaToken}
           placeholder="your-access-token"
+          placeholderTextColor={c.textTertiary}
           secureTextEntry
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Repositories (one per line, owner/repo format)</Text>
+        <Text style={[styles.label, { color: c.text }]}>Repositories (one per line, owner/repo format)</Text>
         <TextInput
-          style={[styles.input, styles.multiline]}
+          style={[styles.input, styles.multiline, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
           value={giteaRepos}
           onChangeText={setGiteaRepos}
-          placeholder="owner/repo1&#10;owner/repo2"
+          placeholder={'owner/repo1\nowner/repo2'}
+          placeholderTextColor={c.textTertiary}
           multiline
           numberOfLines={4}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        <TouchableOpacity style={styles.button} onPress={saveGitea}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveGitea}>
           <Text style={styles.buttonText}>Save & Test Gitea</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
+      {/* Data */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Data</Text>
+        {state.lastSync && (
+          <Text style={[styles.lastSyncText, { color: c.textSecondary }]}>
+            Last synced: {state.lastSync.toLocaleString()}
+          </Text>
+        )}
+        <TouchableOpacity style={[styles.button, styles.secondaryButton, { backgroundColor: c.filterChip }]} onPress={clearCachedData}>
+          <Text style={[styles.buttonText, { color: c.text }]}>Clear Cached Data</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.button, styles.dangerButton]} onPress={clearAllSettings}>
           <Text style={styles.buttonText}>Clear All Credentials</Text>
         </TouchableOpacity>
@@ -242,10 +298,8 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   section: {
-    backgroundColor: '#fff',
     margin: 16,
     padding: 16,
     borderRadius: 8,
@@ -264,6 +318,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginBottom: 12,
   },
   statusDot: {
     width: 12,
@@ -274,28 +329,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
-    color: '#333',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     fontSize: 16,
-    backgroundColor: '#fafafa',
   },
   multiline: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
+  themeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  themeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  themeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   button: {
-    backgroundColor: '#007AFF',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
   },
+  secondaryButton: {},
   dangerButton: {
     backgroundColor: '#F44336',
   },
@@ -303,5 +370,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  lastSyncText: {
+    fontSize: 13,
+    marginBottom: 8,
   },
 });

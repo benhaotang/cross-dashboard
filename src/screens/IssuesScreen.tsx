@@ -9,7 +9,9 @@ import {
   Linking,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import * as gitea from '../services/gitea';
+import * as cache from '../services/cache';
 import { GiteaIssue } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
@@ -17,6 +19,7 @@ type FilterState = 'open' | 'closed' | 'all';
 
 export default function IssuesScreen() {
   const { state, setIssues, setLoading } = useApp();
+  const theme = useTheme();
   const [filter, setFilter] = useState<FilterState>('open');
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export default function IssuesScreen() {
     try {
       const issues = await gitea.fetchAllIssues(state.giteaRepositories);
       setIssues(issues);
+      await cache.saveIssues(issues);
     } catch (error) {
       console.error('Error loading issues:', error);
     } finally {
@@ -58,24 +62,27 @@ export default function IssuesScreen() {
         i.id === issue.id ? { ...i, state: newState } : i
       );
       setIssues(updated);
+      await cache.saveIssues(updated);
     }
   }
 
+  const c = theme.colors;
+
   function renderIssue({ item }: { item: GiteaIssue }) {
     return (
-      <TouchableOpacity style={styles.issueCard} onPress={() => openIssue(item.htmlUrl)}>
+      <TouchableOpacity style={[styles.issueCard, { backgroundColor: c.surface }]} onPress={() => openIssue(item.htmlUrl)}>
         <View style={styles.issueHeader}>
           <View style={[styles.stateBadge, item.state === 'open' ? styles.stateOpen : styles.stateClosed]}>
             <Text style={styles.stateText}>{item.state}</Text>
           </View>
-          <Text style={styles.issueNumber}>#{item.number}</Text>
+          <Text style={[styles.issueNumber, { color: c.textTertiary }]}>#{item.number}</Text>
         </View>
 
-        <Text style={styles.issueTitle}>{item.title}</Text>
-        <Text style={styles.issueRepo}>{item.repository}</Text>
+        <Text style={[styles.issueTitle, { color: c.text }]}>{item.title}</Text>
+        <Text style={[styles.issueRepo, { color: c.textSecondary }]}>{item.repository}</Text>
 
         {item.body && (
-          <Text style={styles.issueBody} numberOfLines={2}>
+          <Text style={[styles.issueBody, { color: c.textSecondary }]} numberOfLines={2}>
             {item.body}
           </Text>
         )}
@@ -88,18 +95,18 @@ export default function IssuesScreen() {
           ))}
         </View>
 
-        <View style={styles.issueFooter}>
-          <Text style={styles.issueDate}>
+        <View style={[styles.issueFooter, { borderTopColor: c.borderLight }]}>
+          <Text style={[styles.issueDate, { color: c.textTertiary }]}>
             Updated: {item.updatedAt.toLocaleDateString()}
           </Text>
           <TouchableOpacity
-            style={styles.toggleButton}
+            style={[styles.toggleButton, { backgroundColor: c.filterChip }]}
             onPress={(e) => {
               e.stopPropagation();
               toggleIssueState(item);
             }}
           >
-            <Text style={styles.toggleText}>
+            <Text style={[styles.toggleText, { color: c.textSecondary }]}>
               {item.state === 'open' ? 'Close' : 'Reopen'}
             </Text>
           </TouchableOpacity>
@@ -110,18 +117,18 @@ export default function IssuesScreen() {
 
   if (!state.giteaConfigured) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>Gitea not configured</Text>
-        <Text style={styles.hintText}>Go to Settings to add your Gitea instance</Text>
+      <View style={[styles.centered, { backgroundColor: c.background }]}>
+        <Text style={[styles.emptyText, { color: c.textTertiary }]}>Gitea not configured</Text>
+        <Text style={[styles.hintText, { color: c.textQuaternary }]}>Go to Settings to add your Gitea instance</Text>
       </View>
     );
   }
 
   if (state.giteaRepositories.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>No repositories configured</Text>
-        <Text style={styles.hintText}>Add repositories in Settings</Text>
+      <View style={[styles.centered, { backgroundColor: c.background }]}>
+        <Text style={[styles.emptyText, { color: c.textTertiary }]}>No repositories configured</Text>
+        <Text style={[styles.hintText, { color: c.textQuaternary }]}>Add repositories in Settings</Text>
       </View>
     );
   }
@@ -129,27 +136,27 @@ export default function IssuesScreen() {
   const filteredIssues = getFilteredIssues();
 
   return (
-    <View style={styles.container}>
-      <View style={styles.filterBar}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.filterBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
         {(['open', 'closed', 'all'] as FilterState[]).map((f) => (
           <TouchableOpacity
             key={f}
-            style={[styles.filterButton, filter === f && styles.filterActive]}
+            style={[styles.filterButton, { backgroundColor: c.filterChip }, filter === f && { backgroundColor: c.primary }]}
             onPress={() => setFilter(f)}
           >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+            <Text style={[styles.filterText, { color: filter === f ? '#fff' : c.textSecondary }]}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
               {f !== 'all' && ` (${state.issues.filter((i) => i.state === f).length})`}
             </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.refreshButton} onPress={loadIssues}>
-          <AppIcon name={Icons.refresh} size={16} color="#007AFF" />
+          <AppIcon name={Icons.refresh} size={16} color={c.primary} />
         </TouchableOpacity>
       </View>
 
       {state.isLoading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+        <ActivityIndicator size="large" color={c.primary} style={styles.loader} />
       ) : (
         <FlatList
           data={filteredIssues}
@@ -158,7 +165,7 @@ export default function IssuesScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.emptyText}>No issues found</Text>
+              <Text style={[styles.emptyText, { color: c.textTertiary }]}>No issues found</Text>
             </View>
           }
         />
@@ -170,7 +177,6 @@ export default function IssuesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   centered: {
     flex: 1,
@@ -181,41 +187,26 @@ const styles = StyleSheet.create({
   filterBar: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   filterButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  filterActive: {
-    backgroundColor: '#007AFF',
   },
   filterText: {
     fontSize: 14,
-    color: '#666',
-  },
-  filterTextActive: {
-    color: '#fff',
   },
   refreshButton: {
     marginLeft: 'auto',
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  refreshText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
   listContent: {
     padding: 16,
   },
   issueCard: {
-    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
@@ -249,22 +240,18 @@ const styles = StyleSheet.create({
   },
   issueNumber: {
     fontSize: 14,
-    color: '#999',
   },
   issueTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   issueRepo: {
     fontSize: 12,
-    color: '#666',
     marginBottom: 8,
   },
   issueBody: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -292,30 +279,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
   issueDate: {
     fontSize: 12,
-    color: '#999',
   },
   toggleButton: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 4,
-    backgroundColor: '#f0f0f0',
   },
   toggleText: {
     fontSize: 12,
-    color: '#666',
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     marginBottom: 8,
   },
   hintText: {
     fontSize: 14,
-    color: '#bbb',
   },
   loader: {
     marginTop: 40,

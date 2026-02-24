@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
 import { CalendarEvent, Note, GiteaIssue } from '../types';
+import { ThemePreference } from '../theme';
+import * as cache from '../services/cache';
 
 interface AppState {
   events: CalendarEvent[];
@@ -10,6 +12,8 @@ interface AppState {
   caldavConfigured: boolean;
   giteaConfigured: boolean;
   giteaRepositories: string[];
+  themePreference: ThemePreference;
+  lastSync: Date | null;
 }
 
 type AppAction =
@@ -20,7 +24,9 @@ type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_CALDAV_CONFIGURED'; payload: boolean }
   | { type: 'SET_GITEA_CONFIGURED'; payload: boolean }
-  | { type: 'SET_GITEA_REPOSITORIES'; payload: string[] };
+  | { type: 'SET_GITEA_REPOSITORIES'; payload: string[] }
+  | { type: 'SET_THEME'; payload: ThemePreference }
+  | { type: 'SET_LAST_SYNC'; payload: Date | null };
 
 const initialState: AppState = {
   events: [],
@@ -31,6 +37,8 @@ const initialState: AppState = {
   caldavConfigured: false,
   giteaConfigured: false,
   giteaRepositories: [],
+  themePreference: 'system',
+  lastSync: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -51,6 +59,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, giteaConfigured: action.payload };
     case 'SET_GITEA_REPOSITORIES':
       return { ...state, giteaRepositories: action.payload };
+    case 'SET_THEME':
+      return { ...state, themePreference: action.payload };
+    case 'SET_LAST_SYNC':
+      return { ...state, lastSync: action.payload };
     default:
       return state;
   }
@@ -66,12 +78,35 @@ interface AppContextType {
   setCaldavConfigured: (configured: boolean) => void;
   setGiteaConfigured: (configured: boolean) => void;
   setGiteaRepositories: (repos: string[]) => void;
+  setThemePreference: (theme: ThemePreference) => void;
+  setLastSync: (date: Date | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  useEffect(() => {
+    async function init() {
+      const [themeRaw, events, notes, issues, lastSync] = await Promise.all([
+        cache.loadThemePreference(),
+        cache.loadEvents(),
+        cache.loadNotes(),
+        cache.loadIssues(),
+        cache.getLastSync(),
+      ]);
+
+      if (themeRaw === 'light' || themeRaw === 'dark' || themeRaw === 'system') {
+        dispatch({ type: 'SET_THEME', payload: themeRaw });
+      }
+      if (events) dispatch({ type: 'SET_EVENTS', payload: events });
+      if (notes) dispatch({ type: 'SET_NOTES', payload: notes });
+      if (issues) dispatch({ type: 'SET_ISSUES', payload: issues });
+      if (lastSync) dispatch({ type: 'SET_LAST_SYNC', payload: lastSync });
+    }
+    init();
+  }, []);
 
   const setEvents = useCallback((events: CalendarEvent[]) => {
     dispatch({ type: 'SET_EVENTS', payload: events });
@@ -105,6 +140,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_GITEA_REPOSITORIES', payload: repos });
   }, []);
 
+  const setThemePreference = useCallback((theme: ThemePreference) => {
+    dispatch({ type: 'SET_THEME', payload: theme });
+    cache.saveThemePreference(theme);
+  }, []);
+
+  const setLastSync = useCallback((date: Date | null) => {
+    dispatch({ type: 'SET_LAST_SYNC', payload: date });
+  }, []);
+
   const value: AppContextType = {
     state,
     setEvents,
@@ -115,6 +159,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCaldavConfigured,
     setGiteaConfigured,
     setGiteaRepositories,
+    setThemePreference,
+    setLastSync,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

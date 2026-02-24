@@ -205,9 +205,9 @@ npx expo install --fix
 - [x] Iconify icon integration for web
 - [x] All 5 main screens implemented
 
-### In Progress
-- [ ] Dark/light mode theming
-- [ ] Offline caching
+### Completed (continued)
+- [x] Dark/light mode theming (system/light/dark toggle, persisted via AsyncStorage, all screens themed)
+- [x] Offline caching (AsyncStorage, events/issues/notes cached, loaded on startup, lastSync timestamp)
 
 ### Pending
 - [ ] Native icon support (react-native-vector-icons)

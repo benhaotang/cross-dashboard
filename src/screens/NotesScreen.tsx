@@ -9,11 +9,14 @@ import {
   Modal,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
+import { useTheme } from '../hooks/useTheme';
+import * as cache from '../services/cache';
 import { Note } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function NotesScreen() {
   const { state, setNotes } = useApp();
+  const theme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -33,16 +36,16 @@ export default function NotesScreen() {
     setModalVisible(true);
   }
 
-  function saveNote() {
+  async function saveNote() {
     if (!newTitle.trim()) return;
 
     const now = new Date();
+    let updated: Note[];
 
     if (selectedNote) {
-      const updated = state.notes.map((n) =>
+      updated = state.notes.map((n) =>
         n.uid === selectedNote.uid ? { ...n, title: newTitle, content: newContent, updatedAt: now } : n
       );
-      setNotes(updated);
     } else {
       const newNote: Note = {
         uid: `note-${Date.now()}`,
@@ -51,8 +54,11 @@ export default function NotesScreen() {
         createdAt: now,
         updatedAt: now,
       };
-      setNotes([newNote, ...state.notes]);
+      updated = [newNote, ...state.notes];
     }
+
+    setNotes(updated);
+    await cache.saveNotes(updated);
 
     setModalVisible(false);
     setNewTitle('');
@@ -60,25 +66,29 @@ export default function NotesScreen() {
     setSelectedNote(null);
   }
 
-  function deleteNote(uid: string) {
-    setNotes(state.notes.filter((n) => n.uid !== uid));
+  async function deleteNote(uid: string) {
+    const updated = state.notes.filter((n) => n.uid !== uid);
+    setNotes(updated);
+    await cache.saveNotes(updated);
   }
+
+  const c = theme.colors;
 
   function renderNote({ item }: { item: Note }) {
     return (
-      <TouchableOpacity style={styles.noteCard} onPress={() => openEditNote(item)}>
+      <TouchableOpacity style={[styles.noteCard, { backgroundColor: c.surface }]} onPress={() => openEditNote(item)}>
         <View style={styles.noteHeader}>
-          <Text style={styles.noteTitle} numberOfLines={1}>
+          <Text style={[styles.noteTitle, { color: c.text }]} numberOfLines={1}>
             {item.title}
           </Text>
           <TouchableOpacity onPress={() => deleteNote(item.uid)} style={styles.deleteButton}>
             <AppIcon name={Icons.delete} size={18} color="#F44336" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.noteContent} numberOfLines={3}>
+        <Text style={[styles.noteContent, { color: c.textSecondary }]} numberOfLines={3}>
           {item.content}
         </Text>
-        <Text style={styles.noteDate}>
+        <Text style={[styles.noteDate, { color: c.textTertiary }]}>
           {item.updatedAt.toLocaleDateString()} {item.updatedAt.toLocaleTimeString()}
         </Text>
       </TouchableOpacity>
@@ -86,10 +96,10 @@ export default function NotesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notes</Text>
-        <TouchableOpacity style={styles.addButton} onPress={openNewNote}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Notes</Text>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: c.primary }]} onPress={openNewNote}>
           <AppIcon name={Icons.add} size={18} color="#fff" />
           <Text style={styles.addButtonText}>New</Text>
         </TouchableOpacity>
@@ -102,40 +112,42 @@ export default function NotesScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No notes yet</Text>
-            <Text style={styles.hintText}>Tap "+ New" to create your first note</Text>
+            <Text style={[styles.emptyText, { color: c.textTertiary }]}>No notes yet</Text>
+            <Text style={[styles.hintText, { color: c.textQuaternary }]}>Tap "+ New" to create your first note</Text>
           </View>
         }
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: c.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedNote ? 'Edit Note' : 'New Note'}</Text>
+              <Text style={[styles.modalTitle, { color: c.text }]}>{selectedNote ? 'Edit Note' : 'New Note'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={[styles.cancelText, { color: c.primary }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
             <TextInput
-              style={styles.titleInput}
+              style={[styles.titleInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
               value={newTitle}
               onChangeText={setNewTitle}
               placeholder="Title"
+              placeholderTextColor={c.textTertiary}
               autoFocus
             />
 
             <TextInput
-              style={styles.contentInput}
+              style={[styles.contentInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
               value={newContent}
               onChangeText={setNewContent}
               placeholder="Write your note..."
+              placeholderTextColor={c.textTertiary}
               multiline
               textAlignVertical="top"
             />
 
-            <TouchableOpacity style={styles.saveButton} onPress={saveNote}>
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: c.primary }]} onPress={saveNote}>
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -148,16 +160,13 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 20,
@@ -167,7 +176,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#007AFF',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -181,7 +189,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   noteCard: {
-    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
@@ -206,18 +213,12 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 4,
   },
-  deleteText: {
-    color: '#F44336',
-    fontSize: 12,
-  },
   noteContent: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   noteDate: {
     fontSize: 12,
-    color: '#999',
     marginTop: 8,
   },
   emptyContainer: {
@@ -228,12 +229,10 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     marginBottom: 8,
   },
   hintText: {
     fontSize: 14,
-    color: '#bbb',
   },
   modalOverlay: {
     flex: 1,
@@ -241,7 +240,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -258,12 +256,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelText: {
-    color: '#007AFF',
     fontSize: 16,
   },
   titleInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -271,7 +267,6 @@ const styles = StyleSheet.create({
   },
   contentInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -279,7 +274,6 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   saveButton: {
-    backgroundColor: '#007AFF',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',

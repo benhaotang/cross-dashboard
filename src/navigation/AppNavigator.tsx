@@ -12,6 +12,7 @@ import {
 } from '../screens';
 import AppIcon, { Icons } from '../components/Icon';
 import SidebarNavigator from './SidebarNavigator';
+import { useTheme } from '../hooks/useTheme';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,6 +26,7 @@ const tabIcons: Record<string, string> = {
 };
 
 function MobileNavigator() {
+  const theme = useTheme();
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -33,11 +35,12 @@ function MobileNavigator() {
             <AppIcon
               name={tabIcons[route.name] || Icons.dashboard}
               size={24}
-              color={focused ? '#007AFF' : '#999'}
+              color={focused ? theme.colors.primary : theme.colors.textTertiary}
             />
           ),
-          tabBarActiveTintColor: '#007AFF',
-          tabBarInactiveTintColor: '#999',
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.textTertiary,
+          tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border },
           headerShown: false,
         })}
       >
@@ -53,7 +56,6 @@ function MobileNavigator() {
 }
 
 export default function AppNavigator() {
-  // Use sidebar navigation for web and macOS, bottom tabs for mobile
   if (Platform.OS === 'web' || Platform.OS === 'macos') {
     return <SidebarNavigator />;
   }

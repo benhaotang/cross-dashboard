@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import * as caldav from '../services/caldav';
+import * as cache from '../services/cache';
 import { CalendarEvent } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
@@ -16,6 +18,7 @@ type FilterType = 'all' | 'today' | 'week' | 'month';
 
 export default function EventsScreen() {
   const { state, setEvents, setLoading } = useApp();
+  const theme = useTheme();
   const [filter, setFilter] = useState<FilterType>('all');
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function EventsScreen() {
     try {
       const events = await caldav.fetchEvents();
       setEvents(events);
+      await cache.saveEvents(events);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
@@ -45,10 +49,11 @@ export default function EventsScreen() {
     let filtered = [...state.events];
 
     switch (filter) {
-      case 'today':
+      case 'today': {
         const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
         filtered = filtered.filter((e) => e.start >= today && e.start < tomorrow);
         break;
+      }
       case 'week':
         filtered = filtered.filter((e) => e.start >= today && e.start < weekEnd);
         break;
@@ -67,16 +72,18 @@ export default function EventsScreen() {
     return `${startDate} ${startTime} - ${endTime}`;
   }
 
+  const c = theme.colors;
+
   function renderEvent({ item }: { item: CalendarEvent }) {
     return (
-      <View style={styles.eventCard}>
+      <View style={[styles.eventCard, { backgroundColor: c.surface }]}>
         <View style={styles.eventHeader}>
-          <Text style={styles.eventTitle}>{item.summary}</Text>
+          <Text style={[styles.eventTitle, { color: c.text }]}>{item.summary}</Text>
         </View>
-        <Text style={styles.eventTime}>{formatEventTime(item)}</Text>
-        {item.location && <Text style={styles.eventLocation}>{item.location}</Text>}
+        <Text style={[styles.eventTime, { color: c.primary }]}>{formatEventTime(item)}</Text>
+        {item.location && <Text style={[styles.eventLocation, { color: c.textSecondary }]}>{item.location}</Text>}
         {item.description && (
-          <Text style={styles.eventDescription} numberOfLines={2}>
+          <Text style={[styles.eventDescription, { color: c.textTertiary }]} numberOfLines={2}>
             {item.description}
           </Text>
         )}
@@ -86,9 +93,9 @@ export default function EventsScreen() {
 
   if (!state.caldavConfigured) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>CalDAV not configured</Text>
-        <Text style={styles.hintText}>Go to Settings to add your CalDAV server</Text>
+      <View style={[styles.centered, { backgroundColor: c.background }]}>
+        <Text style={[styles.emptyText, { color: c.textTertiary }]}>CalDAV not configured</Text>
+        <Text style={[styles.hintText, { color: c.textQuaternary }]}>Go to Settings to add your CalDAV server</Text>
       </View>
     );
   }
@@ -96,26 +103,26 @@ export default function EventsScreen() {
   const filteredEvents = getFilteredEvents();
 
   return (
-    <View style={styles.container}>
-      <View style={styles.filterBar}>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.filterBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
         {(['all', 'today', 'week', 'month'] as FilterType[]).map((f) => (
           <TouchableOpacity
             key={f}
-            style={[styles.filterButton, filter === f && styles.filterActive]}
+            style={[styles.filterButton, { backgroundColor: c.filterChip }, filter === f && { backgroundColor: c.primary }]}
             onPress={() => setFilter(f)}
           >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+            <Text style={[styles.filterText, { color: filter === f ? '#fff' : c.textSecondary }]}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.refreshButton} onPress={loadEvents}>
-          <AppIcon name={Icons.refresh} size={16} color="#007AFF" />
+          <AppIcon name={Icons.refresh} size={16} color={c.primary} />
         </TouchableOpacity>
       </View>
 
       {state.isLoading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+        <ActivityIndicator size="large" color={c.primary} style={styles.loader} />
       ) : (
         <FlatList
           data={filteredEvents}
@@ -124,7 +131,7 @@ export default function EventsScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.emptyText}>No events found</Text>
+              <Text style={[styles.emptyText, { color: c.textTertiary }]}>No events found</Text>
             </View>
           }
         />
@@ -136,7 +143,6 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   centered: {
     flex: 1,
@@ -147,41 +153,26 @@ const styles = StyleSheet.create({
   filterBar: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   filterButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  filterActive: {
-    backgroundColor: '#007AFF',
   },
   filterText: {
     fontSize: 14,
-    color: '#666',
-  },
-  filterTextActive: {
-    color: '#fff',
   },
   refreshButton: {
     marginLeft: 'auto',
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  refreshText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
   listContent: {
     padding: 16,
   },
   eventCard: {
-    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
@@ -197,31 +188,25 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   eventTime: {
     fontSize: 14,
-    color: '#007AFF',
     marginBottom: 4,
   },
   eventLocation: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 4,
   },
   eventDescription: {
     fontSize: 13,
-    color: '#999',
     marginTop: 8,
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     marginBottom: 8,
   },
   hintText: {
     fontSize: 14,
-    color: '#bbb',
   },
   loader: {
     marginTop: 40,

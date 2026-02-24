@@ -8,13 +8,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
+import * as cache from '../services/cache';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
-  const { state, setEvents, setIssues, setLoading, setCaldavConfigured, setGiteaConfigured } =
+  const { state, setEvents, setIssues, setLoading, setCaldavConfigured, setGiteaConfigured, setLastSync } =
     useApp();
+  const theme = useTheme();
 
   useEffect(() => {
     checkConfiguration();
@@ -29,14 +32,28 @@ export default function DashboardScreen() {
   async function refreshData() {
     setLoading(true);
     try {
+      const fetches: Promise<void>[] = [];
+
       if (state.caldavConfigured) {
-        const events = await caldav.fetchEvents();
-        setEvents(events);
+        fetches.push(
+          caldav.fetchEvents().then(async (events) => {
+            setEvents(events);
+            await cache.saveEvents(events);
+          })
+        );
       }
       if (state.giteaConfigured && state.giteaRepositories.length > 0) {
-        const issues = await gitea.fetchAllIssues(state.giteaRepositories);
-        setIssues(issues);
+        fetches.push(
+          gitea.fetchAllIssues(state.giteaRepositories).then(async (issues) => {
+            setIssues(issues);
+            await cache.saveIssues(issues);
+          })
+        );
       }
+
+      await Promise.all(fetches);
+      const now = new Date();
+      setLastSync(now);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -51,59 +68,68 @@ export default function DashboardScreen() {
 
   const openIssues = state.issues.filter((i) => i.state === 'open').slice(0, 5);
 
+  const c = theme.colors;
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Dashboard</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={refreshData}>
+    <ScrollView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+        <View>
+          <Text style={[styles.title, { color: c.text }]}>Dashboard</Text>
+          {state.lastSync && (
+            <Text style={[styles.lastSync, { color: c.textTertiary }]}>
+              Synced {state.lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity style={[styles.refreshButton, { backgroundColor: c.primary }]} onPress={refreshData}>
           <AppIcon name={Icons.refresh} size={18} color="#fff" />
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
       </View>
 
-      {state.isLoading && <ActivityIndicator size="large" color="#007AFF" />}
+      {state.isLoading && <ActivityIndicator size="large" color={c.primary} style={styles.loader} />}
 
       {!state.caldavConfigured && !state.giteaConfigured && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome!</Text>
-          <Text style={styles.cardText}>
+        <View style={[styles.card, { backgroundColor: c.surface }]}>
+          <Text style={[styles.cardTitle, { color: c.text }]}>Welcome!</Text>
+          <Text style={[styles.cardText, { color: c.textSecondary }]}>
             Configure your CalDAV and Gitea credentials in Settings to get started.
           </Text>
         </View>
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Upcoming Events</Text>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Upcoming Events</Text>
         {!state.caldavConfigured ? (
-          <Text style={styles.emptyText}>CalDAV not configured</Text>
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>CalDAV not configured</Text>
         ) : upcomingEvents.length === 0 ? (
-          <Text style={styles.emptyText}>No upcoming events</Text>
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>No upcoming events</Text>
         ) : (
           upcomingEvents.map((event) => (
-            <View key={event.uid} style={styles.card}>
-              <Text style={styles.cardTitle}>{event.summary}</Text>
-              <Text style={styles.cardText}>
+            <View key={event.uid} style={[styles.card, { backgroundColor: c.surface }]}>
+              <Text style={[styles.cardTitle, { color: c.text }]}>{event.summary}</Text>
+              <Text style={[styles.cardText, { color: c.textSecondary }]}>
                 {event.start.toLocaleDateString()} {event.start.toLocaleTimeString()}
               </Text>
-              {event.location && <Text style={styles.cardSubtext}>{event.location}</Text>}
+              {event.location && <Text style={[styles.cardSubtext, { color: c.textTertiary }]}>{event.location}</Text>}
             </View>
           ))
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Open Issues</Text>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Open Issues</Text>
         {!state.giteaConfigured ? (
-          <Text style={styles.emptyText}>Gitea not configured</Text>
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>Gitea not configured</Text>
         ) : openIssues.length === 0 ? (
-          <Text style={styles.emptyText}>No open issues</Text>
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>No open issues</Text>
         ) : (
           openIssues.map((issue) => (
-            <View key={issue.id} style={styles.card}>
-              <Text style={styles.cardTitle}>
+            <View key={issue.id} style={[styles.card, { backgroundColor: c.surface }]}>
+              <Text style={[styles.cardTitle, { color: c.text }]}>
                 #{issue.number} {issue.title}
               </Text>
-              <Text style={styles.cardSubtext}>{issue.repository}</Text>
+              <Text style={[styles.cardSubtext, { color: c.textTertiary }]}>{issue.repository}</Text>
               <View style={styles.labelContainer}>
                 {issue.labels.map((label) => (
                   <View
@@ -125,26 +151,26 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
   },
+  lastSync: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#007AFF',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -153,6 +179,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  loader: {
+    marginTop: 20,
+  },
   section: {
     padding: 16,
   },
@@ -160,10 +189,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#333',
   },
   card: {
-    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 8,
     marginBottom: 8,
@@ -180,15 +207,12 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontSize: 14,
-    color: '#666',
   },
   cardSubtext: {
     fontSize: 12,
-    color: '#999',
     marginTop: 4,
   },
   emptyText: {
-    color: '#999',
     fontStyle: 'italic',
   },
   labelContainer: {

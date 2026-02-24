@@ -10,6 +10,7 @@ import {
   SettingsScreen,
 } from '../screens';
 import AppIcon, { Icons } from '../components/Icon';
+import { useTheme } from '../hooks/useTheme';
 
 type Screen = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Issues' | 'Settings';
 
@@ -32,16 +33,21 @@ export default function SidebarNavigator() {
   const [activeScreen, setActiveScreen] = useState<Screen>('Dashboard');
   const { width } = useWindowDimensions();
   const isCollapsed = width < 900;
+  const theme = useTheme();
 
   const ActiveComponent = navItems.find((item) => item.name === activeScreen)?.component || DashboardScreen;
 
   return (
     <NavigationContainer>
-      <View style={styles.container}>
-        <View style={[styles.sidebar, isCollapsed && styles.sidebarCollapsed]}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[
+          styles.sidebar,
+          isCollapsed && styles.sidebarCollapsed,
+          { backgroundColor: theme.colors.surface, borderRightColor: theme.colors.border },
+        ]}>
           <View style={styles.logo}>
-            <AppIcon name={Icons.dashboard} size={28} color="#007AFF" />
-            {!isCollapsed && <Text style={styles.logoText}>Cross Dashboard</Text>}
+            <AppIcon name={Icons.dashboard} size={28} color={theme.colors.primary} />
+            {!isCollapsed && <Text style={[styles.logoText, { color: theme.colors.text }]}>Cross Dashboard</Text>}
           </View>
 
           <View style={styles.navItems}>
@@ -50,7 +56,7 @@ export default function SidebarNavigator() {
                 key={item.name}
                 style={[
                   styles.navItem,
-                  activeScreen === item.name && styles.navItemActive,
+                  activeScreen === item.name && { backgroundColor: theme.colors.sidebarActiveBg },
                   isCollapsed && styles.navItemCollapsed,
                 ]}
                 onPress={() => setActiveScreen(item.name)}
@@ -58,12 +64,13 @@ export default function SidebarNavigator() {
                 <AppIcon
                   name={item.icon}
                   size={22}
-                  color={activeScreen === item.name ? '#007AFF' : '#666'}
+                  color={activeScreen === item.name ? theme.colors.primary : theme.colors.textSecondary}
                 />
                 {!isCollapsed && (
                   <Text
                     style={[
                       styles.navItemText,
+                      { color: activeScreen === item.name ? theme.colors.primary : theme.colors.textSecondary },
                       activeScreen === item.name && styles.navItemTextActive,
                     ]}
                   >
@@ -87,13 +94,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
   },
   sidebar: {
     width: 240,
-    backgroundColor: '#fff',
     borderRightWidth: 1,
-    borderRightColor: '#e0e0e0',
     paddingVertical: 16,
   },
   sidebarCollapsed: {
@@ -110,7 +114,6 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#333',
   },
   navItems: {
     flex: 1,
@@ -129,16 +132,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 0,
   },
-  navItemActive: {
-    backgroundColor: '#E3F2FD',
-  },
   navItemText: {
     fontSize: 15,
-    color: '#666',
     fontWeight: '500',
   },
   navItemTextActive: {
-    color: '#007AFF',
     fontWeight: '600',
   },
   content: {
