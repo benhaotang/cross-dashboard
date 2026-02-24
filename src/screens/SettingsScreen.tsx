@@ -28,6 +28,8 @@ import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 import { DEFAULT_POMODORO, ALL_SCREENS, ScreenName } from '../services/cache';
 import AppIcon, { Icons } from '../components/Icon';
 
+const isElectron = Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+
 type AuthMethod = 'manual' | 'nextcloud';
 
 const OPEN_SOURCE_LIBRARIES = [
@@ -341,7 +343,7 @@ export default function SettingsScreen() {
       return;
     }
 
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' && !isElectron) {
       showAlert('Not supported', 'Nextcloud Login Flow is not available on web due to CORS restrictions. Please use manual CalDAV entry with an app password instead.');
       return;
     }
@@ -980,7 +982,7 @@ export default function SettingsScreen() {
               editable={!ncLogging}
             />
 
-            {Platform.OS === 'web' && (
+            {Platform.OS === 'web' && !isElectron && (
               <Text style={[styles.hint, { color: '#FF9800', marginBottom: 8 }]}>
                 Nextcloud Login Flow is not available on web (CORS). Use manual entry with an app password instead.
               </Text>
@@ -1266,7 +1268,7 @@ export default function SettingsScreen() {
       <View style={[styles.section, { backgroundColor: c.surface }]}>
         <Text style={[styles.sectionTitle, { color: c.text }]}>About</Text>
 
-        <Text style={[styles.aboutVersion, { color: c.text }]}>Cross-Dashboard v1.3.1</Text>
+        <Text style={[styles.aboutVersion, { color: c.text }]}>Cross-Dashboard v1.4.0</Text>
 
         <TouchableOpacity
           style={styles.aboutLink}

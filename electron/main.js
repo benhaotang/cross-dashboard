@@ -2,7 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import serve from 'electron-serve';
 
-const loadURL = serve({ directory: 'dist' });
+const loadURL = serve({ directory: 'dist', isCorsEnabled: false });
 
 async function createWindow() {
   const win = new BrowserWindow({

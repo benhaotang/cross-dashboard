@@ -49,7 +49,7 @@ export default function SidebarNavigator() {
   const ActiveComponent = navItems.find((item) => item.name === activeScreen)?.component || navItems[0]?.component || DashboardScreen;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer documentTitle={{ formatter: () => 'Cross Dashboard' }}>
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={[
           styles.sidebar,
