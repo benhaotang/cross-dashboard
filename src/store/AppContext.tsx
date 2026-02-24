@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useCallback, useEffect, R
 import { CalendarEvent, Note, GiteaIssue, CalDavTask, CalDavCalendar } from '../types';
 import { ThemePreference } from '../theme';
 import * as cache from '../services/cache';
+import { ScreenName, ALL_SCREENS } from '../services/cache';
 import * as crypto from '../services/crypto';
 
 interface AppState {
@@ -16,6 +17,7 @@ interface AppState {
   giteaRepositories: string[];
   selectedCalendars: CalDavCalendar[];
   themePreference: ThemePreference;
+  visibleScreens: ScreenName[];
   lastSync: Date | null;
 }
 
@@ -31,6 +33,7 @@ type AppAction =
   | { type: 'SET_GITEA_REPOSITORIES'; payload: string[] }
   | { type: 'SET_SELECTED_CALENDARS'; payload: CalDavCalendar[] }
   | { type: 'SET_THEME'; payload: ThemePreference }
+  | { type: 'SET_VISIBLE_SCREENS'; payload: ScreenName[] }
   | { type: 'SET_LAST_SYNC'; payload: Date | null };
 
 const initialState: AppState = {
@@ -45,6 +48,7 @@ const initialState: AppState = {
   giteaRepositories: [],
   selectedCalendars: [],
   themePreference: 'system',
+  visibleScreens: ALL_SCREENS,
   lastSync: null,
 };
 
@@ -72,6 +76,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedCalendars: action.payload };
     case 'SET_THEME':
       return { ...state, themePreference: action.payload };
+    case 'SET_VISIBLE_SCREENS':
+      return { ...state, visibleScreens: action.payload };
     case 'SET_LAST_SYNC':
       return { ...state, lastSync: action.payload };
     default:
@@ -92,6 +98,7 @@ interface AppContextType {
   setGiteaRepositories: (repos: string[]) => void;
   setSelectedCalendars: (calendars: CalDavCalendar[]) => void;
   setThemePreference: (theme: ThemePreference) => void;
+  setVisibleScreens: (screens: ScreenName[]) => void;
   setLastSync: (date: Date | null) => void;
 }
 
@@ -104,9 +111,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async function init() {
       await crypto.initEncryptionKey();
 
-      const themeRaw = await cache.loadThemePreference();
+      const [themeRaw, savedScreens] = await Promise.all([
+        cache.loadThemePreference(),
+        cache.loadVisibleScreens(),
+      ]);
       if (themeRaw === 'light' || themeRaw === 'dark' || themeRaw === 'system') {
         dispatch({ type: 'SET_THEME', payload: themeRaw });
+      }
+      if (savedScreens) {
+        dispatch({ type: 'SET_VISIBLE_SCREENS', payload: savedScreens });
       }
 
       try {
@@ -176,6 +189,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     cache.saveThemePreference(theme);
   }, []);
 
+  const setVisibleScreens = useCallback((screens: ScreenName[]) => {
+    dispatch({ type: 'SET_VISIBLE_SCREENS', payload: screens });
+    cache.saveVisibleScreens(screens);
+  }, []);
+
   const setLastSync = useCallback((date: Date | null) => {
     dispatch({ type: 'SET_LAST_SYNC', payload: date });
   }, []);
@@ -193,6 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setGiteaRepositories,
     setSelectedCalendars,
     setThemePreference,
+    setVisibleScreens,
     setLastSync,
   };
 

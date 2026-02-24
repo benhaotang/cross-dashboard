@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,11 +9,14 @@ import {
   NotesScreen,
   TasksScreen,
   IssuesScreen,
+  ViewsScreen,
   SettingsScreen,
 } from '../screens';
 import AppIcon, { Icons } from '../components/Icon';
 import SidebarNavigator from './SidebarNavigator';
 import { useTheme } from '../hooks/useTheme';
+import { useApp } from '../store/AppContext';
+import { ScreenName } from '../services/cache';
 
 const Tab = createBottomTabNavigator();
 
@@ -24,11 +27,30 @@ const tabIcons: Record<string, string> = {
   Notes: Icons.notes,
   Tasks: Icons.task,
   Issues: Icons.issues,
+  Views: Icons.views,
   Settings: Icons.settings,
 };
 
+const allTabs: { name: string; component: React.ComponentType }[] = [
+  { name: 'Dashboard', component: DashboardScreen },
+  { name: 'Inbox', component: InboxScreen },
+  { name: 'Events', component: EventsScreen },
+  { name: 'Notes', component: NotesScreen },
+  { name: 'Tasks', component: TasksScreen },
+  { name: 'Issues', component: IssuesScreen },
+  { name: 'Views', component: ViewsScreen },
+  { name: 'Settings', component: SettingsScreen },
+];
+
 function MobileNavigator() {
   const theme = useTheme();
+  const { state } = useApp();
+
+  const visibleTabs = useMemo(() => {
+    const visible = new Set(state.visibleScreens);
+    return allTabs.filter((tab) => tab.name === 'Settings' || visible.has(tab.name as ScreenName));
+  }, [state.visibleScreens]);
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -46,13 +68,9 @@ function MobileNavigator() {
           headerShown: false,
         })}
       >
-        <Tab.Screen name="Dashboard" component={DashboardScreen} />
-        <Tab.Screen name="Inbox" component={InboxScreen} />
-        <Tab.Screen name="Events" component={EventsScreen} />
-        <Tab.Screen name="Notes" component={NotesScreen} />
-        <Tab.Screen name="Tasks" component={TasksScreen} />
-        <Tab.Screen name="Issues" component={IssuesScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
+        {visibleTabs.map((tab) => (
+          <Tab.Screen key={tab.name} name={tab.name} component={tab.component} />
+        ))}
       </Tab.Navigator>
     </NavigationContainer>
   );

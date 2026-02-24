@@ -345,3 +345,30 @@ export async function updateIssue(
 
   return data !== null;
 }
+
+export async function createRepoLabel(
+  owner: string,
+  repo: string,
+  name: string,
+  color: string = '0075ca'
+): Promise<GiteaLabel | null> {
+  const data = await apiRequest<{ id: number; name: string; color: string }>(
+    `/repos/${owner}/${repo}/labels`,
+    { method: 'POST', body: JSON.stringify({ name, color }) }
+  );
+  if (!data) return null;
+  return { id: data.id, name: data.name, color: data.color };
+}
+
+export async function replaceIssueLabels(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  labelIds: number[]
+): Promise<boolean> {
+  const data = await apiRequest(
+    `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+    { method: 'PUT', body: JSON.stringify({ labels: labelIds }) }
+  );
+  return data !== null;
+}

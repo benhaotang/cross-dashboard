@@ -23,12 +23,13 @@ import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
 import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
-import { DEFAULT_POMODORO } from '../services/cache';
+import { DEFAULT_POMODORO, ALL_SCREENS, ScreenName } from '../services/cache';
+import AppIcon, { Icons } from '../components/Icon';
 
 type AuthMethod = 'manual' | 'nextcloud';
 
 export default function SettingsScreen() {
-  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setSelectedCalendars, setThemePreference, setLastSync, state } =
+  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setSelectedCalendars, setThemePreference, setVisibleScreens, setLastSync, state } =
     useApp();
   const theme = useTheme();
 
@@ -560,6 +561,57 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      {/* Navigation */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Navigation</Text>
+        <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 12 }]}>
+          Choose which screens appear in the navigation bar
+        </Text>
+
+        {ALL_SCREENS.map((screen) => {
+          const enabled = state.visibleScreens.includes(screen);
+          const screenIcons: Record<ScreenName, string> = {
+            Dashboard: Icons.dashboard,
+            Inbox: Icons.inbox,
+            Events: Icons.calendar,
+            Notes: Icons.notes,
+            Tasks: Icons.task,
+            Issues: Icons.issues,
+            Views: Icons.views,
+          };
+          return (
+            <TouchableOpacity
+              key={screen}
+              style={[styles.screenToggleRow, { borderBottomColor: c.border }]}
+              onPress={() => {
+                const next = enabled
+                  ? state.visibleScreens.filter((s) => s !== screen)
+                  : [...state.visibleScreens, screen];
+                if (next.length === 0) {
+                  showAlert('Warning', 'You must keep at least one screen visible.');
+                  return;
+                }
+                setVisibleScreens(next);
+              }}
+            >
+              <View
+                style={[
+                  styles.calCheckbox,
+                  { borderColor: enabled ? c.primary : c.border },
+                  enabled && { backgroundColor: c.primary },
+                ]}
+              >
+                {enabled && <AppIcon name={Icons.check} size={14} color="#fff" />}
+              </View>
+              <AppIcon name={screenIcons[screen]} size={20} color={enabled ? c.text : c.textTertiary} />
+              <Text style={[styles.screenToggleName, { color: enabled ? c.text : c.textTertiary }]}>
+                {screen}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Task Input Defaults */}
@@ -1293,6 +1345,17 @@ const styles = StyleSheet.create({
   lastSyncText: {
     fontSize: 13,
     marginBottom: 8,
+  },
+  screenToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  screenToggleName: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   taskDefaultsGrid: {
     gap: 4,

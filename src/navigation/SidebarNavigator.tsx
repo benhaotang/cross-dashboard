@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import {
@@ -8,12 +8,14 @@ import {
   NotesScreen,
   TasksScreen,
   IssuesScreen,
+  ViewsScreen,
   SettingsScreen,
 } from '../screens';
 import AppIcon, { Icons } from '../components/Icon';
 import { useTheme } from '../hooks/useTheme';
+import { useApp } from '../store/AppContext';
 
-type Screen = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Settings';
+type Screen = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Views' | 'Settings';
 
 interface NavItem {
   name: Screen;
@@ -21,13 +23,14 @@ interface NavItem {
   component: React.ComponentType;
 }
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   { name: 'Dashboard', icon: Icons.dashboard, component: DashboardScreen },
   { name: 'Inbox', icon: Icons.inbox, component: InboxScreen },
   { name: 'Events', icon: Icons.calendar, component: EventsScreen },
   { name: 'Notes', icon: Icons.notes, component: NotesScreen },
   { name: 'Tasks', icon: Icons.task, component: TasksScreen },
   { name: 'Issues', icon: Icons.issues, component: IssuesScreen },
+  { name: 'Views', icon: Icons.views, component: ViewsScreen },
   { name: 'Settings', icon: Icons.settings, component: SettingsScreen },
 ];
 
@@ -36,8 +39,14 @@ export default function SidebarNavigator() {
   const { width } = useWindowDimensions();
   const isCollapsed = width < 900;
   const theme = useTheme();
+  const { state } = useApp();
 
-  const ActiveComponent = navItems.find((item) => item.name === activeScreen)?.component || DashboardScreen;
+  const navItems = useMemo(() => {
+    const visible = new Set(state.visibleScreens);
+    return allNavItems.filter((item) => item.name === 'Settings' || visible.has(item.name));
+  }, [state.visibleScreens]);
+
+  const ActiveComponent = navItems.find((item) => item.name === activeScreen)?.component || navItems[0]?.component || DashboardScreen;
 
   return (
     <NavigationContainer>

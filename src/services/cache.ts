@@ -11,6 +11,12 @@ const CACHE_LAST_SYNC = '@cache/last_sync';
 const CACHE_THEME = '@cache/theme';
 const CACHE_TASK_DEFAULTS = '@cache/task_defaults';
 const CACHE_POMODORO = '@cache/pomodoro_settings';
+const CACHE_VISIBLE_SCREENS = '@cache/visible_screens';
+const CACHE_KANBAN_COLUMNS = '@cache/kanban_columns';
+
+export type ScreenName = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Views';
+
+export const ALL_SCREENS: ScreenName[] = ['Dashboard', 'Inbox', 'Events', 'Notes', 'Tasks', 'Issues', 'Views'];
 
 export interface PomodoroSettings {
   workMinutes: number;
@@ -146,6 +152,26 @@ export async function loadPomodoroSettings(): Promise<PomodoroSettings | null> {
   const data = await AsyncStorage.getItem(CACHE_POMODORO);
   if (!data) return null;
   return JSON.parse(data) as PomodoroSettings;
+}
+
+export async function saveVisibleScreens(screens: ScreenName[]): Promise<void> {
+  await AsyncStorage.setItem(CACHE_VISIBLE_SCREENS, JSON.stringify(screens));
+}
+
+export async function loadVisibleScreens(): Promise<ScreenName[] | null> {
+  const data = await AsyncStorage.getItem(CACHE_VISIBLE_SCREENS);
+  if (!data) return null;
+  return JSON.parse(data) as ScreenName[];
+}
+
+export async function saveKanbanColumns(columns: string[]): Promise<void> {
+  await AsyncStorage.setItem(CACHE_KANBAN_COLUMNS, JSON.stringify(columns));
+}
+
+export async function loadKanbanColumns(): Promise<string[] | null> {
+  const data = await AsyncStorage.getItem(CACHE_KANBAN_COLUMNS);
+  if (!data) return null;
+  return JSON.parse(data) as string[];
 }
 
 export async function clearCache(): Promise<void> {

@@ -63,4 +63,5 @@ export const Icons = {
   pause: 'mdi:pause-circle-outline',
   stop: 'mdi:stop-circle-outline',
   timer: 'mdi:timer-outline',
+  views: 'mdi:view-column',
 };

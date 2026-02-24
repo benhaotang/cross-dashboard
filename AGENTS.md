@@ -21,7 +21,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 - **UI**: React Native components with platform-specific adaptations
 - **Icons**: Iconify (`@iconify/react`) - MDI icon set
 - **Navigation**: React Navigation (bottom tabs for mobile, sidebar for web/desktop)
-- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues, selectedCalendars
+- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues, selectedCalendars, visibleScreens
 - **Secure Storage**: expo-secure-store (keyring integration)
 
 ---
@@ -123,6 +123,7 @@ cross-dashboard/
   Icons.pause        // mdi:pause-circle-outline
   Icons.stop         // mdi:stop-circle-outline
   Icons.timer        // mdi:timer-outline
+  Icons.views        // mdi:view-column
   ```
 
 ### Property Pages (`src/components/*PropertyPage.tsx`)
@@ -143,10 +144,13 @@ Property page components:
 - **AppNavigator.tsx**: Platform-aware navigation router
   - Web/macOS/Linux: Uses `SidebarNavigator`
   - Android: Uses bottom tab navigation
+  - Both navigators filter screens by `visibleScreens` from AppContext (Settings always shown)
 - **SidebarNavigator.tsx**: Sidebar navigation for desktop/web
   - Collapsible at <900px width
   - Shows icons and labels
   - Active state highlighting
+- **Visible screens**: Configurable in Settings > Navigation; persisted via `cache.saveVisibleScreens()`
+  - `ScreenName` type and `ALL_SCREENS` constant exported from `src/services/cache.ts`
 
 ### Screens (`src/screens/`)
 | Screen | Description |
@@ -156,8 +160,9 @@ Property page components:
 | NotesScreen | Note management with create/edit/delete, calendar-aware fetching, tap-to-open property page with read/edit modes |
 | TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots, tap-to-open property page with subtask list, read/edit modes |
 | IssuesScreen | Gitea issues with state filtering, tap-to-open property page with comments, read/edit modes |
+| ViewsScreen | Kanban board + Covey's Four Quadrants (Eisenhower matrix) — tasks and issues grouped by `#tag` (categories/labels), assign modal with mutual exclusivity, configurable kanban columns, syncs tag changes back to CalDAV/Gitea |
 | InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones |
-| SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, task input defaults, notifications |
+| SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, visible screen toggles, task input defaults, notifications |
 
 ---
 
@@ -351,6 +356,28 @@ npx expo install --fix
 - [x] Play button on TaskPropertyPage — starts Pomodoro timer, logs completed sessions to task description field (persisted via CalDAV)
 - [x] Play button on IssuePropertyPage — starts Pomodoro timer (no session logging for issues)
 - [x] New icons: `play`, `pause`, `stop`, `timer`
+
+### Completed (continued 8)
+- [x] Configurable visible screens — user can toggle which screens (Dashboard, Inbox, Events, Notes, Tasks, Issues, Views) appear in navigation
+- [x] `ScreenName` type and `ALL_SCREENS` constant in `src/services/cache.ts`
+- [x] `saveVisibleScreens`/`loadVisibleScreens` persistence via AsyncStorage
+- [x] `visibleScreens` state in AppContext with `setVisibleScreens` setter (persists on change, loads on init)
+- [x] SidebarNavigator and AppNavigator (mobile tabs) dynamically filter nav items by `visibleScreens` (Settings always shown)
+- [x] Navigation section in SettingsScreen — checkbox toggles per screen with icons, at least one screen must remain visible
+
+### Completed (continued 9)
+- [x] Views screen (`src/screens/ViewsScreen.tsx`) — Kanban board + Covey's Four Quadrants (Eisenhower matrix)
+- [x] Both tasks AND issues appear in views — tasks matched by `categories`, issues matched by `labels[].name`
+- [x] Kanban view: horizontal scrollable columns, configurable column tags (persisted via `saveKanbanColumns`/`loadKanbanColumns`)
+- [x] Covey's Four Quadrants view: 2x2 grid with Do (`#do`), Delay (`#delay`), Delegate (`#delegate`), Eliminate (`#eliminate`) tags
+- [x] Assign modal: "+" button opens modal to assign tasks/issues to columns/quadrants — pick a target tag, tap an item to assign
+- [x] Mutual exclusivity: within a view, an item can only have one tag (e.g. `#inprogress` OR `#backlog`, not both); cross-view tags are allowed (e.g. `#inprogress` + `#do`)
+- [x] Sync back to source: task categories updated via CalDAV `updateTask()`, issue labels updated via Gitea `replaceIssueLabels()` (labels auto-created if missing via `createRepoLabel()`)
+- [x] Compact item cards with type icon (task/bug), priority dot, due date, tap-to-open property page
+- [x] View toggle chips (Kanban / Quadrants), filter icon opens column config modal for Kanban
+- [x] New icon: `views` (mdi:view-column)
+- [x] `'Views'` added to `ScreenName` type and `ALL_SCREENS` in `cache.ts`
+- [x] Gitea API extensions: `createRepoLabel()`, `replaceIssueLabels()` in `gitea.ts`
 
 ---
 
