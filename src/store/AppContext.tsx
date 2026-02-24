@@ -110,19 +110,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      await crypto.initEncryptionKey();
+      // Initialize encryption key — may fail on Android if Keystore is unavailable
+      try {
+        await crypto.initEncryptionKey();
+      } catch (error) {
+        console.warn('Failed to initialize encryption key:', error);
+      }
 
-      const [themeRaw, savedScreens, caldavServer, caldavUsername, caldavPassword,
-        giteaInstance, giteaToken, savedCalendars, savedGiteaRepos] = await Promise.all([
+      // Phase 1: Load from AsyncStorage (always reliable, no Keystore dependency).
+      // This must be separate from the SecureStore loads so that visible screens
+      // and theme are always restored even when the Android Keystore is unavailable.
+      const [themeRaw, savedScreens] = await Promise.all([
         cache.loadThemePreference(),
         cache.loadVisibleScreens(),
-        keyring.getCredential('caldav_server'),
-        keyring.getCredential('caldav_username'),
-        keyring.getCredential('caldav_password'),
-        keyring.getCredential('gitea_instance'),
-        keyring.getCredential('gitea_token'),
-        keyring.getCredential('caldav_selected_calendars'),
-        keyring.getCredential('gitea_repositories'),
       ]);
       if (themeRaw === 'light' || themeRaw === 'dark' || themeRaw === 'system') {
         dispatch({ type: 'SET_THEME', payload: themeRaw });
@@ -131,30 +131,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_VISIBLE_SCREENS', payload: savedScreens });
       }
 
-      // Restore CalDAV configured state
-      if (caldavServer && caldavUsername && caldavPassword) {
-        dispatch({ type: 'SET_CALDAV_CONFIGURED', payload: true });
+      // Phase 2: Load from SecureStore/Keychain — may fail on Android when the
+      // Keystore becomes temporarily unavailable (e.g. after removing device lock).
+      try {
+        const [caldavServer, caldavUsername, caldavPassword,
+          giteaInstance, giteaToken, savedCalendars, savedGiteaRepos] = await Promise.all([
+          keyring.getCredential('caldav_server'),
+          keyring.getCredential('caldav_username'),
+          keyring.getCredential('caldav_password'),
+          keyring.getCredential('gitea_instance'),
+          keyring.getCredential('gitea_token'),
+          keyring.getCredential('caldav_selected_calendars'),
+          keyring.getCredential('gitea_repositories'),
+        ]);
+
+        // Restore CalDAV configured state
+        if (caldavServer && caldavUsername && caldavPassword) {
+          dispatch({ type: 'SET_CALDAV_CONFIGURED', payload: true });
+        }
+
+        // Restore selected calendars
+        if (savedCalendars) {
+          try {
+            const cals: CalDavCalendar[] = JSON.parse(savedCalendars);
+            dispatch({ type: 'SET_SELECTED_CALENDARS', payload: cals });
+          } catch { /* ignore parse errors */ }
+        }
+
+        // Restore Gitea configured state and repositories
+        if (giteaInstance && giteaToken) {
+          dispatch({ type: 'SET_GITEA_CONFIGURED', payload: true });
+        }
+        if (savedGiteaRepos) {
+          try {
+            const repos: string[] = JSON.parse(savedGiteaRepos);
+            dispatch({ type: 'SET_GITEA_REPOSITORIES', payload: repos });
+          } catch { /* ignore parse errors */ }
+        }
+      } catch (error) {
+        console.warn('Failed to load credentials from secure store:', error);
       }
 
-      // Restore selected calendars
-      if (savedCalendars) {
-        try {
-          const cals: CalDavCalendar[] = JSON.parse(savedCalendars);
-          dispatch({ type: 'SET_SELECTED_CALENDARS', payload: cals });
-        } catch { /* ignore parse errors */ }
-      }
-
-      // Restore Gitea configured state and repositories
-      if (giteaInstance && giteaToken) {
-        dispatch({ type: 'SET_GITEA_CONFIGURED', payload: true });
-      }
-      if (savedGiteaRepos) {
-        try {
-          const repos: string[] = JSON.parse(savedGiteaRepos);
-          dispatch({ type: 'SET_GITEA_REPOSITORIES', payload: repos });
-        } catch { /* ignore parse errors */ }
-      }
-
+      // Phase 3: Load encrypted cache data
       try {
         const [events, notes, issues, tasks, lastSync] = await Promise.all([
           cache.loadEvents(),

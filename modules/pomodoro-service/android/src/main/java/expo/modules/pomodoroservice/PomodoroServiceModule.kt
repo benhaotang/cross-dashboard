@@ -3,7 +3,9 @@ package expo.modules.pomodoroservice
 import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -73,6 +75,22 @@ class PomodoroServiceModule : Module() {
                 alarmManager.canScheduleExactAlarms()
             } else {
                 true
+            }
+        }
+
+        // Opens the system "Alarms & Reminders" settings page for this app so the
+        // user can grant SCHEDULE_EXACT_ALARM (Android 12+ / API 31+).
+        Function("requestExactAlarmPermission") {
+            val context = appContext.reactContext ?: return@Function false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                true
+            } else {
+                true // Permission not required on Android < 12
             }
         }
     }

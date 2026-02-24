@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { loadPomodoroSettings, DEFAULT_POMODORO, PomodoroSettings } from '../services/cache';
 
 export type TimerPhase = 'work' | 'shortBreak' | 'longBreak';
@@ -99,6 +99,30 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [running, handleTimerEnd]);
+
+  // Android: check SCHEDULE_EXACT_ALARM permission on mount and prompt if missing.
+  // This permission is required on Android 12+ for the backup AlarmManager alarm
+  // to fire while the app is in the background (shown as "Wecker und Erinnerungen"
+  // in system settings on German devices).
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    try {
+      const PomodoroService = require('../../modules/pomodoro-service');
+      if (PomodoroService?.isAvailable() && !PomodoroService.canScheduleExactAlarms()) {
+        Alert.alert(
+          'Alarm Permission Needed',
+          'To keep the Pomodoro timer running while the app is in the background, please allow "Alarms & Reminders" (Wecker und Erinnerungen) for this app.',
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => PomodoroService.requestExactAlarmPermission(),
+            },
+          ],
+        );
+      }
+    } catch { /* module not available */ }
+  }, []);
 
   // Android native module integration
   useEffect(() => {

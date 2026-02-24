@@ -23,6 +23,7 @@ interface PomodoroNativeModule {
   resumeTimer(): boolean;
   stopTimer(): boolean;
   canScheduleExactAlarms(): boolean;
+  requestExactAlarmPermission(): boolean;
   addListener(eventName: string, listener: (...args: unknown[]) => void): RemovableSubscription;
   removeAllListeners(eventName: string): void;
 }
@@ -63,6 +64,11 @@ export function stopTimer(): boolean {
 export function canScheduleExactAlarms(): boolean {
   if (!nativeModule) return false;
   return nativeModule.canScheduleExactAlarms();
+}
+
+export function requestExactAlarmPermission(): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.requestExactAlarmPermission();
 }
 
 export function addTickListener(listener: (event: TickEvent) => void): RemovableSubscription | null {
