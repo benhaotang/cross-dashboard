@@ -34,5 +34,5 @@ android {
 dependencies {
   implementation project(':expo-modules-core')
   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${project.ext.kotlinVersion()}"
-  implementation "org.unifiedpush.android:connector:2.4.0"
+  implementation "org.unifiedpush.android:connector:2.5.0"
 }
