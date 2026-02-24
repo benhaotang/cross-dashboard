@@ -9,6 +9,8 @@ jobs:
   build:
     name: Build AppImage (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     strategy:
       matrix:
