@@ -1,10 +1,8 @@
-'use strict';
+import { app, BrowserWindow } from 'electron';
+import path from 'path';
+import serve from 'electron-serve';
 
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
-const serve = require('electron-serve');
-
-const loadURL = serve({ directory: path.join(__dirname, '../dist') });
+const loadURL = serve({ directory: 'dist' });
 
 async function createWindow() {
   const win = new BrowserWindow({
@@ -14,7 +12,7 @@ async function createWindow() {
     minHeight: 480,
     autoHideMenuBar: true,
     title: 'Cross Dashboard',
-    icon: path.join(__dirname, '../assets/icon.png'),
+    icon: path.join(app.getAppPath(), 'assets/icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
