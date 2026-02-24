@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { CalDavCalendar } from '../types';
@@ -23,7 +22,7 @@ export function PropertyPageModal({ visible, children }: PropertyPageModalProps)
     <Modal visible={visible} animationType="slide" transparent>
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
       >
         <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
           {children}

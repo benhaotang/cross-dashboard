@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { useSyncAll } from '../hooks/useSyncAll';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
 import { Note, CalDavCalendar } from '../types';
@@ -20,6 +21,7 @@ import NotePropertyPage from '../components/NotePropertyPage';
 export default function NotesScreen() {
   const { state, setNotes } = useApp();
   const theme = useTheme();
+  const { syncAll } = useSyncAll();
   const [modalVisible, setModalVisible] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -136,7 +138,7 @@ export default function NotesScreen() {
         <Text style={[styles.headerTitle, { color: c.text }]}>Notes</Text>
         <View style={styles.headerActions}>
           {state.caldavConfigured && (
-            <TouchableOpacity style={styles.syncButton} onPress={syncNotes}>
+            <TouchableOpacity style={styles.syncButton} onPress={syncAll}>
               <AppIcon name={Icons.refresh} size={18} color={c.primary} />
             </TouchableOpacity>
           )}

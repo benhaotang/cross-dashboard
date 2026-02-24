@@ -1129,9 +1129,14 @@ export default function SettingsScreen() {
                 </Text>
               )}
 
-              <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalendarSelection}>
-                <Text style={styles.buttonText}>Save Calendar Selection</Text>
-              </TouchableOpacity>
+              <View style={styles.calPickerActions}>
+                <TouchableOpacity style={[styles.button, { backgroundColor: c.primary, flex: 1 }]} onPress={saveCalendarSelection}>
+                  <Text style={styles.buttonText}>Save Selection</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.secondaryButton, { backgroundColor: c.filterChip, flex: 0, paddingHorizontal: 16 }]} onPress={loadCalendars}>
+                  <AppIcon name={Icons.refresh} size={18} color={c.text} />
+                </TouchableOpacity>
+              </View>
 
               {/* Default calendar pickers */}
               <View style={[styles.divider, { backgroundColor: c.border }]} />

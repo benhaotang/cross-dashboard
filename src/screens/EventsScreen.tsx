@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { useSyncAll } from '../hooks/useSyncAll';
 import * as caldav from '../services/caldav';
 import * as cache from '../services/cache';
 import { CalendarEvent, CalDavCalendar } from '../types';
@@ -30,6 +31,7 @@ function useCalendarColorMap(calendars: CalDavCalendar[]): Map<string, string> {
 export default function EventsScreen() {
   const { state, setEvents, setLoading } = useApp();
   const theme = useTheme();
+  const { syncAll } = useSyncAll();
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const calColorMap = useCalendarColorMap(state.selectedCalendars);
@@ -134,7 +136,7 @@ export default function EventsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={styles.refreshButton} onPress={loadEvents}>
+        <TouchableOpacity style={styles.refreshButton} onPress={syncAll}>
           <AppIcon name={Icons.refresh} size={16} color={c.primary} />
         </TouchableOpacity>
       </View>

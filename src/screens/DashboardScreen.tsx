@@ -9,78 +9,13 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import * as caldav from '../services/caldav';
-import * as gitea from '../services/gitea';
-import * as cache from '../services/cache';
-import * as notifications from '../services/notifications';
-import * as DashboardWidget from '../../modules/dashboard-widget';
+import { useSyncAll } from '../hooks/useSyncAll';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
-  const { state, setEvents, setIssues, setTasks, setLoading, setLastSync } = useApp();
+  const { state } = useApp();
   const theme = useTheme();
-
-  async function refreshData() {
-    setLoading(true);
-    try {
-      const fetches: Promise<void>[] = [];
-
-      if (state.caldavConfigured) {
-        fetches.push(
-          caldav.fetchEvents().then(async (events) => {
-            setEvents(events);
-            await cache.saveEvents(events);
-          })
-        );
-        fetches.push(
-          caldav.fetchTasks().then(async (tasks) => {
-            setTasks(tasks);
-            await cache.saveTasks(tasks);
-          })
-        );
-      }
-      if (state.giteaConfigured && state.giteaRepositories.length > 0) {
-        fetches.push(
-          gitea.fetchAllIssues(state.giteaRepositories).then(async (issues) => {
-            setIssues(issues);
-            await cache.saveIssues(issues);
-          })
-        );
-      }
-
-      await Promise.all(fetches);
-      const now = new Date();
-      setLastSync(now);
-
-      // Reschedule event reminders after sync
-      const settings = await notifications.getNotificationSettings();
-      if (settings.enabled && state.events.length > 0) {
-        await notifications.scheduleEventReminders(state.events, settings.minutesBefore);
-      }
-
-      // Update home screen widget
-      if (DashboardWidget.isAvailable()) {
-        const upcomingCount = state.events.filter((e) => e.start >= now).length;
-        const openCount = state.issues.filter((i) => i.state === 'open').length;
-        const nextEvt = state.events
-          .filter((e) => e.start >= now)
-          .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
-        const nextEventText = nextEvt
-          ? `${nextEvt.summary} - ${nextEvt.start.toLocaleDateString()} ${nextEvt.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : 'No upcoming events';
-        DashboardWidget.updateWidgetData(
-          upcomingCount,
-          openCount,
-          nextEventText,
-          `Synced ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-        );
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { syncAll } = useSyncAll();
 
   const upcomingEvents = state.events
     .filter((e) => e.start >= new Date())
@@ -111,7 +46,7 @@ export default function DashboardScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity style={[styles.refreshButton, { backgroundColor: c.primary }]} onPress={refreshData}>
+        <TouchableOpacity style={[styles.refreshButton, { backgroundColor: c.primary }]} onPress={syncAll}>
           <AppIcon name={Icons.refresh} size={18} color="#fff" />
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>

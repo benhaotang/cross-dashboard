@@ -12,9 +12,8 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
-import * as cache from '../services/cache';
+import { useSyncAll } from '../hooks/useSyncAll';
 import { InboxItem, InboxItemType, GiteaMilestone } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
@@ -59,8 +58,9 @@ const TYPE_ICONS: Record<InboxItemType, string> = {
 };
 
 export default function InboxScreen() {
-  const { state, setEvents, setIssues, setTasks, setLoading } = useApp();
+  const { state } = useApp();
   const theme = useTheme();
+  const { syncAll } = useSyncAll();
   const [milestones, setMilestones] = useState<GiteaMilestone[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<InboxItemType[]>(['event', 'issue', 'milestone', 'task']);
   const [dateFrom, setDateFrom] = useState('');
@@ -73,43 +73,15 @@ export default function InboxScreen() {
   }, []);
 
   async function loadAllData() {
-    setLoading(true);
-    try {
-      const promises: Promise<void>[] = [];
-
-      if (state.caldavConfigured) {
-        promises.push(
-          caldav.fetchEvents().then(async (events) => {
-            setEvents(events);
-            await cache.saveEvents(events);
-          })
-        );
-        promises.push(
-          caldav.fetchTasks().then(async (tasks) => {
-            setTasks(tasks);
-            await cache.saveTasks(tasks);
-          })
-        );
-      }
-
-      if (state.giteaConfigured && state.giteaRepositories.length > 0) {
-        promises.push(
-          gitea.fetchAllIssues(state.giteaRepositories).then(async (issues) => {
-            setIssues(issues);
-            await cache.saveIssues(issues);
-          })
-        );
-        promises.push(
-          gitea.fetchAllMilestones(state.giteaRepositories).then((m) => setMilestones(m))
-        );
-      }
-
-      await Promise.all(promises);
-    } catch (error) {
-      console.error('Error loading inbox data:', error);
-    } finally {
-      setLoading(false);
+    const promises: Promise<void>[] = [syncAll()];
+    if (state.giteaConfigured && state.giteaRepositories.length > 0) {
+      promises.push(
+        gitea.fetchAllMilestones(state.giteaRepositories)
+          .then((m) => setMilestones(m))
+          .catch(() => {})
+      );
     }
+    await Promise.all(promises);
   }
 
   const inboxItems = useMemo((): InboxItem[] => {

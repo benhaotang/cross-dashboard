@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { useSyncAll } from '../hooks/useSyncAll';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
 import * as keyring from '../services/keyring';
@@ -130,6 +131,7 @@ function useCalendarColorMap(calendars: CalDavCalendar[]): Map<string, string> {
 export default function TasksScreen() {
   const { state, setTasks } = useApp();
   const theme = useTheme();
+  const { syncAll } = useSyncAll();
   const calColorMap = useCalendarColorMap(state.selectedCalendars);
   const [modalVisible, setModalVisible] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -474,7 +476,7 @@ export default function TasksScreen() {
         <Text style={[styles.headerTitle, { color: c.text }]}>Tasks</Text>
         <View style={styles.headerActions}>
           {state.caldavConfigured && (
-            <TouchableOpacity style={styles.syncButton} onPress={syncTasks}>
+            <TouchableOpacity style={styles.syncButton} onPress={syncAll}>
               <AppIcon name={Icons.refresh} size={18} color={c.primary} />
             </TouchableOpacity>
           )}

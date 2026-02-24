@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { useSyncAll } from '../hooks/useSyncAll';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
 import { GiteaIssue } from '../types';
@@ -20,6 +21,7 @@ type FilterState = 'open' | 'closed' | 'all';
 export default function IssuesScreen() {
   const { state, setIssues, setLoading } = useApp();
   const theme = useTheme();
+  const { syncAll } = useSyncAll();
   const [filter, setFilter] = useState<FilterState>('open');
   const [selectedIssue, setSelectedIssue] = useState<GiteaIssue | null>(null);
 
@@ -147,7 +149,7 @@ export default function IssuesScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={styles.refreshButton} onPress={loadIssues}>
+        <TouchableOpacity style={styles.refreshButton} onPress={syncAll}>
           <AppIcon name={Icons.refresh} size={16} color={c.primary} />
         </TouchableOpacity>
       </View>
