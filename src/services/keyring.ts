@@ -11,7 +11,9 @@ export type CredentialKey =
   | 'gitea_instance'
   | 'notif_enabled'
   | 'notif_minutes'
-  | 'up_endpoint';
+  | 'up_endpoint'
+  | 'encryption_key'
+  | 'encryption_key_custom';
 
 function getFullKey(key: CredentialKey): string {
   return `${KEYRING_PREFIX}${key}`;

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useCallback, useEffect, R
 import { CalendarEvent, Note, GiteaIssue } from '../types';
 import { ThemePreference } from '../theme';
 import * as cache from '../services/cache';
+import * as crypto from '../services/crypto';
 
 interface AppState {
   events: CalendarEvent[];
@@ -89,21 +90,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      const [themeRaw, events, notes, issues, lastSync] = await Promise.all([
-        cache.loadThemePreference(),
-        cache.loadEvents(),
-        cache.loadNotes(),
-        cache.loadIssues(),
-        cache.getLastSync(),
-      ]);
+      await crypto.initEncryptionKey();
 
+      const themeRaw = await cache.loadThemePreference();
       if (themeRaw === 'light' || themeRaw === 'dark' || themeRaw === 'system') {
         dispatch({ type: 'SET_THEME', payload: themeRaw });
       }
-      if (events) dispatch({ type: 'SET_EVENTS', payload: events });
-      if (notes) dispatch({ type: 'SET_NOTES', payload: notes });
-      if (issues) dispatch({ type: 'SET_ISSUES', payload: issues });
-      if (lastSync) dispatch({ type: 'SET_LAST_SYNC', payload: lastSync });
+
+      try {
+        const [events, notes, issues, lastSync] = await Promise.all([
+          cache.loadEvents(),
+          cache.loadNotes(),
+          cache.loadIssues(),
+          cache.getLastSync(),
+        ]);
+
+        if (events) dispatch({ type: 'SET_EVENTS', payload: events });
+        if (notes) dispatch({ type: 'SET_NOTES', payload: notes });
+        if (issues) dispatch({ type: 'SET_ISSUES', payload: issues });
+        if (lastSync) dispatch({ type: 'SET_LAST_SYNC', payload: lastSync });
+      } catch {
+        console.warn('Failed to decrypt cached data, clearing cache');
+        await cache.clearCache();
+      }
     }
     init();
   }, []);

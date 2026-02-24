@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarEvent, Note, GiteaIssue } from '../types';
+import { encrypt, decrypt } from './crypto';
 
 const CACHE_EVENTS = '@cache/events';
 const CACHE_NOTES = '@cache/notes';
@@ -30,35 +31,46 @@ function reviveIssueDates(raw: unknown): GiteaIssue {
   } as GiteaIssue;
 }
 
+async function encryptedSetItem(key: string, json: string): Promise<void> {
+  const encrypted = encrypt(json);
+  await AsyncStorage.setItem(key, encrypted);
+}
+
+async function decryptedGetItem(key: string): Promise<string | null> {
+  const stored = await AsyncStorage.getItem(key);
+  if (!stored) return null;
+  return decrypt(stored);
+}
+
 export async function saveEvents(events: CalendarEvent[]): Promise<void> {
   await Promise.all([
-    AsyncStorage.setItem(CACHE_EVENTS, JSON.stringify(events)),
+    encryptedSetItem(CACHE_EVENTS, JSON.stringify(events)),
     AsyncStorage.setItem(CACHE_LAST_SYNC, new Date().toISOString()),
   ]);
 }
 
 export async function loadEvents(): Promise<CalendarEvent[] | null> {
-  const data = await AsyncStorage.getItem(CACHE_EVENTS);
+  const data = await decryptedGetItem(CACHE_EVENTS);
   if (!data) return null;
   return (JSON.parse(data) as unknown[]).map(reviveEventDates);
 }
 
 export async function saveNotes(notes: Note[]): Promise<void> {
-  await AsyncStorage.setItem(CACHE_NOTES, JSON.stringify(notes));
+  await encryptedSetItem(CACHE_NOTES, JSON.stringify(notes));
 }
 
 export async function loadNotes(): Promise<Note[] | null> {
-  const data = await AsyncStorage.getItem(CACHE_NOTES);
+  const data = await decryptedGetItem(CACHE_NOTES);
   if (!data) return null;
   return (JSON.parse(data) as unknown[]).map(reviveNoteDates);
 }
 
 export async function saveIssues(issues: GiteaIssue[]): Promise<void> {
-  await AsyncStorage.setItem(CACHE_ISSUES, JSON.stringify(issues));
+  await encryptedSetItem(CACHE_ISSUES, JSON.stringify(issues));
 }
 
 export async function loadIssues(): Promise<GiteaIssue[] | null> {
-  const data = await AsyncStorage.getItem(CACHE_ISSUES);
+  const data = await decryptedGetItem(CACHE_ISSUES);
   if (!data) return null;
   return (JSON.parse(data) as unknown[]).map(reviveIssueDates);
 }

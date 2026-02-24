@@ -16,6 +16,7 @@ import * as keyring from '../services/keyring';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
+import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
 
 export default function SettingsScreen() {
@@ -43,6 +44,11 @@ export default function SettingsScreen() {
   const [upDistributor, setUpDistributor] = useState('');
   const [upEndpoint, setUpEndpoint] = useState<string | null>(null);
   const [upRegistered, setUpRegistered] = useState(false);
+
+  // Security / Encryption
+  const [isCustomKey, setIsCustomKey] = useState(false);
+  const [passphrase, setPassphrase] = useState('');
+  const [securityBusy, setSecurityBusy] = useState(false);
 
   // Status
   const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
@@ -82,16 +88,18 @@ export default function SettingsScreen() {
   }, []);
 
   async function loadSettings() {
-    const [server, username, instance] = await Promise.all([
+    const [server, username, instance, customKey] = await Promise.all([
       keyring.getCredential('caldav_server'),
       keyring.getCredential('caldav_username'),
       keyring.getCredential('gitea_instance'),
+      crypto.hasCustomKey(),
     ]);
 
     if (server) setCaldavServer(server);
     if (username) setCaldavUsername(username);
     if (instance) setGiteaInstance(instance);
     if (state.giteaRepositories.length > 0) setGiteaRepos(state.giteaRepositories.join('\n'));
+    setIsCustomKey(customKey);
   }
 
   async function loadNotificationSettings() {
@@ -217,6 +225,47 @@ export default function SettingsScreen() {
     }
   }
 
+  async function reEncryptCache(rotateKey: () => Promise<void>) {
+    setSecurityBusy(true);
+    try {
+      const [events, notes, issues] = await Promise.all([
+        cache.loadEvents(),
+        cache.loadNotes(),
+        cache.loadIssues(),
+      ]);
+
+      await rotateKey();
+
+      await Promise.all([
+        events ? cache.saveEvents(events) : Promise.resolve(),
+        notes ? cache.saveNotes(notes) : Promise.resolve(),
+        issues ? cache.saveIssues(issues) : Promise.resolve(),
+      ]);
+    } catch {
+      await cache.clearCache();
+      showAlert('Encryption', 'Re-encryption failed. Cached data has been cleared and will be re-fetched on next sync.');
+    } finally {
+      setSecurityBusy(false);
+    }
+  }
+
+  async function handleSetCustomPassphrase() {
+    if (passphrase.length < 8) {
+      showAlert('Error', 'Passphrase must be at least 8 characters');
+      return;
+    }
+    await reEncryptCache(() => crypto.setCustomKey(passphrase));
+    setIsCustomKey(true);
+    setPassphrase('');
+    showAlert('Security', 'Custom passphrase set. Cache re-encrypted.');
+  }
+
+  async function handleResetToRandomKey() {
+    await reEncryptCache(() => crypto.resetToRandomKey());
+    setIsCustomKey(false);
+    showAlert('Security', 'Switched to random encryption key. Cache re-encrypted.');
+  }
+
   async function clearAllSettings() {
     await keyring.clearAllCredentials();
     setCaldavServer('');
@@ -291,6 +340,45 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      {/* Security */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Security</Text>
+        <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 12 }]}>
+          Cache encryption is active ({isCustomKey ? 'custom passphrase' : 'random key'})
+        </Text>
+
+        <Text style={[styles.label, { color: c.text }]}>Set Custom Passphrase</Text>
+        <TextInput
+          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+          value={passphrase}
+          onChangeText={setPassphrase}
+          placeholder="Min 8 characters"
+          placeholderTextColor={c.textTertiary}
+          secureTextEntry
+          autoCapitalize="none"
+          editable={!securityBusy}
+        />
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: c.primary, opacity: securityBusy ? 0.5 : 1 }]}
+          onPress={handleSetCustomPassphrase}
+          disabled={securityBusy}
+        >
+          <Text style={styles.buttonText}>
+            {securityBusy ? 'Re-encrypting...' : 'Set Custom Passphrase'}
+          </Text>
+        </TouchableOpacity>
+
+        {isCustomKey && (
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton, { backgroundColor: c.filterChip, opacity: securityBusy ? 0.5 : 1 }]}
+            onPress={handleResetToRandomKey}
+            disabled={securityBusy}
+          >
+            <Text style={[styles.buttonText, { color: c.text }]}>Reset to Random Key</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Notifications */}
