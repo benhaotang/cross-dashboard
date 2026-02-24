@@ -8,7 +8,8 @@
     "macos": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "electron:build": "expo export --platform web && electron-builder"
+    "electron:build": "expo export --platform web && electron-builder",
+    "electron:build:mac": "expo export --platform web && electron-builder --mac"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",
