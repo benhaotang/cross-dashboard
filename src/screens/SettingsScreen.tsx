@@ -1354,7 +1354,7 @@ export default function SettingsScreen() {
       <View style={[styles.section, { backgroundColor: c.surface }]}>
         <Text style={[styles.sectionTitle, { color: c.text }]}>About</Text>
 
-        <Text style={[styles.aboutVersion, { color: c.text }]}>Cross-Dashboard v1.5.0</Text>
+        <Text style={[styles.aboutVersion, { color: c.text }]}>Cross-Dashboard v1.5.1</Text>
 
         <TouchableOpacity
           style={styles.aboutLink}
