@@ -13,6 +13,8 @@ export type CredentialKey =
   | 'caldav_default_task_calendar'
   | 'gitea_token'
   | 'gitea_instance'
+  | 'gitea_repositories'
+  | 'nextcloud_server'
   | 'notif_enabled'
   | 'notif_minutes'
   | 'up_endpoint'
@@ -74,6 +76,8 @@ export async function clearAllCredentials(): Promise<void> {
     'caldav_default_task_calendar',
     'gitea_token',
     'gitea_instance',
+    'gitea_repositories',
+    'nextcloud_server',
   ];
   
   await Promise.all(keys.map(key => deleteCredential(key)));

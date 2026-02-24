@@ -4,6 +4,7 @@ import { ThemePreference } from '../theme';
 import * as cache from '../services/cache';
 import { ScreenName, ALL_SCREENS } from '../services/cache';
 import * as crypto from '../services/crypto';
+import * as keyring from '../services/keyring';
 
 interface AppState {
   events: CalendarEvent[];
@@ -111,15 +112,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async function init() {
       await crypto.initEncryptionKey();
 
-      const [themeRaw, savedScreens] = await Promise.all([
+      const [themeRaw, savedScreens, caldavServer, caldavUsername, caldavPassword,
+        giteaInstance, giteaToken, savedCalendars, savedGiteaRepos] = await Promise.all([
         cache.loadThemePreference(),
         cache.loadVisibleScreens(),
+        keyring.getCredential('caldav_server'),
+        keyring.getCredential('caldav_username'),
+        keyring.getCredential('caldav_password'),
+        keyring.getCredential('gitea_instance'),
+        keyring.getCredential('gitea_token'),
+        keyring.getCredential('caldav_selected_calendars'),
+        keyring.getCredential('gitea_repositories'),
       ]);
       if (themeRaw === 'light' || themeRaw === 'dark' || themeRaw === 'system') {
         dispatch({ type: 'SET_THEME', payload: themeRaw });
       }
       if (savedScreens) {
         dispatch({ type: 'SET_VISIBLE_SCREENS', payload: savedScreens });
+      }
+
+      // Restore CalDAV configured state
+      if (caldavServer && caldavUsername && caldavPassword) {
+        dispatch({ type: 'SET_CALDAV_CONFIGURED', payload: true });
+      }
+
+      // Restore selected calendars
+      if (savedCalendars) {
+        try {
+          const cals: CalDavCalendar[] = JSON.parse(savedCalendars);
+          dispatch({ type: 'SET_SELECTED_CALENDARS', payload: cals });
+        } catch { /* ignore parse errors */ }
+      }
+
+      // Restore Gitea configured state and repositories
+      if (giteaInstance && giteaToken) {
+        dispatch({ type: 'SET_GITEA_CONFIGURED', payload: true });
+      }
+      if (savedGiteaRepos) {
+        try {
+          const repos: string[] = JSON.parse(savedGiteaRepos);
+          dispatch({ type: 'SET_GITEA_REPOSITORIES', payload: repos });
+        } catch { /* ignore parse errors */ }
       }
 
       try {

@@ -153,21 +153,36 @@ export default function SettingsScreen() {
   }, []);
 
   async function loadSettings() {
-    const [server, username, instance, customKey, savedAuthMethod, savedCalendars, savedDefEvent, savedDefTask] = await Promise.all([
+    const [server, username, password, instance, giteaTokenSaved, customKey, savedAuthMethod,
+      savedCalendars, savedDefEvent, savedDefTask, savedNcServer, savedGiteaRepos] = await Promise.all([
       keyring.getCredential('caldav_server'),
       keyring.getCredential('caldav_username'),
+      keyring.getCredential('caldav_password'),
       keyring.getCredential('gitea_instance'),
+      keyring.getCredential('gitea_token'),
       crypto.hasCustomKey(),
       keyring.getCredential('caldav_auth_method'),
       keyring.getCredential('caldav_selected_calendars'),
       keyring.getCredential('caldav_default_event_calendar'),
       keyring.getCredential('caldav_default_task_calendar'),
+      keyring.getCredential('nextcloud_server'),
+      keyring.getCredential('gitea_repositories'),
     ]);
 
     if (server) setCaldavServer(server);
     if (username) setCaldavUsername(username);
+    if (password) setCaldavPassword(password);
     if (instance) setGiteaInstance(instance);
-    if (state.giteaRepositories.length > 0) setGiteaRepos(state.giteaRepositories.join('\n'));
+    if (giteaTokenSaved) setGiteaToken(giteaTokenSaved);
+    if (savedNcServer) setNcServer(savedNcServer);
+    if (savedGiteaRepos) {
+      try {
+        const repos: string[] = JSON.parse(savedGiteaRepos);
+        setGiteaRepos(repos.join('\n'));
+      } catch { /* ignore parse errors */ }
+    } else if (state.giteaRepositories.length > 0) {
+      setGiteaRepos(state.giteaRepositories.join('\n'));
+    }
     setIsCustomKey(customKey);
     if (savedAuthMethod === 'nextcloud' || savedAuthMethod === 'manual') {
       setAuthMethod(savedAuthMethod);
@@ -350,6 +365,7 @@ export default function SettingsScreen() {
         keyring.setCredential('caldav_username', creds.loginName),
         keyring.setCredential('caldav_password', creds.appPassword),
         keyring.setCredential('caldav_auth_method', 'nextcloud'),
+        keyring.setCredential('nextcloud_server', ncServer.trim()),
       ]);
 
       setCaldavStatus('testing');
@@ -446,15 +462,16 @@ export default function SettingsScreen() {
       return;
     }
 
-    await Promise.all([
-      keyring.setCredential('gitea_instance', giteaInstance),
-      keyring.setCredential('gitea_token', giteaToken),
-    ]);
-
     const repos = giteaRepos
       .split('\n')
       .map((r) => r.trim())
       .filter((r) => r.includes('/'));
+
+    await Promise.all([
+      keyring.setCredential('gitea_instance', giteaInstance),
+      keyring.setCredential('gitea_token', giteaToken),
+      keyring.setCredential('gitea_repositories', JSON.stringify(repos)),
+    ]);
     setGiteaRepositories(repos);
 
     setGiteaStatus('testing');
