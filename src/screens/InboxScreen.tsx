@@ -18,6 +18,32 @@ import * as cache from '../services/cache';
 import { InboxItem, InboxItemType, GiteaMilestone } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
+// Parse time-estimate tags like #20m, #2h — returns minutes or null
+function parseTimeTag(tag: string): number | null {
+  const match = tag.match(/^(\d+)(m|h)$/i);
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  return match[2].toLowerCase() === 'h' ? value * 60 : value;
+}
+
+function isAllDayEvent(start: Date, end: Date): boolean {
+  const durationMs = end.getTime() - start.getTime();
+  if (durationMs < 24 * 60 * 60 * 1000) return false;
+  return (
+    start.getHours() === 0 && start.getMinutes() === 0 && start.getSeconds() === 0 &&
+    end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0
+  );
+}
+
+function formatTotalTime(minutes: number): string {
+  if (minutes === 0) return '0m';
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 const TYPE_COLORS: Record<InboxItemType, string> = {
   event: '#4CAF50',
   issue: '#2196F3',
@@ -158,6 +184,43 @@ export default function InboxScreen() {
 
     return items.sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [inboxItems, selectedTypes, dateFrom, dateTo]);
+
+  // Total time estimate from filtered items
+  const totalMinutes = useMemo(() => {
+    let total = 0;
+
+    // Build task categories lookup by uid
+    const taskCatMap = new Map<string, string[]>();
+    for (const t of state.tasks) {
+      taskCatMap.set(t.uid, t.categories || []);
+    }
+
+    for (const item of filteredItems) {
+      if (item.type === 'event') {
+        if (item.date && item.endDate) {
+          if (isAllDayEvent(item.date, item.endDate)) continue;
+          const mins = (item.endDate.getTime() - item.date.getTime()) / 60000;
+          if (mins > 0) total += mins;
+        }
+      } else if (item.type === 'task') {
+        const uid = item.id.replace('task-', '');
+        const categories = taskCatMap.get(uid) || [];
+        for (const cat of categories) {
+          const mins = parseTimeTag(cat);
+          if (mins !== null) { total += mins; break; }
+        }
+      } else if (item.type === 'issue') {
+        if (item.labels) {
+          for (const label of item.labels) {
+            const mins = parseTimeTag(label.name);
+            if (mins !== null) { total += mins; break; }
+          }
+        }
+      }
+    }
+
+    return total;
+  }, [filteredItems, state.tasks]);
 
   function toggleType(type: InboxItemType) {
     setSelectedTypes((prev) =>
@@ -327,6 +390,15 @@ export default function InboxScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          ListFooterComponent={
+            filteredItems.length > 0 ? (
+              <View style={[styles.totalTimeContainer, { backgroundColor: c.surface, borderColor: c.border }]}>
+                <AppIcon name={Icons.timer} size={18} color={c.primary} />
+                <Text style={[styles.totalTimeLabel, { color: c.textSecondary }]}>Total estimated time:</Text>
+                <Text style={[styles.totalTimeValue, { color: c.text }]}>{formatTotalTime(totalMinutes)}</Text>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <AppIcon name="mdi:inbox" size={48} color={c.textQuaternary} />
@@ -513,6 +585,23 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 40,
+  },
+  totalTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  totalTimeLabel: {
+    fontSize: 14,
+  },
+  totalTimeValue: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   emptyContainer: {
     alignItems: 'center',

@@ -161,7 +161,7 @@ Property page components:
 | TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots, tap-to-open property page with subtask list, read/edit modes |
 | IssuesScreen | Gitea issues with state filtering, tap-to-open property page with comments, read/edit modes |
 | ViewsScreen | Kanban board + Covey's Four Quadrants (Eisenhower matrix) — tasks and issues grouped by `#tag` (categories/labels), assign modal with mutual exclusivity, configurable kanban columns, syncs tag changes back to CalDAV/Gitea |
-| InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones |
+| InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones; total estimated time calculation from event durations and `#Xm`/`#Xh` time tags on tasks/issues |
 | SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, visible screen toggles, task input defaults, notifications |
 
 ---
@@ -378,6 +378,14 @@ npx expo install --fix
 - [x] New icon: `views` (mdi:view-column)
 - [x] `'Views'` added to `ScreenName` type and `ALL_SCREENS` in `cache.ts`
 - [x] Gitea API extensions: `createRepoLabel()`, `replaceIssueLabels()` in `gitea.ts`
+
+### Completed (continued 10)
+- [x] Inbox total estimated time — shown at the end of the scrollable list after filtering
+- [x] Events: duration calculated from start/end times; all-day events (midnight-to-midnight, >=24h) are excluded
+- [x] Tasks: time estimated from `#Xm` or `#Xh` tags in `categories` (e.g. `#20m` = 20 minutes, `#2h` = 2 hours)
+- [x] Issues: time estimated from `#Xm` or `#Xh` labels (same pattern as tasks)
+- [x] Items without time information are excluded from the total
+- [x] Formatted as "Xh Ym" (e.g. "3h 45m"), updates reactively when filters change
 
 ---
 
