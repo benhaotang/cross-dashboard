@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   DashboardScreen,
@@ -19,6 +19,27 @@ import { useApp } from '../store/AppContext';
 import { ScreenName } from '../services/cache';
 
 const Tab = createBottomTabNavigator();
+
+const linking: LinkingOptions<Record<string, object | undefined>> = {
+  prefixes: ['crossdashboard://'],
+  config: {
+    screens: {
+      Dashboard: 'dashboard',
+      Inbox: 'inbox',
+      Events: 'events',
+      Notes: 'notes',
+      Tasks: {
+        path: 'tasks',
+        parse: {
+          action: (action: string) => action,
+        },
+      },
+      Issues: 'issues',
+      Views: 'views',
+      Settings: 'settings',
+    },
+  },
+};
 
 const tabIcons: Record<string, string> = {
   Dashboard: Icons.dashboard,
@@ -52,7 +73,7 @@ function MobileNavigator() {
   }, [state.visibleScreens]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused }) => (

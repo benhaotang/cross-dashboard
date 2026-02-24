@@ -25,8 +25,9 @@ import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
 import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
-import { DEFAULT_POMODORO, ALL_SCREENS, ScreenName } from '../services/cache';
+import { DEFAULT_POMODORO, DEFAULT_WIDGET_SYNC_INTERVAL, ALL_SCREENS, ScreenName } from '../services/cache';
 import AppIcon, { Icons } from '../components/Icon';
+import * as DashboardWidget from '../../modules/dashboard-widget';
 
 const isElectron = Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 
@@ -106,6 +107,9 @@ export default function SettingsScreen() {
   const [taskNight, setTaskNight] = useState(String(DEFAULT_TASK_DEFAULTS.nightHour));
   const [taskDefault, setTaskDefault] = useState(String(DEFAULT_TASK_DEFAULTS.defaultHour));
 
+  // Widget sync interval (Android only)
+  const [widgetSyncInterval, setWidgetSyncInterval] = useState(String(DEFAULT_WIDGET_SYNC_INTERVAL));
+
   // Pomodoro settings
   const [pomWork, setPomWork] = useState(String(DEFAULT_POMODORO.workMinutes));
   const [pomShortBreak, setPomShortBreak] = useState(String(DEFAULT_POMODORO.shortBreakMinutes));
@@ -124,6 +128,9 @@ export default function SettingsScreen() {
     loadNotificationSettings();
     loadTaskDefaults();
     loadPomodoroDefaults();
+    if (Platform.OS === 'android') {
+      cache.loadWidgetSyncInterval().then((v) => setWidgetSyncInterval(String(v)));
+    }
   }, []);
 
   // Listen for UP endpoint changes
@@ -337,6 +344,7 @@ export default function SettingsScreen() {
       setCaldavConfigured(true);
       showAlert('Success', 'CalDAV connection successful!');
       loadCalendars();
+      updateWidgetWorkerCredentials();
     } else {
       setCaldavStatus('error');
       showAlert('Error', `CalDAV connection failed: ${result.error}`);
@@ -452,6 +460,7 @@ export default function SettingsScreen() {
     await keyring.setCredential('caldav_selected_calendars', JSON.stringify(selected));
     setSelectedCalendars(selected);
     showAlert('Saved', `${selected.length} calendar(s) selected for sync`);
+    updateWidgetWorkerCredentials();
   }
 
   async function setDefaultEventCal(href: string) {
@@ -489,6 +498,7 @@ export default function SettingsScreen() {
       setGiteaStatus('success');
       setGiteaConfigured(true);
       showAlert('Success', 'Gitea connection successful!');
+      updateWidgetWorkerCredentials();
     } else {
       setGiteaStatus('error');
       showAlert('Error', `Gitea connection failed: ${result.error}`);
@@ -534,6 +544,47 @@ export default function SettingsScreen() {
     await reEncryptCache(() => crypto.resetToRandomKey());
     setIsCustomKey(false);
     showAlert('Security', 'Switched to random encryption key. Cache re-encrypted.');
+  }
+
+  async function saveWidgetSyncIntervalHandler() {
+    const minutes = Math.max(15, parseInt(widgetSyncInterval, 10) || DEFAULT_WIDGET_SYNC_INTERVAL);
+    setWidgetSyncInterval(String(minutes));
+    await cache.saveWidgetSyncInterval(minutes);
+    if (DashboardWidget.isAvailable()) {
+      DashboardWidget.scheduleSync(minutes);
+    }
+    showAlert('Saved', `Widget syncs every ${minutes} minutes`);
+  }
+
+  async function updateWidgetWorkerCredentials() {
+    if (!DashboardWidget.isAvailable()) return;
+    const [server, user, pass, giteaInst, token, repos] = await Promise.all([
+      keyring.getCredential('caldav_server'),
+      keyring.getCredential('caldav_username'),
+      keyring.getCredential('caldav_password'),
+      keyring.getCredential('gitea_instance'),
+      keyring.getCredential('gitea_token'),
+      keyring.getCredential('gitea_repositories'),
+    ]);
+    const selectedCalsRaw = await keyring.getCredential('caldav_selected_calendars');
+    let calHrefs = '';
+    if (selectedCalsRaw) {
+      try {
+        const cals = JSON.parse(selectedCalsRaw) as { href: string }[];
+        calHrefs = cals.map((c) => c.href).join('|');
+      } catch { /* ignore */ }
+    }
+    let repoList = '';
+    if (repos) {
+      try {
+        const parsed = JSON.parse(repos) as string[];
+        repoList = parsed.join('|');
+      } catch { /* ignore */ }
+    }
+    DashboardWidget.saveWorkerCredentials(
+      server ?? '', user ?? '', pass ?? '', calHrefs,
+      giteaInst ?? '', token ?? '', repoList
+    );
   }
 
   async function clearAllSettings() {
@@ -940,6 +991,30 @@ export default function SettingsScreen() {
               )}
             </>
           )}
+        </View>
+      )}
+
+      {/* Android Widget */}
+      {Platform.OS === 'android' && DashboardWidget.isAvailable() && (
+        <View style={[styles.section, { backgroundColor: c.surface }]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Home Screen Widget</Text>
+          <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 12 }]}>
+            Background sync interval for the Android home screen widget. Minimum 15 minutes.
+          </Text>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Sync interval (min)</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={widgetSyncInterval}
+              onChangeText={setWidgetSyncInterval}
+              keyboardType="numeric"
+              placeholder="60"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveWidgetSyncIntervalHandler}>
+            <Text style={styles.buttonText}>Save &amp; Apply</Text>
+          </TouchableOpacity>
         </View>
       )}
 

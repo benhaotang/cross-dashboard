@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useSyncAll } from '../hooks/useSyncAll';
@@ -128,10 +129,14 @@ function useCalendarColorMap(calendars: CalDavCalendar[]): Map<string, string> {
   }, [calendars]);
 }
 
+type TasksRouteParams = { action?: string };
+
 export default function TasksScreen() {
   const { state, setTasks } = useApp();
   const theme = useTheme();
   const { syncAll } = useSyncAll();
+  const route = useRoute<RouteProp<Record<string, TasksRouteParams>, string>>();
+  const quickInputRef = useRef<TextInput>(null);
   const calColorMap = useCalendarColorMap(state.selectedCalendars);
   const [modalVisible, setModalVisible] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -160,6 +165,14 @@ export default function TasksScreen() {
       syncTasks();
     }
   }, [state.caldavConfigured]);
+
+  // Focus quick input when navigated here via deep link with action=add
+  useEffect(() => {
+    if (route.params?.action === 'add') {
+      const timer = setTimeout(() => quickInputRef.current?.focus(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [route.params?.action]);
 
   async function loadDefaults() {
     const [saved, defCal] = await Promise.all([
@@ -493,6 +506,7 @@ export default function TasksScreen() {
       <View style={[styles.quickInputContainer, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
         <View style={styles.quickInputRow}>
           <TextInput
+            ref={quickInputRef}
             style={[styles.quickInputField, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
             value={quickInput}
             onChangeText={setQuickInput}

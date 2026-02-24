@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { useApp } from '../store/AppContext';
-import { CalDavCalendar } from '../types';
+import { CalDavCalendar, CalendarEvent, GiteaIssue, CalDavTask } from '../types';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
@@ -23,6 +24,9 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
     setLoading(true);
     try {
       const fetches: Promise<void>[] = [];
+      let freshEvents: CalendarEvent[] = state.events;
+      let freshTasks: CalDavTask[] = state.tasks;
+      let freshIssues: GiteaIssue[] = state.issues;
 
       if (state.caldavConfigured) {
         const hrefs = (type: string) => {
@@ -35,6 +39,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
         fetches.push(
           caldav.fetchEvents(hrefs('VEVENT')).then(async (events) => {
             if (events.length > 0 || state.events.length > 0) {
+              freshEvents = events;
               setEvents(events);
               await cache.saveEvents(events);
             }
@@ -43,6 +48,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
         fetches.push(
           caldav.fetchTasks(hrefs('VTODO')).then(async (tasks) => {
             if (tasks.length > 0 || state.tasks.length > 0) {
+              freshTasks = tasks;
               setTasks(tasks);
               await cache.saveTasks(tasks);
             }
@@ -62,6 +68,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
         fetches.push(
           gitea.fetchAllIssues(state.giteaRepositories).then(async (issues) => {
             if (issues.length > 0 || state.issues.length > 0) {
+              freshIssues = issues;
               setIssues(issues);
               await cache.saveIssues(issues);
             }
@@ -75,25 +82,45 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
 
       // Reschedule event reminders
       const notifSettings = await notifications.getNotificationSettings();
-      if (notifSettings.enabled && state.events.length > 0) {
-        await notifications.scheduleEventReminders(state.events, notifSettings.minutesBefore);
+      if (notifSettings.enabled && freshEvents.length > 0) {
+        await notifications.scheduleEventReminders(freshEvents, notifSettings.minutesBefore);
       }
 
-      // Update home screen widget
-      if (DashboardWidget.isAvailable()) {
-        const upcomingCount = state.events.filter((e) => e.start >= now).length;
-        const openCount = state.issues.filter((i) => i.state === 'open').length;
-        const nextEvt = state.events
+      // Update home screen widget (Android only) — use fresh data from fetches
+      if (Platform.OS === 'android' && DashboardWidget.isAvailable()) {
+        const upcoming = freshEvents
           .filter((e) => e.start >= now)
-          .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
-        const nextEventText = nextEvt
-          ? `${nextEvt.summary} - ${nextEvt.start.toLocaleDateString()} ${nextEvt.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : 'No upcoming events';
+          .sort((a, b) => a.start.getTime() - b.start.getTime())
+          .slice(0, 3);
+
+        const eventRows = upcoming.map((e) => {
+          const time = e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const date = e.start.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
+          return `${date} ${time} ${e.summary}`;
+        });
+
+        const pendingTasks = freshTasks
+          .filter((t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+          .sort((a, b) => {
+            const aDate = a.due?.getTime() ?? Infinity;
+            const bDate = b.due?.getTime() ?? Infinity;
+            return aDate - bDate;
+          })
+          .slice(0, 3);
+        const taskRows = pendingTasks.map((t) => {
+          const isOverdue = t.due && t.due < now;
+          const prefix = isOverdue ? '⚠ ' : '• ';
+          return `${prefix}${t.summary}`;
+        });
+
+        const openIssues = freshIssues.filter((i) => i.state === 'open');
+        const syncLabel = `Synced ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
         DashboardWidget.updateWidgetData(
-          upcomingCount,
-          openCount,
-          nextEventText,
-          `Synced ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          eventRows.join('|'),
+          taskRows.join('|'),
+          openIssues.length,
+          syncLabel
         );
       }
     } catch (error) {

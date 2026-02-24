@@ -14,6 +14,9 @@ const CACHE_POMODORO = '@cache/pomodoro_settings';
 const CACHE_VISIBLE_SCREENS = '@cache/visible_screens';
 const CACHE_KANBAN_COLUMNS = '@cache/kanban_columns';
 const CACHE_DAILY_STATS = '@cache/daily_stats';
+const CACHE_WIDGET_SYNC_INTERVAL = '@cache/widget_sync_interval';
+
+export const DEFAULT_WIDGET_SYNC_INTERVAL = 60; // minutes
 
 export type ScreenName = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Views';
 
@@ -226,6 +229,15 @@ export async function loadKanbanColumns(): Promise<string[] | null> {
   const data = await AsyncStorage.getItem(CACHE_KANBAN_COLUMNS);
   if (!data) return null;
   return JSON.parse(data) as string[];
+}
+
+export async function saveWidgetSyncInterval(minutes: number): Promise<void> {
+  await AsyncStorage.setItem(CACHE_WIDGET_SYNC_INTERVAL, String(minutes));
+}
+
+export async function loadWidgetSyncInterval(): Promise<number> {
+  const data = await AsyncStorage.getItem(CACHE_WIDGET_SYNC_INTERVAL);
+  return data ? (parseInt(data, 10) || DEFAULT_WIDGET_SYNC_INTERVAL) : DEFAULT_WIDGET_SYNC_INTERVAL;
 }
 
 export async function clearCache(): Promise<void> {

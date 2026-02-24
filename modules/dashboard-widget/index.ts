@@ -2,7 +2,18 @@ import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 
 interface WidgetNativeModule {
-  updateWidgetData(eventsCount: number, issuesCount: number, nextEvent: string, lastSync: string): boolean;
+  updateWidgetData(eventRowsStr: string, taskRowsStr: string, issuesCount: number, lastSync: string): boolean;
+  saveWorkerCredentials(
+    caldavServer: string,
+    caldavUser: string,
+    caldavPass: string,
+    calendarHrefs: string,
+    giteaUrl: string,
+    giteaToken: string,
+    giteaRepos: string
+  ): boolean;
+  scheduleSync(intervalMinutes: number): boolean;
+  cancelSync(): boolean;
   forceRefresh(): boolean;
 }
 
@@ -20,13 +31,38 @@ export function isAvailable(): boolean {
 }
 
 export function updateWidgetData(
-  eventsCount: number,
+  eventRowsStr: string,
+  taskRowsStr: string,
   issuesCount: number,
-  nextEvent: string,
   lastSync: string
 ): boolean {
   if (!nativeModule) return false;
-  return nativeModule.updateWidgetData(eventsCount, issuesCount, nextEvent, lastSync);
+  return nativeModule.updateWidgetData(eventRowsStr, taskRowsStr, issuesCount, lastSync);
+}
+
+export function saveWorkerCredentials(
+  caldavServer: string,
+  caldavUser: string,
+  caldavPass: string,
+  calendarHrefs: string,
+  giteaUrl: string,
+  giteaToken: string,
+  giteaRepos: string
+): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.saveWorkerCredentials(
+    caldavServer, caldavUser, caldavPass, calendarHrefs, giteaUrl, giteaToken, giteaRepos
+  );
+}
+
+export function scheduleSync(intervalMinutes: number): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.scheduleSync(intervalMinutes);
+}
+
+export function cancelSync(): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.cancelSync();
 }
 
 export function forceRefresh(): boolean {
