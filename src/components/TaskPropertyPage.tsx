@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from './Icon';
+import PomodoroTimer from './PomodoroTimer';
 import {
   PropertyPageModal,
   PropertyPageHeader,
@@ -80,6 +81,7 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
   const theme = useTheme();
   const c = theme.colors;
   const [editing, setEditing] = useState(false);
+  const [pomodoroOpen, setPomodoroOpen] = useState(false);
 
   // Form state
   const [formSummary, setFormSummary] = useState(task.summary);
@@ -111,6 +113,26 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
 
   const cal = resolveCalendar(task.calendarHref, calendars);
   const isOverdue = task.due && task.due < new Date() && task.status !== 'COMPLETED';
+
+  const handlePomodoroSession = useCallback((sessionNumber: number, totalMinutes: number) => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').slice(0, 16);
+    const sessionLog = `[Pomodoro] Session #${sessionNumber} completed (${totalMinutes}min) - ${timestamp}`;
+    const totalLog = `[Pomodoro] Total: ${sessionNumber} session${sessionNumber !== 1 ? 's' : ''}, ${sessionNumber * totalMinutes}min`;
+
+    const existingDesc = task.description || '';
+    // Remove previous total line if present
+    const lines = existingDesc.split('\n').filter((l) => !l.startsWith('[Pomodoro] Total:'));
+    lines.push(sessionLog);
+    lines.push(totalLog);
+    const newDesc = lines.filter(Boolean).join('\n');
+
+    onSave({
+      ...task,
+      description: newDesc,
+      lastModified: now,
+    });
+  }, [task, onSave]);
 
   function handleSave() {
     if (!formSummary.trim()) return;
@@ -294,7 +316,7 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
           <>
             <Text style={[styles.summary, { color: c.text }]}>{task.summary}</Text>
 
-            {/* Status badge + calendar */}
+            {/* Status badge + calendar + pomodoro */}
             <View style={styles.badgeRow}>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) }]}>
                 <Text style={styles.statusBadgeText}>{getStatusLabel(task.status)}</Text>
@@ -305,6 +327,9 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
                   <Text style={[styles.calName, { color: c.textSecondary }]}>{cal.displayName}</Text>
                 </View>
               )}
+              <TouchableOpacity onPress={() => setPomodoroOpen(true)} style={styles.pomodoroButton}>
+                <AppIcon name={Icons.play} size={22} color={c.primary} />
+              </TouchableOpacity>
             </View>
 
             {/* Priority */}
@@ -425,6 +450,12 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
           </>
         )}
       </ScrollView>
+      <PomodoroTimer
+        visible={pomodoroOpen}
+        onClose={() => setPomodoroOpen(false)}
+        itemTitle={task.summary}
+        onSessionComplete={handlePomodoroSession}
+      />
     </PropertyPageModal>
   );
 }
@@ -433,7 +464,8 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   bodyContent: { paddingBottom: 40 },
   summary: { fontSize: 22, fontWeight: '700', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingBottom: 12 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingBottom: 12, flexWrap: 'wrap' },
+  pomodoroButton: { marginLeft: 'auto', padding: 4 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusBadgeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   calChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },

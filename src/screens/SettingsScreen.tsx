@@ -23,6 +23,7 @@ import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
 import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
+import { DEFAULT_POMODORO } from '../services/cache';
 
 type AuthMethod = 'manual' | 'nextcloud';
 
@@ -74,6 +75,12 @@ export default function SettingsScreen() {
   const [taskNight, setTaskNight] = useState(String(DEFAULT_TASK_DEFAULTS.nightHour));
   const [taskDefault, setTaskDefault] = useState(String(DEFAULT_TASK_DEFAULTS.defaultHour));
 
+  // Pomodoro settings
+  const [pomWork, setPomWork] = useState(String(DEFAULT_POMODORO.workMinutes));
+  const [pomShortBreak, setPomShortBreak] = useState(String(DEFAULT_POMODORO.shortBreakMinutes));
+  const [pomLongBreak, setPomLongBreak] = useState(String(DEFAULT_POMODORO.longBreakMinutes));
+  const [pomSessions, setPomSessions] = useState(String(DEFAULT_POMODORO.sessionsUntilLongBreak));
+
   // Status
   const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
   const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
@@ -82,6 +89,7 @@ export default function SettingsScreen() {
     loadSettings();
     loadNotificationSettings();
     loadTaskDefaults();
+    loadPomodoroDefaults();
   }, []);
 
   // Listen for UP endpoint changes
@@ -182,6 +190,27 @@ export default function SettingsScreen() {
     };
     await cache.saveTaskDefaults(defaults);
     showAlert('Saved', 'Task input defaults updated');
+  }
+
+  async function loadPomodoroDefaults() {
+    const saved = await cache.loadPomodoroSettings();
+    if (saved) {
+      setPomWork(String(saved.workMinutes));
+      setPomShortBreak(String(saved.shortBreakMinutes));
+      setPomLongBreak(String(saved.longBreakMinutes));
+      setPomSessions(String(saved.sessionsUntilLongBreak));
+    }
+  }
+
+  async function savePomodoroHandler() {
+    const settings = {
+      workMinutes: Math.max(1, Math.min(120, parseInt(pomWork, 10) || DEFAULT_POMODORO.workMinutes)),
+      shortBreakMinutes: Math.max(1, Math.min(60, parseInt(pomShortBreak, 10) || DEFAULT_POMODORO.shortBreakMinutes)),
+      longBreakMinutes: Math.max(1, Math.min(60, parseInt(pomLongBreak, 10) || DEFAULT_POMODORO.longBreakMinutes)),
+      sessionsUntilLongBreak: Math.max(1, Math.min(12, parseInt(pomSessions, 10) || DEFAULT_POMODORO.sessionsUntilLongBreak)),
+    };
+    await cache.savePomodoroSettings(settings);
+    showAlert('Saved', 'Pomodoro settings updated');
   }
 
   async function toggleNotifications() {
@@ -589,6 +618,65 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveTaskDefaultsHandler}>
           <Text style={styles.buttonText}>Save Defaults</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Pomodoro Timer */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Pomodoro Timer</Text>
+        <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 12 }]}>
+          Configure work and break durations for the Pomodoro timer
+        </Text>
+
+        <View style={styles.taskDefaultsGrid}>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Work (min)</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={pomWork}
+              onChangeText={setPomWork}
+              keyboardType="numeric"
+              placeholder="25"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Short break (min)</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={pomShortBreak}
+              onChangeText={setPomShortBreak}
+              keyboardType="numeric"
+              placeholder="5"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Long break (min)</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={pomLongBreak}
+              onChangeText={setPomLongBreak}
+              keyboardType="numeric"
+              placeholder="15"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Sessions until long break</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={pomSessions}
+              onChangeText={setPomSessions}
+              keyboardType="numeric"
+              placeholder="4"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={savePomodoroHandler}>
+          <Text style={styles.buttonText}>Save Pomodoro Settings</Text>
         </TouchableOpacity>
       </View>
 

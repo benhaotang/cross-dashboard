@@ -59,4 +59,8 @@ export const Icons = {
   priority: 'mdi:alert-circle',
   pencil: 'mdi:pencil',
   comment: 'mdi:comment-text-outline',
+  play: 'mdi:play-circle-outline',
+  pause: 'mdi:pause-circle-outline',
+  stop: 'mdi:stop-circle-outline',
+  timer: 'mdi:timer-outline',
 };

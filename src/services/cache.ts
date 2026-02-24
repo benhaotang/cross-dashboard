@@ -10,6 +10,21 @@ const CACHE_TASKS = '@cache/tasks';
 const CACHE_LAST_SYNC = '@cache/last_sync';
 const CACHE_THEME = '@cache/theme';
 const CACHE_TASK_DEFAULTS = '@cache/task_defaults';
+const CACHE_POMODORO = '@cache/pomodoro_settings';
+
+export interface PomodoroSettings {
+  workMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  sessionsUntilLongBreak: number;
+}
+
+export const DEFAULT_POMODORO: PomodoroSettings = {
+  workMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  sessionsUntilLongBreak: 4,
+};
 
 function reviveEventDates(raw: unknown): CalendarEvent {
   const e = raw as Record<string, unknown>;
@@ -121,6 +136,16 @@ export async function loadTaskDefaults(): Promise<TaskDefaults | null> {
   const data = await AsyncStorage.getItem(CACHE_TASK_DEFAULTS);
   if (!data) return null;
   return JSON.parse(data) as TaskDefaults;
+}
+
+export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
+  await AsyncStorage.setItem(CACHE_POMODORO, JSON.stringify(settings));
+}
+
+export async function loadPomodoroSettings(): Promise<PomodoroSettings | null> {
+  const data = await AsyncStorage.getItem(CACHE_POMODORO);
+  if (!data) return null;
+  return JSON.parse(data) as PomodoroSettings;
 }
 
 export async function clearCache(): Promise<void> {

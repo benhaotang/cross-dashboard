@@ -14,6 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { GiteaIssue, GiteaComment } from '../types';
 import * as gitea from '../services/gitea';
 import AppIcon, { Icons } from './Icon';
+import PomodoroTimer from './PomodoroTimer';
 import {
   PropertyPageModal,
   PropertyPageHeader,
@@ -33,6 +34,7 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
   const theme = useTheme();
   const c = theme.colors;
   const [editing, setEditing] = useState(false);
+  const [pomodoroOpen, setPomodoroOpen] = useState(false);
 
   // Form state
   const [formTitle, setFormTitle] = useState(issue.title);
@@ -147,7 +149,7 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
           <>
             <Text style={[styles.title, { color: c.text }]}>{issue.title}</Text>
 
-            {/* State badge + repo */}
+            {/* State badge + repo + pomodoro */}
             <View style={styles.badgeRow}>
               <View style={[styles.stateBadge, issue.state === 'open' ? styles.stateOpen : styles.stateClosed]}>
                 <Text style={styles.stateBadgeText}>{issue.state}</Text>
@@ -155,6 +157,9 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
               <Text style={[styles.repoName, { color: c.textSecondary }]}>
                 {issue.repository} #{issue.number}
               </Text>
+              <TouchableOpacity onPress={() => setPomodoroOpen(true)} style={styles.pomodoroButton}>
+                <AppIcon name={Icons.play} size={22} color={c.primary} />
+              </TouchableOpacity>
             </View>
 
             {/* Labels */}
@@ -256,6 +261,11 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
           </>
         )}
       </ScrollView>
+      <PomodoroTimer
+        visible={pomodoroOpen}
+        onClose={() => setPomodoroOpen(false)}
+        itemTitle={issue.title}
+      />
     </PropertyPageModal>
   );
 }
@@ -264,7 +274,8 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   bodyContent: { paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: '700', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingBottom: 12 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingBottom: 12, flexWrap: 'wrap' },
+  pomodoroButton: { marginLeft: 'auto', padding: 4 },
   stateBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   stateOpen: { backgroundColor: '#4CAF50' },
   stateClosed: { backgroundColor: '#9E9E9E' },

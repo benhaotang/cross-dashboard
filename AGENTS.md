@@ -119,6 +119,10 @@ cross-dashboard/
   Icons.delete       // mdi:delete
   Icons.pencil       // mdi:pencil
   Icons.comment      // mdi:comment-text-outline
+  Icons.play         // mdi:play-circle-outline
+  Icons.pause        // mdi:pause-circle-outline
+  Icons.stop         // mdi:stop-circle-outline
+  Icons.timer        // mdi:timer-outline
   ```
 
 ### Property Pages (`src/components/*PropertyPage.tsx`)
@@ -339,6 +343,14 @@ npx expo install --fix
 - [x] Gitea API extensions: `fetchComments`, `addComment`, `updateIssue` in `gitea.ts`
 - [x] `GiteaComment` type added to `src/types/index.ts`
 - [x] New icons: `pencil` (mdi:pencil), `comment` (mdi:comment-text-outline)
+
+### Completed (continued 7)
+- [x] Pomodoro timer (`src/components/PomodoroTimer.tsx`) — modal overlay with countdown, session tracking, work/short break/long break phases
+- [x] Pomodoro settings in `cache.ts` (`PomodoroSettings` interface, `savePomodoroSettings`/`loadPomodoroSettings`, defaults: 25min work, 5min short break, 15min long break, 4 sessions)
+- [x] Pomodoro settings UI in SettingsScreen — configurable work/break durations and sessions until long break
+- [x] Play button on TaskPropertyPage — starts Pomodoro timer, logs completed sessions to task description field (persisted via CalDAV)
+- [x] Play button on IssuePropertyPage — starts Pomodoro timer (no session logging for issues)
+- [x] New icons: `play`, `pause`, `stop`, `timer`
 
 ---
 
