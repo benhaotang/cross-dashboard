@@ -41,9 +41,7 @@ jobs:
         run: pnpm exec expo export --platform web
 
       - name: Build AppImage (${{ matrix.arch }})
-        run: pnpm exec electron-builder --linux AppImage --${{ matrix.electron_arch }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec electron-builder --linux AppImage --${{ matrix.electron_arch }} --publish never
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
