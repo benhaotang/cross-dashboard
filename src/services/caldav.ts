@@ -110,27 +110,29 @@ export async function fetchCalendars(): Promise<CalDavCalendar[]> {
 function parseCalendarList(xmlText: string): CalDavCalendar[] {
   const calendars: CalDavCalendar[] = [];
 
-  // Split into individual responses
-  const responseBlocks = xmlText.split(/<d:response>/gi).slice(1);
+  // Split into individual responses — handle any namespace prefix (d:, D:, etc.)
+  const responseBlocks = xmlText.split(/<(?:\w+:)?response>/gi).slice(1);
 
   for (const block of responseBlocks) {
-    // Must be a calendar collection (has both <d:collection/> and <c:calendar/>)
-    const hasCollection = /<d:collection\s*\/?>|<d:collection>/i.test(block);
-    const hasCalendar = /<c:calendar\s*\/?>|<c:calendar>/i.test(block);
+    // Must be a calendar collection (has both <X:collection/> and <X:calendar/>)
+    // Use prefix-agnostic regex: namespace prefix can be any word chars followed by colon
+    const hasCollection = /<(?:\w+:)?collection[\s/>]/i.test(block);
+    const hasCalendar = /<(?:\w+:)?calendar[\s/>]/i.test(block);
     if (!hasCollection || !hasCalendar) continue;
 
     // Extract href
-    const hrefMatch = block.match(/<d:href>([^<]+)<\/d:href>/i);
+    const hrefMatch = block.match(/<(?:\w+:)?href>([^<]+)<\/(?:\w+:)?href>/i);
     if (!hrefMatch) continue;
     const href = hrefMatch[1];
 
     // Extract display name
-    const nameMatch = block.match(/<d:displayname>([^<]+)<\/d:displayname>/i);
+    const nameMatch = block.match(/<(?:\w+:)?displayname>([^<]+)<\/(?:\w+:)?displayname>/i);
     const displayName = nameMatch ? nameMatch[1] : href.split('/').filter(Boolean).pop() || 'Unknown';
 
     // Extract color (strip alpha from #RRGGBBAA → #RRGGBB)
+    // Server may use any prefix for apple namespace (apple:, x1:, x2:, etc.)
     let color: string | undefined;
-    const colorMatch = block.match(/<apple:calendar-color>([^<]+)<\/apple:calendar-color>/i);
+    const colorMatch = block.match(/<(?:\w+:)?calendar-color>([^<]+)<\/(?:\w+:)?calendar-color>/i);
     if (colorMatch) {
       let c = colorMatch[1].trim();
       if (c.length === 9 && c.startsWith('#')) {
@@ -141,12 +143,12 @@ function parseCalendarList(xmlText: string): CalDavCalendar[] {
 
     // Extract ctag
     let ctag: string | undefined;
-    const ctagMatch = block.match(/<cs:getctag>([^<]+)<\/cs:getctag>/i);
+    const ctagMatch = block.match(/<(?:\w+:)?getctag>([^<]+)<\/(?:\w+:)?getctag>/i);
     if (ctagMatch) ctag = ctagMatch[1];
 
     // Extract supported components
     const components: string[] = [];
-    const compMatches = block.matchAll(/<c:comp\s+name="([^"]+)"/gi);
+    const compMatches = block.matchAll(/<(?:\w+:)?comp\s+name="([^"]+)"/gi);
     for (const cm of compMatches) {
       components.push(cm[1].toUpperCase());
     }
@@ -231,7 +233,7 @@ function formatICalDate(date: Date): string {
 
 function parseICalEvents(xmlText: string): CalendarEvent[] {
   const events: CalendarEvent[] = [];
-  const calDataMatches = xmlText.matchAll(/<c:calendar-data[^>]*>([^<]+)<\/c:calendar-data>/gi);
+  const calDataMatches = xmlText.matchAll(/<(?:\w+:)?calendar-data[^>]*>([^<]+)<\/(?:\w+:)?calendar-data>/gi);
 
   for (const match of calDataMatches) {
     const ical = match[1]
@@ -329,7 +331,7 @@ export async function fetchNotes(calendarHrefs?: string[]): Promise<Note[]> {
 
 function parseVJournalEntries(xmlText: string): Note[] {
   const notes: Note[] = [];
-  const calDataMatches = xmlText.matchAll(/<c:calendar-data[^>]*>([^<]+)<\/c:calendar-data>/gi);
+  const calDataMatches = xmlText.matchAll(/<(?:\w+:)?calendar-data[^>]*>([^<]+)<\/(?:\w+:)?calendar-data>/gi);
 
   for (const match of calDataMatches) {
     const ical = match[1]
@@ -508,7 +510,7 @@ export async function fetchTasks(calendarHrefs?: string[]): Promise<CalDavTask[]
 
 function parseVTodoEntries(xmlText: string): CalDavTask[] {
   const tasks: CalDavTask[] = [];
-  const calDataMatches = xmlText.matchAll(/<c:calendar-data[^>]*>([^<]+)<\/c:calendar-data>/gi);
+  const calDataMatches = xmlText.matchAll(/<(?:\w+:)?calendar-data[^>]*>([^<]+)<\/(?:\w+:)?calendar-data>/gi);
 
   for (const match of calDataMatches) {
     const ical = match[1]
