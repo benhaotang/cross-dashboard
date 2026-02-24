@@ -3,12 +3,15 @@ import { Platform } from 'react-native';
 
 const KEYRING_PREFIX = 'cross_dashboard_';
 
-export type CredentialKey = 
+export type CredentialKey =
   | 'caldav_password'
   | 'caldav_server'
   | 'caldav_username'
   | 'gitea_token'
-  | 'gitea_instance';
+  | 'gitea_instance'
+  | 'notif_enabled'
+  | 'notif_minutes'
+  | 'up_endpoint';
 
 function getFullKey(key: CredentialKey): string {
   return `${KEYRING_PREFIX}${key}`;

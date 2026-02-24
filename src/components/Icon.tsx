@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 
 interface IconProps {
   name: string;
@@ -7,26 +7,20 @@ interface IconProps {
   color?: string;
 }
 
+function toMciName(mdiName: string): string {
+  return mdiName.replace(/^mdi:/, '');
+}
+
 // Web implementation using Iconify
 function WebIcon({ name, size = 24, color = '#666' }: IconProps) {
-  // Dynamic import for web only
   const { Icon } = require('@iconify/react');
   return <Icon icon={name} width={size} height={size} color={color} />;
 }
 
-// Native fallback (can be extended with react-native-vector-icons later)
-function NativeIcon({ size = 24, color = '#666' }: IconProps) {
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: color,
-        borderRadius: size / 2,
-        opacity: 0.3,
-      }}
-    />
-  );
+// Native implementation using @expo/vector-icons MaterialCommunityIcons
+function NativeIcon({ name, size = 24, color = '#666' }: IconProps) {
+  const MaterialCommunityIcons = require('@expo/vector-icons/MaterialCommunityIcons').default;
+  return <MaterialCommunityIcons name={toMciName(name)} size={size} color={color} />;
 }
 
 export default function AppIcon(props: IconProps) {

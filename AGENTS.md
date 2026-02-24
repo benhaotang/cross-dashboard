@@ -11,6 +11,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 - Android
 - macOS (via React Native macOS or Expo)
 - Web (via react-native-web)
+- Linux AppImage (amd64 & aarch64, via Electron wrapper)
 
 ### Tech Stack
 - **Framework**: React Native with Expo (SDK 54)
@@ -38,8 +39,11 @@ cross-dashboard/
 │   ├── types/          # TypeScript type definitions (index.ts)
 │   ├── utils/          # Helper utilities
 │   └── store/          # State management (AppContext.tsx)
+├── electron/           # Electron main process (Linux AppImage builds)
+│   └── main.js         # BrowserWindow loading Expo web export
 ├── assets/             # Images, fonts, etc.
 ├── App.tsx             # Root component with providers
+├── electron-builder.yml # Electron-builder config for AppImage packaging
 └── index.ts            # Entry point
 ```
 
@@ -75,7 +79,7 @@ cross-dashboard/
 
 ### Icon System (`src/components/Icon.tsx`)
 - Uses `@iconify/react` for web platform
-- Native fallback for Android/iOS (placeholder, can extend with react-native-vector-icons)
+- Native fallback for Android (placeholder, can extend with react-native-vector-icons)
 - Centralized icon names in `Icons` constant:
   ```typescript
   Icons.dashboard   // mdi:view-dashboard
@@ -90,8 +94,8 @@ cross-dashboard/
 
 ### Navigation (`src/navigation/`)
 - **AppNavigator.tsx**: Platform-aware navigation router
-  - Web/macOS: Uses `SidebarNavigator`
-  - Android/iOS: Uses bottom tab navigation
+  - Web/macOS/Linux: Uses `SidebarNavigator`
+  - Android: Uses bottom tab navigation
 - **SidebarNavigator.tsx**: Sidebar navigation for desktop/web
   - Collapsible at <900px width
   - Shows icons and labels
@@ -119,7 +123,7 @@ cross-dashboard/
 ### React Native
 - Functional components with hooks only
 - Use `StyleSheet.create()` for styles
-- Platform-specific code via `Platform.OS` or `.android.ts` / `.ios.ts` / `.web.ts` extensions
+- Platform-specific code via `Platform.OS` or `.android.ts` / `.web.ts` extensions
 - Keep components focused and composable
 
 ### Naming
@@ -183,11 +187,13 @@ pnpm start
 
 # Platform-specific
 pnpm android    # Android emulator/device
-pnpm ios        # iOS simulator (if on macOS)
 pnpm web        # Web browser (sidebar navigation)
 
 # Type checking
 pnpm typecheck
+
+# Build Linux AppImage (requires electron + electron-builder)
+pnpm electron:build
 
 # Fix Expo SDK compatibility issues
 npx expo install --fix
@@ -208,12 +214,15 @@ npx expo install --fix
 ### Completed (continued)
 - [x] Dark/light mode theming (system/light/dark toggle, persisted via AsyncStorage, all screens themed)
 - [x] Offline caching (AsyncStorage, events/issues/notes cached, loaded on startup, lastSync timestamp)
+- [x] Linux AppImage packaging (Electron wrapper, amd64 + aarch64, CI workflow)
 
-### Pending
-- [ ] Native icon support (react-native-vector-icons)
-- [ ] CalDAV notes sync (VJOURNAL)
-- [ ] Push notifications
-- [ ] Widget support
+### Completed (continued 2)
+- [x] Native icon support (@expo/vector-icons MaterialCommunityIcons for native, Iconify for web)
+- [x] CalDAV notes sync (VJOURNAL fetch/create/update/delete, wired to NotesScreen)
+- [x] Push notifications (expo-notifications for local event reminders, UnifiedPush client for de-googled Android)
+
+### Completed (continued 3)
+- [x] Widget support (Android home screen widget showing upcoming events count, open issues, next event, last sync)
 
 ---
 
@@ -255,5 +264,5 @@ npx expo install --fix
 ## Future Considerations
 - Offline mode with local SQLite caching
 - Push notifications for calendar events
-- Widget support (Android/macOS)
+- Widget support (Android/macOS/Linux)
 - Multi-account support for CalDAV/Gitea

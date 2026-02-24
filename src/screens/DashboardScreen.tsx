@@ -12,6 +12,8 @@ import { useTheme } from '../hooks/useTheme';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
+import * as notifications from '../services/notifications';
+import * as DashboardWidget from '../../modules/dashboard-widget';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
@@ -54,6 +56,30 @@ export default function DashboardScreen() {
       await Promise.all(fetches);
       const now = new Date();
       setLastSync(now);
+
+      // Reschedule event reminders after sync
+      const settings = await notifications.getNotificationSettings();
+      if (settings.enabled && state.events.length > 0) {
+        await notifications.scheduleEventReminders(state.events, settings.minutesBefore);
+      }
+
+      // Update home screen widget
+      if (DashboardWidget.isAvailable()) {
+        const upcomingCount = state.events.filter((e) => e.start >= now).length;
+        const openCount = state.issues.filter((i) => i.state === 'open').length;
+        const nextEvt = state.events
+          .filter((e) => e.start >= now)
+          .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
+        const nextEventText = nextEvt
+          ? `${nextEvt.summary} - ${nextEvt.start.toLocaleDateString()} ${nextEvt.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : 'No upcoming events';
+        DashboardWidget.updateWidgetData(
+          upcomingCount,
+          openCount,
+          nextEventText,
+          `Synced ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        );
+      }
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {

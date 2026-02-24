@@ -196,28 +196,158 @@ function parseICalDate(dateStr: string): Date {
   return new Date(dateStr);
 }
 
-// Notes support via VJOURNAL or plain text files
+// Notes support via VJOURNAL
 export async function fetchNotes(): Promise<Note[]> {
-  // Simplified: In production, query for VJOURNAL entries
-  // For now, return empty array - implement based on server support
-  return [];
+  const client = await getClient();
+  if (!client) return [];
+
+  try {
+    const response = await fetch(client.serverUrl, {
+      method: 'REPORT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        Depth: '1',
+        'Content-Type': 'application/xml',
+      },
+      body: `<?xml version="1.0" encoding="UTF-8"?>
+        <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+          <d:prop>
+            <d:getetag/>
+            <c:calendar-data/>
+          </d:prop>
+          <c:filter>
+            <c:comp-filter name="VCALENDAR">
+              <c:comp-filter name="VJOURNAL"/>
+            </c:comp-filter>
+          </c:filter>
+        </c:calendar-query>`,
+    });
+
+    if (!response.ok && response.status !== 207) {
+      return [];
+    }
+
+    const text = await response.text();
+    return parseVJournalEntries(text);
+  } catch {
+    return [];
+  }
 }
 
-export async function createNote(title: string, content: string): Promise<Note | null> {
+function parseVJournalEntries(xmlText: string): Note[] {
+  const notes: Note[] = [];
+  const calDataMatches = xmlText.matchAll(/<c:calendar-data[^>]*>([^<]+)<\/c:calendar-data>/gi);
+
+  for (const match of calDataMatches) {
+    const ical = match[1]
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+
+    const uid = extractICalProp(ical, 'UID');
+    const summary = extractICalProp(ical, 'SUMMARY');
+    const description = extractICalProp(ical, 'DESCRIPTION');
+    const dtstart = extractICalProp(ical, 'DTSTART');
+    const lastModified = extractICalProp(ical, 'LAST-MODIFIED');
+    const categories = extractICalProp(ical, 'CATEGORIES');
+
+    if (uid && summary) {
+      notes.push({
+        uid,
+        title: summary,
+        content: description || '',
+        createdAt: dtstart ? parseICalDate(dtstart) : new Date(),
+        updatedAt: lastModified ? parseICalDate(lastModified) : new Date(),
+        tags: categories ? categories.split(',').map((t) => t.trim()) : undefined,
+      });
+    }
+  }
+
+  return notes.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+}
+
+function buildVJournal(uid: string, title: string, content: string, createdAt: Date, tags?: string[]): string {
+  const now = new Date();
+  let vjournal = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CrossDashboard//EN\r\nBEGIN:VJOURNAL\r\nUID:${uid}\r\nDTSTAMP:${formatICalDate(now)}\r\nDTSTART:${formatICalDate(createdAt)}\r\nLAST-MODIFIED:${formatICalDate(now)}\r\nSUMMARY:${title}\r\n`;
+
+  if (content) {
+    const escaped = content.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+    vjournal += `DESCRIPTION:${escaped}\r\n`;
+  }
+
+  if (tags && tags.length > 0) {
+    vjournal += `CATEGORIES:${tags.join(',')}\r\n`;
+  }
+
+  vjournal += `END:VJOURNAL\r\nEND:VCALENDAR`;
+  return vjournal;
+}
+
+export async function createNote(title: string, content: string, tags?: string[]): Promise<Note | null> {
   const client = await getClient();
   if (!client) return null;
 
   const uid = `note-${Date.now()}@cross-dashboard`;
   const now = new Date();
+  const vjournal = buildVJournal(uid, title, content, now, tags);
 
-  const note: Note = {
-    uid,
-    title,
-    content,
-    createdAt: now,
-    updatedAt: now,
-  };
+  try {
+    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+      method: 'PUT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'If-None-Match': '*',
+      },
+      body: vjournal,
+    });
 
-  // In production: PUT VJOURNAL to CalDAV server
-  return note;
+    if (!response.ok && response.status !== 201 && response.status !== 204) {
+      return null;
+    }
+
+    return { uid, title, content, createdAt: now, updatedAt: now, tags };
+  } catch {
+    return null;
+  }
+}
+
+export async function updateNote(uid: string, title: string, content: string, createdAt: Date, tags?: string[]): Promise<boolean> {
+  const client = await getClient();
+  if (!client) return false;
+
+  const vjournal = buildVJournal(uid, title, content, createdAt, tags);
+
+  try {
+    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+      method: 'PUT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        'Content-Type': 'text/calendar; charset=utf-8',
+      },
+      body: vjournal,
+    });
+
+    return response.ok || response.status === 204;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteNote(uid: string): Promise<boolean> {
+  const client = await getClient();
+  if (!client) return false;
+
+  try {
+    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+      },
+    });
+
+    return response.ok || response.status === 204;
+  } catch {
+    return false;
+  }
 }

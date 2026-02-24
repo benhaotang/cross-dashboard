@@ -16,6 +16,7 @@ import * as keyring from '../services/keyring';
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
+import * as notifications from '../services/notifications';
 
 export default function SettingsScreen() {
   const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setThemePreference, setLastSync, state } =
@@ -32,12 +33,52 @@ export default function SettingsScreen() {
   const [giteaToken, setGiteaToken] = useState('');
   const [giteaRepos, setGiteaRepos] = useState('');
 
+  // Notification settings
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [reminderMinutes, setReminderMinutes] = useState('15');
+
+  // UnifiedPush settings
+  const [upAvailable, setUpAvailable] = useState(false);
+  const [upDistributors, setUpDistributors] = useState<string[]>([]);
+  const [upDistributor, setUpDistributor] = useState('');
+  const [upEndpoint, setUpEndpoint] = useState<string | null>(null);
+  const [upRegistered, setUpRegistered] = useState(false);
+
   // Status
   const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
   const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
 
   useEffect(() => {
     loadSettings();
+    loadNotificationSettings();
+  }, []);
+
+  // Listen for UP endpoint changes
+  useEffect(() => {
+    const cleanup = notifications.onUPEndpoint((endpoint, _instance) => {
+      setUpEndpoint(endpoint);
+      setUpRegistered(true);
+      notifications.saveUPEndpoint(endpoint);
+      showAlert('UnifiedPush', `Registered! Endpoint:\n${endpoint}`);
+    });
+    const cleanupFail = notifications.onUPRegistrationFailed((_instance) => {
+      setUpRegistered(false);
+      showAlert('UnifiedPush', 'Registration failed. Is the distributor running?');
+    });
+    const cleanupUnreg = notifications.onUPUnregistered((_instance) => {
+      setUpRegistered(false);
+      setUpEndpoint(null);
+    });
+    const cleanupMsg = notifications.onUPMessage((_message, _instance) => {
+      // Message is auto-displayed as notification by the service
+    });
+
+    return () => {
+      cleanup?.();
+      cleanupFail?.();
+      cleanupUnreg?.();
+      cleanupMsg?.();
+    };
   }, []);
 
   async function loadSettings() {
@@ -51,6 +92,74 @@ export default function SettingsScreen() {
     if (username) setCaldavUsername(username);
     if (instance) setGiteaInstance(instance);
     if (state.giteaRepositories.length > 0) setGiteaRepos(state.giteaRepositories.join('\n'));
+  }
+
+  async function loadNotificationSettings() {
+    const settings = await notifications.getNotificationSettings();
+    setNotifEnabled(settings.enabled);
+    setReminderMinutes(String(settings.minutesBefore));
+    if (settings.upEndpoint) {
+      setUpEndpoint(settings.upEndpoint);
+      setUpRegistered(true);
+    }
+
+    // Check UP availability (Android only)
+    const available = notifications.isUnifiedPushAvailable();
+    setUpAvailable(available);
+    if (available) {
+      const distributors = notifications.getUPDistributors();
+      setUpDistributors(distributors);
+      const current = notifications.getUPDistributor();
+      if (current) setUpDistributor(current);
+    }
+  }
+
+  async function toggleNotifications() {
+    const newValue = !notifEnabled;
+    if (newValue) {
+      const granted = await notifications.requestPermissions();
+      if (!granted) {
+        showAlert('Permissions', 'Notification permission not granted');
+        return;
+      }
+    } else {
+      await notifications.cancelAllEventReminders();
+    }
+    setNotifEnabled(newValue);
+    await notifications.saveNotificationEnabled(newValue);
+
+    if (newValue && state.events.length > 0) {
+      const minutes = parseInt(reminderMinutes, 10) || 15;
+      await notifications.scheduleEventReminders(state.events, minutes);
+    }
+  }
+
+  async function saveReminderMinutes() {
+    const minutes = parseInt(reminderMinutes, 10) || 15;
+    await notifications.saveReminderMinutes(minutes);
+    if (notifEnabled && state.events.length > 0) {
+      await notifications.scheduleEventReminders(state.events, minutes);
+    }
+    showAlert('Saved', `Reminders set to ${minutes} minutes before events`);
+  }
+
+  function selectDistributor(distributor: string) {
+    notifications.selectUPDistributor(distributor);
+    setUpDistributor(distributor);
+  }
+
+  function registerUP() {
+    if (!upDistributor) {
+      showAlert('UnifiedPush', 'Please select a distributor first');
+      return;
+    }
+    notifications.registerUnifiedPush('default');
+  }
+
+  function unregisterUP() {
+    notifications.unregisterUnifiedPush('default');
+    setUpRegistered(false);
+    setUpEndpoint(null);
   }
 
   async function saveCalDav() {
@@ -183,6 +292,122 @@ export default function SettingsScreen() {
           ))}
         </View>
       </View>
+
+      {/* Notifications */}
+      {Platform.OS !== 'web' && (
+        <View style={[styles.section, { backgroundColor: c.surface }]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Notifications</Text>
+
+          <TouchableOpacity
+            style={[
+              styles.toggleRow,
+              { backgroundColor: notifEnabled ? c.primary : c.filterChip },
+            ]}
+            onPress={toggleNotifications}
+          >
+            <Text style={[styles.toggleText, { color: notifEnabled ? '#fff' : c.textSecondary }]}>
+              Event Reminders: {notifEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+
+          {notifEnabled && (
+            <>
+              <Text style={[styles.label, { color: c.text, marginTop: 12 }]}>Remind before (minutes)</Text>
+              <View style={styles.reminderRow}>
+                <TextInput
+                  style={[styles.input, styles.reminderInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+                  value={reminderMinutes}
+                  onChangeText={setReminderMinutes}
+                  keyboardType="numeric"
+                  placeholder="15"
+                  placeholderTextColor={c.textTertiary}
+                />
+                <TouchableOpacity
+                  style={[styles.smallButton, { backgroundColor: c.primary }]}
+                  onPress={saveReminderMinutes}
+                >
+                  <Text style={styles.smallButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* UnifiedPush section */}
+          {upAvailable && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+              <Text style={[styles.subsectionTitle, { color: c.text }]}>UnifiedPush</Text>
+              <Text style={[styles.hint, { color: c.textTertiary }]}>
+                Receive push notifications from Gitea and other services via your installed UP distributor.
+              </Text>
+
+              {upDistributors.length === 0 ? (
+                <Text style={[styles.hint, { color: c.textTertiary, marginTop: 8 }]}>
+                  No UP distributors found. Install ntfy or NextPush.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[styles.label, { color: c.text, marginTop: 8 }]}>Distributor</Text>
+                  <View style={styles.themeRow}>
+                    {upDistributors.map((dist) => {
+                      const shortName = dist.split('.').pop() || dist;
+                      return (
+                        <TouchableOpacity
+                          key={dist}
+                          style={[
+                            styles.themeButton,
+                            { backgroundColor: c.filterChip },
+                            upDistributor === dist && { backgroundColor: c.primary },
+                          ]}
+                          onPress={() => selectDistributor(dist)}
+                        >
+                          <Text
+                            style={[
+                              styles.themeButtonText,
+                              { color: upDistributor === dist ? '#fff' : c.textSecondary },
+                            ]}
+                          >
+                            {shortName}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {!upRegistered ? (
+                    <TouchableOpacity
+                      style={[styles.button, { backgroundColor: c.primary }]}
+                      onPress={registerUP}
+                    >
+                      <Text style={styles.buttonText}>Register with UnifiedPush</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      {upEndpoint && (
+                        <View style={[styles.endpointBox, { backgroundColor: c.inputBackground, borderColor: c.border }]}>
+                          <Text style={[styles.label, { color: c.text, marginBottom: 4 }]}>Endpoint URL</Text>
+                          <Text style={[styles.endpointText, { color: c.textSecondary }]} selectable>
+                            {upEndpoint}
+                          </Text>
+                          <Text style={[styles.hint, { color: c.textTertiary, marginTop: 4 }]}>
+                            Use this URL as a webhook target in Gitea or other services.
+                          </Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.button, styles.dangerButton]}
+                        onPress={unregisterUP}
+                      >
+                        <Text style={styles.buttonText}>Unregister</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </View>
+      )}
 
       {/* CalDAV */}
       <View style={[styles.section, { backgroundColor: c.surface }]}>
@@ -320,6 +545,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
   statusDot: {
     width: 12,
     height: 12,
@@ -329,6 +559,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
+  },
+  hint: {
+    fontSize: 13,
   },
   input: {
     borderWidth: 1,
@@ -355,6 +588,47 @@ const styles = StyleSheet.create({
   themeButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  toggleRow: {
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reminderInput: {
+    flex: 1,
+  },
+  smallButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  smallButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  endpointBox: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  endpointText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
   button: {
     padding: 14,

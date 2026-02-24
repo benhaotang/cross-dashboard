@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import * as cache from '../services/cache';
+import * as caldav from '../services/caldav';
 import { Note } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
@@ -21,6 +23,28 @@ export default function NotesScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    if (state.caldavConfigured && state.notes.length === 0) {
+      syncNotes();
+    }
+  }, [state.caldavConfigured]);
+
+  async function syncNotes() {
+    setSyncing(true);
+    try {
+      const notes = await caldav.fetchNotes();
+      if (notes.length > 0) {
+        setNotes(notes);
+        await cache.saveNotes(notes);
+      }
+    } catch (error) {
+      console.error('Error syncing notes:', error);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   function openNewNote() {
     setSelectedNote(null);
@@ -43,17 +67,22 @@ export default function NotesScreen() {
     let updated: Note[];
 
     if (selectedNote) {
+      const success = state.caldavConfigured
+        ? await caldav.updateNote(selectedNote.uid, newTitle, newContent, selectedNote.createdAt, selectedNote.tags)
+        : true;
+      if (!success) console.error('Failed to update note on server');
+
       updated = state.notes.map((n) =>
         n.uid === selectedNote.uid ? { ...n, title: newTitle, content: newContent, updatedAt: now } : n
       );
     } else {
-      const newNote: Note = {
-        uid: `note-${Date.now()}`,
-        title: newTitle,
-        content: newContent,
-        createdAt: now,
-        updatedAt: now,
-      };
+      let newNote: Note;
+      if (state.caldavConfigured) {
+        const created = await caldav.createNote(newTitle, newContent);
+        newNote = created || { uid: `note-${Date.now()}`, title: newTitle, content: newContent, createdAt: now, updatedAt: now };
+      } else {
+        newNote = { uid: `note-${Date.now()}`, title: newTitle, content: newContent, createdAt: now, updatedAt: now };
+      }
       updated = [newNote, ...state.notes];
     }
 
@@ -67,6 +96,9 @@ export default function NotesScreen() {
   }
 
   async function deleteNote(uid: string) {
+    if (state.caldavConfigured) {
+      await caldav.deleteNote(uid);
+    }
     const updated = state.notes.filter((n) => n.uid !== uid);
     setNotes(updated);
     await cache.saveNotes(updated);
@@ -99,11 +131,20 @@ export default function NotesScreen() {
     <View style={[styles.container, { backgroundColor: c.background }]}>
       <View style={[styles.header, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
         <Text style={[styles.headerTitle, { color: c.text }]}>Notes</Text>
-        <TouchableOpacity style={[styles.addButton, { backgroundColor: c.primary }]} onPress={openNewNote}>
-          <AppIcon name={Icons.add} size={18} color="#fff" />
-          <Text style={styles.addButtonText}>New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {state.caldavConfigured && (
+            <TouchableOpacity style={styles.syncButton} onPress={syncNotes}>
+              <AppIcon name={Icons.refresh} size={18} color={c.primary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: c.primary }]} onPress={openNewNote}>
+            <AppIcon name={Icons.add} size={18} color="#fff" />
+            <Text style={styles.addButtonText}>New</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {syncing && <ActivityIndicator size="small" color={c.primary} style={{ marginTop: 12 }} />}
 
       <FlatList
         data={state.notes}
@@ -171,6 +212,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  syncButton: {
+    padding: 4,
   },
   addButton: {
     flexDirection: 'row',
