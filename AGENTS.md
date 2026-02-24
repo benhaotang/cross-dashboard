@@ -32,7 +32,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 ```
 cross-dashboard/
 ├── src/
-│   ├── components/     # Reusable UI components (Icon.tsx)
+│   ├── components/     # Reusable UI components (Icon, PropertyPageShared, *PropertyPage)
 │   ├── navigation/     # Navigation configuration (AppNavigator, SidebarNavigator)
 │   ├── screens/        # Screen components (Dashboard, Events, Notes, Tasks, Issues, Settings)
 │   ├── services/       # API clients (caldav.ts, nextcloud.ts, gitea.ts, keyring.ts, taskParser.ts)
@@ -85,8 +85,9 @@ cross-dashboard/
 #### Gitea Service (`src/services/gitea.ts`)
 - Personal access token authentication
 - Fetch issues from configured repositories
-- Create/update issues
+- Create/update issues (`updateIssue` supports title, body, state)
 - Label and milestone management
+- Issue comments: `fetchComments`, `addComment` (returns `GiteaComment[]`)
 
 #### Keyring Service (`src/services/keyring.ts`)
 - Wrapper around expo-secure-store
@@ -116,7 +117,23 @@ cross-dashboard/
   Icons.refresh      // mdi:refresh
   Icons.add          // mdi:plus
   Icons.delete       // mdi:delete
+  Icons.pencil       // mdi:pencil
+  Icons.comment      // mdi:comment-text-outline
   ```
+
+### Property Pages (`src/components/*PropertyPage.tsx`)
+Full-screen modal overlays for viewing/editing item details. Built on shared components from `PropertyPageShared.tsx`:
+- **PropertyPageModal** -- outer modal shell (slide animation, transparent, maxHeight 92%)
+- **PropertyPageHeader** -- header with Close (left), title (center), pencil/cancel edit toggle (right)
+- **ReadField** -- labeled read-only field row
+- **SectionHeader** -- uppercase section divider
+- **resolveCalendar()** -- resolves `calendarHref` to `{displayName, color}`
+
+Property page components:
+- **EventPropertyPage** -- read-only (no edit mode): date/time range, duration, location, description, UID
+- **NotePropertyPage** -- read/edit toggle: tags as chips, full content, title/content/tags editing
+- **TaskPropertyPage** -- read/edit toggle: status badge, priority, due date, progress bar, categories, subtask list with completion toggle, full edit form
+- **IssuePropertyPage** -- read/edit toggle: state badge, labels, assignees, body, open/close toggle, comments section (fetched from Gitea API), add comment, "Open in Browser" link
 
 ### Navigation (`src/navigation/`)
 - **AppNavigator.tsx**: Platform-aware navigation router
@@ -131,10 +148,10 @@ cross-dashboard/
 | Screen | Description |
 |--------|-------------|
 | DashboardScreen | Overview with upcoming events, tasks due soon, and open issues |
-| EventsScreen | CalDAV events with day/week/month filters, calendar color dots per event |
-| NotesScreen | Note management with create/edit/delete, calendar-aware fetching |
-| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots per task |
-| IssuesScreen | Gitea issues with state filtering |
+| EventsScreen | CalDAV events with day/week/month filters, calendar color dots, tap-to-open read-only property page |
+| NotesScreen | Note management with create/edit/delete, calendar-aware fetching, tap-to-open property page with read/edit modes |
+| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots, tap-to-open property page with subtask list, read/edit modes |
+| IssuesScreen | Gitea issues with state filtering, tap-to-open property page with comments, read/edit modes |
 | InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones |
 | SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, task input defaults, notifications |
 
@@ -311,6 +328,17 @@ npx expo install --fix
 - [x] Default event/task calendar settings — user picks which calendar new events/tasks are saved to
 - [x] Calendar color dots on EventsScreen and TasksScreen — each item shows a colored dot matching its source calendar
 - [x] Events and tasks tagged with `calendarHref` during fetch for calendar identification
+
+### Completed (continued 6)
+- [x] Property/detail pages for all item types (tasks, events, notes, issues)
+- [x] Shared property page components (`PropertyPageShared.tsx`): modal shell, header with edit toggle, read fields, section headers
+- [x] EventPropertyPage — read-only detail view with date/time range, duration, location, description
+- [x] NotePropertyPage — read/edit modes, full content display, tag chips, delete action
+- [x] TaskPropertyPage — read/edit modes, status badge, priority, progress bar, subtask list with completion toggle, categories, full edit form
+- [x] IssuePropertyPage — read/edit modes, state badge, labels, assignees, body, open/close toggle, Gitea comment fetching/posting, "Open in Browser" link
+- [x] Gitea API extensions: `fetchComments`, `addComment`, `updateIssue` in `gitea.ts`
+- [x] `GiteaComment` type added to `src/types/index.ts`
+- [x] New icons: `pencil` (mdi:pencil), `comment` (mdi:comment-text-outline)
 
 ---
 

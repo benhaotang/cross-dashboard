@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -14,6 +13,7 @@ import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
 import { GiteaIssue } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
+import IssuePropertyPage from '../components/IssuePropertyPage';
 
 type FilterState = 'open' | 'closed' | 'all';
 
@@ -21,6 +21,7 @@ export default function IssuesScreen() {
   const { state, setIssues, setLoading } = useApp();
   const theme = useTheme();
   const [filter, setFilter] = useState<FilterState>('open');
+  const [selectedIssue, setSelectedIssue] = useState<GiteaIssue | null>(null);
 
   useEffect(() => {
     if (state.giteaConfigured && state.issues.length === 0 && state.giteaRepositories.length > 0) {
@@ -48,10 +49,6 @@ export default function IssuesScreen() {
     return state.issues.filter((i) => i.state === filter);
   }
 
-  function openIssue(url: string) {
-    Linking.openURL(url);
-  }
-
   async function toggleIssueState(issue: GiteaIssue) {
     const [owner, repo] = issue.repository.split('/');
     const newState = issue.state === 'open' ? 'closed' : 'open';
@@ -70,7 +67,7 @@ export default function IssuesScreen() {
 
   function renderIssue({ item }: { item: GiteaIssue }) {
     return (
-      <TouchableOpacity style={[styles.issueCard, { backgroundColor: c.surface }]} onPress={() => openIssue(item.htmlUrl)}>
+      <TouchableOpacity style={[styles.issueCard, { backgroundColor: c.surface }]} onPress={() => setSelectedIssue(item)}>
         <View style={styles.issueHeader}>
           <View style={[styles.stateBadge, item.state === 'open' ? styles.stateOpen : styles.stateClosed]}>
             <Text style={styles.stateText}>{item.state}</Text>
@@ -168,6 +165,36 @@ export default function IssuesScreen() {
               <Text style={[styles.emptyText, { color: c.textTertiary }]}>No issues found</Text>
             </View>
           }
+        />
+      )}
+
+      {selectedIssue && (
+        <IssuePropertyPage
+          issue={selectedIssue}
+          canEdit
+          onClose={() => setSelectedIssue(null)}
+          onSave={(updated) => {
+            const newIssues = state.issues.map((i): GiteaIssue =>
+              i.id === updated.id ? updated : i
+            );
+            setIssues(newIssues);
+            cache.saveIssues(newIssues);
+            setSelectedIssue(null);
+          }}
+          onStateToggle={async (issue) => {
+            const [o, r] = issue.repository.split('/');
+            const newState = issue.state === 'open' ? 'closed' : 'open';
+            const success = await gitea.updateIssueState(o, r, issue.number, newState);
+            if (success) {
+              const updated = { ...issue, state: newState as 'open' | 'closed' };
+              const newIssues = state.issues.map((i): GiteaIssue =>
+                i.id === issue.id ? updated : i
+              );
+              setIssues(newIssues);
+              cache.saveIssues(newIssues);
+              setSelectedIssue(updated);
+            }
+          }}
         />
       )}
     </View>

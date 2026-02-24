@@ -15,6 +15,7 @@ import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
 import { Note, CalDavCalendar } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
+import NotePropertyPage from '../components/NotePropertyPage';
 
 export default function NotesScreen() {
   const { state, setNotes } = useApp();
@@ -23,6 +24,7 @@ export default function NotesScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [propertyNote, setPropertyNote] = useState<Note | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
@@ -57,13 +59,6 @@ export default function NotesScreen() {
     setSelectedNote(null);
     setNewTitle('');
     setNewContent('');
-    setModalVisible(true);
-  }
-
-  function openEditNote(note: Note) {
-    setSelectedNote(note);
-    setNewTitle(note.title);
-    setNewContent(note.content);
     setModalVisible(true);
   }
 
@@ -116,7 +111,7 @@ export default function NotesScreen() {
 
   function renderNote({ item }: { item: Note }) {
     return (
-      <TouchableOpacity style={[styles.noteCard, { backgroundColor: c.surface }]} onPress={() => openEditNote(item)}>
+      <TouchableOpacity style={[styles.noteCard, { backgroundColor: c.surface }]} onPress={() => setPropertyNote(item)}>
         <View style={styles.noteHeader}>
           <Text style={[styles.noteTitle, { color: c.text }]} numberOfLines={1}>
             {item.title}
@@ -166,6 +161,30 @@ export default function NotesScreen() {
           </View>
         }
       />
+
+      {propertyNote && (
+        <NotePropertyPage
+          note={propertyNote}
+          canEdit
+          onClose={() => setPropertyNote(null)}
+          onSave={async (updated) => {
+            const now = new Date();
+            if (state.caldavConfigured) {
+              await caldav.updateNote(updated.uid, updated.title, updated.content, updated.createdAt, updated.tags);
+            }
+            const newNotes = state.notes.map((n) =>
+              n.uid === updated.uid ? { ...n, title: updated.title, content: updated.content, tags: updated.tags, updatedAt: now } : n
+            );
+            setNotes(newNotes);
+            await cache.saveNotes(newNotes);
+            setPropertyNote(null);
+          }}
+          onDelete={async (uid) => {
+            await deleteNote(uid);
+            setPropertyNote(null);
+          }}
+        />
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

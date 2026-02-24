@@ -1,4 +1,4 @@
-import { GiteaIssue, GiteaLabel, GiteaUser, GiteaMilestone } from '../types';
+import { GiteaIssue, GiteaLabel, GiteaUser, GiteaMilestone, GiteaComment } from '../types';
 import { getCredential } from './keyring';
 
 interface GiteaClient {
@@ -272,4 +272,76 @@ export async function fetchAllMilestones(repositories: string[]): Promise<GiteaM
     if (!b.dueOn) return -1;
     return a.dueOn.getTime() - b.dueOn.getTime();
   });
+}
+
+export async function fetchComments(
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<GiteaComment[]> {
+  interface ApiComment {
+    id: number;
+    body: string;
+    user: { id: number; login: string; avatar_url: string };
+    created_at: string;
+    updated_at: string;
+  }
+
+  const data = await apiRequest<ApiComment[]>(
+    `/repos/${owner}/${repo}/issues/${issueNumber}/comments`
+  );
+
+  if (!data) return [];
+
+  return data.map((c) => ({
+    id: c.id,
+    body: c.body,
+    user: { id: c.user.id, login: c.user.login, avatarUrl: c.user.avatar_url },
+    createdAt: new Date(c.created_at),
+    updatedAt: new Date(c.updated_at),
+  }));
+}
+
+export async function addComment(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  body: string
+): Promise<GiteaComment | null> {
+  interface ApiComment {
+    id: number;
+    body: string;
+    user: { id: number; login: string; avatar_url: string };
+    created_at: string;
+    updated_at: string;
+  }
+
+  const data = await apiRequest<ApiComment>(
+    `/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
+    { method: 'POST', body: JSON.stringify({ body }) }
+  );
+
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    body: data.body,
+    user: { id: data.user.id, login: data.user.login, avatarUrl: data.user.avatar_url },
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+  };
+}
+
+export async function updateIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  updates: { title?: string; body?: string; state?: 'open' | 'closed' }
+): Promise<boolean> {
+  const data = await apiRequest(`/repos/${owner}/${repo}/issues/${issueNumber}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+
+  return data !== null;
 }

@@ -85,6 +85,15 @@ export interface GiteaUser {
   avatarUrl: string;
 }
 
+// Gitea Comment
+export interface GiteaComment {
+  id: number;
+  body: string;
+  user: GiteaUser;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Gitea Milestone
 export interface GiteaMilestone {
   id: number;

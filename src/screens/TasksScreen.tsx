@@ -18,6 +18,7 @@ import * as keyring from '../services/keyring';
 import { parseTaskInput, TaskDefaults, DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
+import TaskPropertyPage from '../components/TaskPropertyPage';
 
 type FilterMode = 'all' | 'active' | 'completed';
 
@@ -134,6 +135,7 @@ export default function TasksScreen() {
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<FilterMode>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [propertyTask, setPropertyTask] = useState<CalDavTask | null>(null);
 
   // Quick input state
   const [quickInput, setQuickInput] = useState('');
@@ -269,18 +271,6 @@ export default function TasksScreen() {
     setModalVisible(true);
   }
 
-  function openEditTask(task: CalDavTask) {
-    setEditTask(task);
-    setFormSummary(task.summary);
-    setFormDescription(task.description || '');
-    setFormStatus(task.status);
-    setFormPriority(getPriorityLabel(task.priority));
-    setFormDue(task.due ? task.due.toISOString().split('T')[0] : '');
-    setFormPercent(String(task.percentComplete));
-    setFormParentUid(task.parentUid || '');
-    setModalVisible(true);
-  }
-
   async function saveTask() {
     if (!formSummary.trim()) return;
 
@@ -385,7 +375,7 @@ export default function TasksScreen() {
     return (
       <TouchableOpacity
         style={[styles.taskCard, { backgroundColor: c.surface, marginLeft: depth * 24 }]}
-        onPress={() => openEditTask(task)}
+        onPress={() => setPropertyTask(task)}
       >
         <View style={styles.taskRow}>
           <TouchableOpacity onPress={() => toggleCompletion(task)} style={styles.checkbox}>
@@ -575,6 +565,29 @@ export default function TasksScreen() {
           </View>
         }
       />
+
+      {propertyTask && (
+        <TaskPropertyPage
+          task={propertyTask}
+          allTasks={state.tasks}
+          calendars={state.selectedCalendars}
+          canEdit
+          onClose={() => setPropertyTask(null)}
+          onSave={async (updated) => {
+            if (state.caldavConfigured) {
+              await caldav.updateTask(updated);
+            }
+            const newTasks = state.tasks.map((t) => (t.uid === updated.uid ? updated : t));
+            setTasks(newTasks);
+            await cache.saveTasks(newTasks);
+            setPropertyTask(null);
+          }}
+          onDelete={async (uid) => {
+            await deleteTask(uid);
+            setPropertyTask(null);
+          }}
+        />
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

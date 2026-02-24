@@ -13,6 +13,7 @@ import * as caldav from '../services/caldav';
 import * as cache from '../services/cache';
 import { CalendarEvent, CalDavCalendar } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
+import EventPropertyPage from '../components/EventPropertyPage';
 
 type FilterType = 'all' | 'today' | 'week' | 'month';
 
@@ -30,6 +31,7 @@ export default function EventsScreen() {
   const { state, setEvents, setLoading } = useApp();
   const theme = useTheme();
   const [filter, setFilter] = useState<FilterType>('all');
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const calColorMap = useCalendarColorMap(state.selectedCalendars);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function EventsScreen() {
   function renderEvent({ item }: { item: CalendarEvent }) {
     const calColor = item.calendarHref ? calColorMap.get(item.calendarHref) : undefined;
     return (
-      <View style={[styles.eventCard, { backgroundColor: c.surface }]}>
+      <TouchableOpacity style={[styles.eventCard, { backgroundColor: c.surface }]} onPress={() => setSelectedEvent(item)}>
         <View style={styles.eventHeader}>
           {calColor && <View style={[styles.eventCalDot, { backgroundColor: calColor }]} />}
           <Text style={[styles.eventTitle, { color: c.text }]}>{item.summary}</Text>
@@ -103,7 +105,7 @@ export default function EventsScreen() {
             {item.description}
           </Text>
         )}
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -150,6 +152,14 @@ export default function EventsScreen() {
               <Text style={[styles.emptyText, { color: c.textTertiary }]}>No events found</Text>
             </View>
           }
+        />
+      )}
+
+      {selectedEvent && (
+        <EventPropertyPage
+          event={selectedEvent}
+          calendars={state.selectedCalendars}
+          onClose={() => setSelectedEvent(null)}
         />
       )}
     </View>
