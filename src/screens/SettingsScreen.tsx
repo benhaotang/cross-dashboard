@@ -10,6 +10,8 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -27,6 +29,32 @@ import { DEFAULT_POMODORO, ALL_SCREENS, ScreenName } from '../services/cache';
 import AppIcon, { Icons } from '../components/Icon';
 
 type AuthMethod = 'manual' | 'nextcloud';
+
+const OPEN_SOURCE_LIBRARIES = [
+  { name: 'React', version: '19.1.0', license: 'MIT' },
+  { name: 'React Native', version: '0.81.5', license: 'MIT' },
+  { name: 'Expo', version: '54.0.32', license: 'MIT' },
+  { name: 'expo-modules-core', version: '3.0.29', license: 'MIT' },
+  { name: 'expo-notifications', version: '0.32.16', license: 'MIT' },
+  { name: 'expo-secure-store', version: '15.0.8', license: 'MIT' },
+  { name: 'expo-status-bar', version: '3.0.9', license: 'MIT' },
+  { name: '@react-navigation/native', version: '7.1.28', license: 'MIT' },
+  { name: '@react-navigation/bottom-tabs', version: '7.10.1', license: 'MIT' },
+  { name: '@react-native-async-storage/async-storage', version: '2.2.0', license: 'MIT' },
+  { name: 'react-native-safe-area-context', version: '5.6.2', license: 'MIT' },
+  { name: 'react-native-screens', version: '4.16.0', license: 'MIT' },
+  { name: 'react-native-web', version: '0.21.2', license: 'MIT' },
+  { name: 'react-dom', version: '19.1.0', license: 'MIT' },
+  { name: '@iconify/react', version: '6.0.2', license: 'MIT' },
+  { name: '@expo/vector-icons', version: '15.1.1', license: 'MIT' },
+  { name: '@expo/metro-runtime', version: '6.1.2', license: 'MIT' },
+  { name: '@noble/ciphers', version: '2.1.1', license: 'MIT' },
+  { name: '@noble/hashes', version: '2.0.1', license: 'MIT' },
+  { name: '@babel/runtime', version: '7.28.6', license: 'MIT' },
+  { name: 'TypeScript', version: '5.9.2', license: 'Apache-2.0' },
+  { name: 'Electron', version: '33.0.0', license: 'MIT' },
+  { name: 'electron-builder', version: '25.0.0', license: 'MIT' },
+];
 
 export default function SettingsScreen() {
   const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setSelectedCalendars, setThemePreference, setVisibleScreens, setLastSync, state } =
@@ -85,6 +113,9 @@ export default function SettingsScreen() {
   // Status
   const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
   const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
+
+  // About
+  const [libsModalVisible, setLibsModalVisible] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -1213,6 +1244,58 @@ export default function SettingsScreen() {
           <Text style={styles.buttonText}>Clear All Credentials</Text>
         </TouchableOpacity>
       </View>
+
+      {/* About */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>About</Text>
+
+        <Text style={[styles.aboutVersion, { color: c.text }]}>Cross-Dashboard v1.3.0</Text>
+
+        <TouchableOpacity
+          style={styles.aboutLink}
+          onPress={() => Linking.openURL('https://github.com/benhaotang/cross-dashboard')}
+        >
+          <AppIcon name={Icons.link} size={16} color={c.primary} />
+          <Text style={[styles.aboutLinkText, { color: c.primary }]}>GitHub Repository</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton, { backgroundColor: c.filterChip, marginTop: 12 }]}
+          onPress={() => setLibsModalVisible(true)}
+        >
+          <Text style={[styles.buttonText, { color: c.text }]}>Open Source Libraries</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Open Source Libraries Modal */}
+      <Modal visible={libsModalVisible} animationType="slide" transparent>
+        <View style={styles.libsOverlay}>
+          <View style={[styles.libsContainer, { backgroundColor: c.surface }]}>
+            <View style={[styles.libsHeader, { borderBottomColor: c.border }]}>
+              <Text style={[styles.libsTitle, { color: c.text }]}>Open Source Libraries</Text>
+              <TouchableOpacity onPress={() => setLibsModalVisible(false)}>
+                <AppIcon name={Icons.close} size={22} color={c.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={OPEN_SOURCE_LIBRARIES}
+              keyExtractor={(item) => item.name}
+              contentContainerStyle={{ padding: 16 }}
+              renderItem={({ item }) => (
+                <View style={[styles.libRow, { borderBottomColor: c.borderLight }]}>
+                  <View style={styles.libInfo}>
+                    <Text style={[styles.libName, { color: c.text }]}>{item.name}</Text>
+                    <Text style={[styles.libVersion, { color: c.textTertiary }]}>{item.version}</Text>
+                  </View>
+                  {item.license && (
+                    <Text style={[styles.libLicense, { color: c.textSecondary }]}>{item.license}</Text>
+                  )}
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1441,6 +1524,67 @@ const styles = StyleSheet.create({
   },
   defaultCalText: {
     fontSize: 13,
+    fontWeight: '500',
+  },
+  aboutVersion: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  aboutLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  aboutLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  libsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  libsContainer: {
+    borderRadius: 12,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  libsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  libsTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  libRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  libInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  libName: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  libVersion: {
+    fontSize: 12,
+  },
+  libLicense: {
+    fontSize: 12,
     fontWeight: '500',
   },
 });

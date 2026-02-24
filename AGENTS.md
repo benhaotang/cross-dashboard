@@ -21,7 +21,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 - **UI**: React Native components with platform-specific adaptations
 - **Icons**: Iconify (`@iconify/react`) - MDI icon set
 - **Navigation**: React Navigation (bottom tabs for mobile, sidebar for web/desktop)
-- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues, selectedCalendars, visibleScreens
+- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues, selectedCalendars, visibleScreens; Pomodoro context (`src/store/PomodoroContext.tsx`) — shared timer state + native module bridge
 - **Secure Storage**: expo-secure-store (keyring integration)
 
 ---
@@ -39,7 +39,10 @@ cross-dashboard/
 │   ├── hooks/          # Custom React hooks
 │   ├── types/          # TypeScript type definitions (index.ts)
 │   ├── utils/          # Helper utilities
-│   └── store/          # State management (AppContext.tsx)
+│   └── store/          # State management (AppContext.tsx, PomodoroContext.tsx)
+├── modules/            # Expo native modules
+│   ├── unified-push/   # UnifiedPush client (Android)
+│   └── pomodoro-service/ # Pomodoro foreground service (Android)
 ├── electron/           # Electron main process (Linux AppImage builds)
 │   └── main.js         # BrowserWindow loading Expo web export
 ├── assets/             # Images, fonts, etc.
@@ -357,7 +360,22 @@ npx expo install --fix
 - [x] Play button on IssuePropertyPage — starts Pomodoro timer (no session logging for issues)
 - [x] New icons: `play`, `pause`, `stop`, `timer`
 
-### Completed (continued 8)
+### Completed (continued 8 — Pomodoro enhancements)
+- [x] Pomodoro state lifted to shared context (`src/store/PomodoroContext.tsx`) — timer logic extracted from component, exposed via `usePomodoro()` hook
+- [x] `PomodoroProvider` wraps app in `App.tsx`; `PomodoroTimer` and `PomodoroMiniView` rendered at root level (above navigator)
+- [x] `PomodoroTimer.tsx` refactored to presentational — reads all state from context, no local timer logic
+- [x] TaskPropertyPage and IssuePropertyPage use context: play button calls `pomodoro.start(title, onSessionComplete?)` instead of local modal state
+- [x] Desktop floating mini view (`src/components/PomodoroMiniView.tsx`) — fixed-position overlay (bottom-right, 220px), visible on web/macOS when timer active and modal hidden; shows phase color bar, task name, countdown (28px), phase label, play/pause + stop + expand controls
+- [x] Android foreground service native module (`modules/pomodoro-service/`) — Expo module following `unified-push` pattern
+- [x] `PomodoroForegroundService.kt` — persistent notification with Chronometer countdown, task name, Play/Pause + Stop action buttons, `CountDownTimer` for native-side countdown
+- [x] `PomodoroAlarmReceiver.kt` — BroadcastReceiver for `AlarmManager.setExactAndAllowWhileIdle()` backup alarms
+- [x] `PomodoroEventBus.kt` — singleton event bridge between Service/Receiver and Expo Module
+- [x] `PomodoroServiceModule.kt` — Expo Module with `startTimer`/`pauseTimer`/`resumeTimer`/`stopTimer`/`canScheduleExactAlarms` functions + `onTick`/`onPhaseEnd`/`onAction`/`onAlarmFired` events
+- [x] TypeScript wrapper (`modules/pomodoro-service/index.ts`) with `Platform.OS` guard, typed event listeners
+- [x] Android permissions: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `USE_EXACT_ALARM`, `SCHEDULE_EXACT_ALARM`, `POST_NOTIFICATIONS`
+- [x] PomodoroContext integrates native module on Android: mirrors start/pause/resume/stop to native, resyncs JS state from native `onTick`/`onAction`/`onPhaseEnd` events
+
+### Completed (continued 9 — visible screens)
 - [x] Configurable visible screens — user can toggle which screens (Dashboard, Inbox, Events, Notes, Tasks, Issues, Views) appear in navigation
 - [x] `ScreenName` type and `ALL_SCREENS` constant in `src/services/cache.ts`
 - [x] `saveVisibleScreens`/`loadVisibleScreens` persistence via AsyncStorage
@@ -365,7 +383,7 @@ npx expo install --fix
 - [x] SidebarNavigator and AppNavigator (mobile tabs) dynamically filter nav items by `visibleScreens` (Settings always shown)
 - [x] Navigation section in SettingsScreen — checkbox toggles per screen with icons, at least one screen must remain visible
 
-### Completed (continued 9)
+### Completed (continued 10 — Views)
 - [x] Views screen (`src/screens/ViewsScreen.tsx`) — Kanban board + Covey's Four Quadrants (Eisenhower matrix)
 - [x] Both tasks AND issues appear in views — tasks matched by `categories`, issues matched by `labels[].name`
 - [x] Kanban view: horizontal scrollable columns, configurable column tags (persisted via `saveKanbanColumns`/`loadKanbanColumns`)
@@ -379,7 +397,7 @@ npx expo install --fix
 - [x] `'Views'` added to `ScreenName` type and `ALL_SCREENS` in `cache.ts`
 - [x] Gitea API extensions: `createRepoLabel()`, `replaceIssueLabels()` in `gitea.ts`
 
-### Completed (continued 10)
+### Completed (continued 11 — Inbox time)
 - [x] Inbox total estimated time — shown at the end of the scrollable list after filtering
 - [x] Events: duration calculated from start/end times; all-day events (midnight-to-midnight, >=24h) are excluded
 - [x] Tasks: time estimated from `#Xm` or `#Xh` tags in `categories` (e.g. `#20m` = 20 minutes, `#2h` = 2 hours)
