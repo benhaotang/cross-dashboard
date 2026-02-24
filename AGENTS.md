@@ -41,9 +41,8 @@ cross-dashboard/
 │   ├── utils/          # Helper utilities
 │   └── store/          # State management (AppContext.tsx, PomodoroContext.tsx)
 ├── modules/            # Expo native modules
-│   ├── unified-push/   # UnifiedPush client (Android)
 │   ├── pomodoro-service/ # Pomodoro foreground service (Android)
-│   └── dashboard-widget/ # Android home screen widget + WorkManager sync
+│   └── dashboard-widget/ # Android home screen widget + WorkManager sync + exact alarms
 ├── electron/           # Electron main process (Linux AppImage builds)
 │   └── main.js         # BrowserWindow loading Expo web export
 ├── assets/             # Images, fonts, etc.
@@ -98,7 +97,7 @@ cross-dashboard/
 - Platform-specific implementations for secure credential storage
 - Methods: `setCredential`, `getCredential`, `deleteCredential`, `hasCredential`, `clearAllCredentials`
 - Web fallback uses localStorage (less secure)
-- Credential keys include: `caldav_password`, `caldav_server`, `caldav_username`, `caldav_auth_method` (manual/nextcloud), `caldav_selected_calendars` (JSON CalDavCalendar[]), `caldav_default_event_calendar`, `caldav_default_task_calendar`, `gitea_token`, `gitea_instance`, `notif_*`, `up_endpoint`, `encryption_key*`
+- Credential keys include: `caldav_password`, `caldav_server`, `caldav_username`, `caldav_auth_method` (manual/nextcloud), `caldav_selected_calendars` (JSON CalDavCalendar[]), `caldav_default_event_calendar`, `caldav_default_task_calendar`, `gitea_token`, `gitea_instance`, `notif_enabled`, `notif_minutes`, `encryption_key*`
 
 ---
 
@@ -150,13 +149,16 @@ Local-only activity counter stored in AsyncStorage under `@cache/daily_stats`:
 - `DashboardScreen` loads `statsStore` on mount and on `lastSync` change, computes `this7` (days 0–6) and `prev7` (days 7–13), shows delta arrows (↑/↓) if prior week has any data
 
 ### Android Widget Module (`modules/dashboard-widget/`)
-Expo native module for the Android home screen widget:
+Expo native module for the Android home screen widget and background event alarm scheduling:
 - **`DashboardWidgetModule.kt`** — Expo Module with functions:
   - `updateWidgetData(eventRowsStr, taskRowsStr, issuesCount, lastSync)` — pipe-separated row strings (up to 3 each), triggers widget redraw
   - `saveWorkerCredentials(caldavServer, caldavUser, caldavPass, calendarHrefs, giteaUrl, giteaToken, giteaRepos)` — persists credentials to SharedPreferences for background worker use; called from SettingsScreen after CalDAV/Gitea save and calendar selection save
-  - `scheduleSync(intervalMinutes)` — schedules/replaces periodic `PeriodicWorkRequest` (min 15 min, default 60); `ExistingPeriodicWorkPolicy.UPDATE`
+  - `scheduleSync(intervalMinutes)` — schedules/replaces periodic `PeriodicWorkRequest` (min 15 min, default 60); `ExistingPeriodicWorkPolicy.UPDATE`; persists interval to `worker_sync_interval` SharedPref
   - `cancelSync()` — cancels the periodic work
   - `forceRefresh()` — triggers immediate widget redraw
+  - `saveWorkerNotificationSettings(enabled, minutesBefore)` — persists `notif_enabled`/`notif_minutes` to SharedPreferences; if enabling, ensures periodic worker is running (`KEEP` policy)
+  - `canScheduleExactAlarms()` — returns `AlarmManager.canScheduleExactAlarms()` on API 31+, else `true`
+  - `requestExactAlarmPermission()` — opens `Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM` system UI
 - **`DashboardWidgetProvider.kt`** — `AppWidgetProvider`:
   - Size-aware: reads `OPTION_APPWIDGET_MIN_HEIGHT` from options bundle, shows 1–3 rows per section via `setViewVisibility()`
   - Handles `onAppWidgetOptionsChanged` (live resize)
@@ -165,12 +167,25 @@ Expo native module for the Android home screen widget:
 - **`WidgetSyncWorker.kt`** — `CoroutineWorker` (WorkManager):
   - Reads credentials from SharedPreferences (set by `saveWorkerCredentials`)
   - Makes CalDAV `REPORT` for upcoming VEVENTs (next 30 days) and pending VTODOs (non-COMPLETED)
-  - Simple line-by-line iCal parser with fold unfolding; parses SUMMARY, DTSTART, DUE
+  - iCal parser parses SUMMARY, DTSTART, UID, LOCATION, DUE; emits `EventInfo(formattedRow, epochMs, uid, summary, location?)`
   - Calls Gitea `/api/v1/repos/{repo}/issues?state=open` and reads `X-Total-Count` header
   - Writes formatted row strings + counts to SharedPreferences, broadcasts `ACTION_UPDATE_WIDGET`
+  - If `notif_enabled=true`: calls `scheduleEventAlarms()` to schedule exact alarms for all future events
+- **`EventAlarmReceiver.kt`** — `BroadcastReceiver` for exact alarm intents:
+  - Intent extras: `summary`, `location`, `type` ("at_time"|"remind_before"), `minutes`, `notif_id`
+  - Notification channel: `event_reminders` (IMPORTANCE_HIGH), created lazily via `createChannel()` static helper
+  - Body: "Starting now [at location]" (at_time) or "In N minutes [at location]" (remind_before)
+  - Checks `POST_NOTIFICATIONS` permission on API 33+
+- **`BootReceiver.kt`** — `BroadcastReceiver` for `BOOT_COMPLETED`/`MY_PACKAGE_REPLACED`:
+  - Enqueues a one-shot `WidgetSyncWorker` (CONNECTED constraint) to reschedule alarms after reboot/update
+- **Alarm scheduling** in `WidgetSyncWorker`:
+  - Stable alarm IDs from `abs(uid.hashCode()) % 50_000`; at-time ID = baseId, remind-before ID = baseId + 50_000
+  - Cancel-then-reschedule is idempotent per sync run
+  - Uses `AlarmManager.setExactAndAllowWhileIdle(RTC_WAKEUP, …)`, catches `SecurityException` silently
 - **`widget_dashboard.xml`** — `RelativeLayout` with EVENTS section (3 rows + empty fallback), TASKS section (3 rows + empty fallback), issues count + last-sync footer, and a circular `+` FAB (`Button` with `@drawable/fab_background` oval shape) pinned bottom-right
-- **`index.ts`** — TypeScript wrapper with `isAvailable()`, `updateWidgetData()`, `saveWorkerCredentials()`, `scheduleSync()`, `cancelSync()`, `forceRefresh()`
-- **SharedPreferences key** (`cross_dashboard_widget`): `event_row_0/1/2`, `task_row_0/1/2`, `events_count`, `tasks_count`, `issues_count`, `last_sync`, `worker_caldav_*`, `worker_gitea_*`, `worker_calendar_hrefs`, `worker_gitea_repos`
+- **`index.ts`** — TypeScript wrapper with `isAvailable()`, `updateWidgetData()`, `saveWorkerCredentials()`, `scheduleSync()`, `cancelSync()`, `forceRefresh()`, `saveWorkerNotificationSettings()`, `canScheduleExactAlarms()`, `requestExactAlarmPermission()`
+- **SharedPreferences key** (`cross_dashboard_widget`): `event_row_0/1/2`, `task_row_0/1/2`, `events_count`, `tasks_count`, `issues_count`, `last_sync`, `worker_caldav_*`, `worker_gitea_*`, `worker_calendar_hrefs`, `worker_gitea_repos`, `worker_sync_interval`, `notif_enabled`, `notif_minutes`
+- **Permissions** declared in module manifest: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`
 
 ### Property Pages (`src/components/*PropertyPage.tsx`)
 Full-screen modal overlays for viewing/editing item details. Built on shared components from `PropertyPageShared.tsx`:
@@ -369,7 +384,7 @@ npx expo install --fix
 ### Completed (continued 2)
 - [x] Native icon support (@expo/vector-icons MaterialCommunityIcons for native, Iconify for web)
 - [x] CalDAV notes sync (VJOURNAL fetch/create/update/delete, wired to NotesScreen)
-- [x] Push notifications (expo-notifications for local event reminders, UnifiedPush client for de-googled Android)
+- [x] Push notifications (expo-notifications for local event reminders, JS-side scheduling for remind-before and at-time)
 
 ### Completed (continued 3)
 - [x] Widget support (Android home screen widget — see Android Widget Module section for full details)
@@ -482,6 +497,15 @@ npx expo install --fix
 - [x] **Configurable sync interval** — Settings > Home Screen Widget (Android only); min 15 min, default 60 min; saved via `cache.saveWidgetSyncInterval()`; calls `DashboardWidget.scheduleSync()`
 - [x] **Worker credentials** — `DashboardWidget.saveWorkerCredentials()` called from SettingsScreen after CalDAV save, Gitea save, and calendar selection save; stores all needed data in SharedPreferences
 - [x] **Fixed "always not synced"** — `useSyncAll` now captures fresh events/tasks/issues from fetch results (not stale `state.*`) before calling `DashboardWidget.updateWidgetData()`; widget update uses `Platform.OS === 'android'` guard
+
+### Completed (continued 15 — background event alarms, remove UnifiedPush)
+- [x] **UnifiedPush removed** — `modules/unified-push/` deleted; all UP imports, state, listeners, and JSX removed from `SettingsScreen.tsx` and `notifications.ts`; `up_endpoint` removed from `CredentialKey`
+- [x] **At-time notifications** — `scheduleEventReminders()` now schedules both remind-before and at-time (`event.start`) local notifications; body: "Starting now [at location]"
+- [x] **Native exact alarms** — `WidgetSyncWorker` schedules `AlarmManager.setExactAndAllowWhileIdle(RTC_WAKEUP)` alarms for every future event after each background sync; two alarms per event (at-time + remind-before); stable IDs from `abs(uid.hashCode()) % 50_000`
+- [x] **`EventAlarmReceiver`** — fires `NotificationCompat` (channel `event_reminders`, IMPORTANCE_HIGH) on alarm; checks `POST_NOTIFICATIONS` on API 33+
+- [x] **`BootReceiver`** — reschedules alarms on `BOOT_COMPLETED`/`MY_PACKAGE_REPLACED` via one-shot `WidgetSyncWorker`
+- [x] **Three new module functions**: `saveWorkerNotificationSettings`, `canScheduleExactAlarms`, `requestExactAlarmPermission` — wired in `DashboardWidgetModule.kt` and `modules/dashboard-widget/index.ts`
+- [x] **SettingsScreen alarm UX** — checks `canScheduleExactAlarms` on load; shows "Grant Alarms & Reminders Permission" button when permission missing; `toggleNotifications` gates on permission before enabling; both `toggleNotifications` and `saveReminderMinutes` call `saveWorkerNotificationSettings` on Android
 
 ---
 

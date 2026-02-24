@@ -404,7 +404,7 @@ export default function ViewsScreen() {
           {quadrantData.map((q) => (
             <View key={q.tag} style={[styles.quadrant, { borderColor: c.border }]}>
               <View style={[styles.quadrantHeader, { backgroundColor: q.color }]}>
-                <View>
+                <View style={styles.quadrantTitleContainer}>
                   <Text style={styles.quadrantTitle}>{q.label}</Text>
                   <Text style={styles.quadrantSubtitle}>{q.subtitle}</Text>
                 </View>
@@ -701,6 +701,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  quadrantTitleContainer: {
+    flex: 1,
+    marginRight: 6,
   },
   quadrantTitle: {
     fontSize: 14,
