@@ -2,16 +2,14 @@ package expo.modules.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -26,10 +24,8 @@ data class EventInfo(
 )
 
 data class TaskInfo(
-    val formattedRow: String,
-    val dueMs: Long,
-    val uid: String,
-    val summary: String
+    val summary: String,
+    val dueMs: Long
 )
 
 class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -81,6 +77,28 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         val allFutureEvents = events.filter { it.epochMs >= now }.sortedBy { it.epochMs }
 
+        // ── Overdue tasks (DUE < now) ─────────────────────────────────────────
+        val overdueTasks = tasks
+            .filter { it.dueMs > 0 && it.dueMs < now }
+            .take(3)
+
+        // ── Events remaining today ────────────────────────────────────────────
+        val endOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+        }.timeInMillis
+        val eventsRemainingToday = events.count { it.epochMs in now..endOfToday }
+
+        // ── Pending tasks (for old widget: sorted by due, first 3) ────────────
+        val pendingRows = tasks
+            .sortedWith(compareBy(nullsLast()) { it.dueMs.takeIf { ms -> ms > 0 } })
+            .take(3)
+            .map { t ->
+                val prefix = if (t.dueMs > 0 && t.dueMs < now) "⚠ " else "• "
+                "$prefix${t.summary}"
+            }
+
         // ── Gitea ─────────────────────────────────────────────────────────────
         if (giteaUrl != null && !giteaToken.isNullOrEmpty()) {
             for (repo in giteaRepos) {
@@ -93,16 +111,27 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         // ── Persist widget data ───────────────────────────────────────────────
         val syncTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val editor = prefs.edit()
+
+        // Old widget data (event rows + task rows)
         editor.putString("event_row_0", upcoming.getOrNull(0)?.formattedRow ?: "")
         editor.putString("event_row_1", upcoming.getOrNull(1)?.formattedRow ?: "")
         editor.putString("event_row_2", upcoming.getOrNull(2)?.formattedRow ?: "")
         editor.putInt("events_count", upcoming.size)
-        editor.putString("task_row_0", tasks.getOrNull(0)?.formattedRow ?: "")
-        editor.putString("task_row_1", tasks.getOrNull(1)?.formattedRow ?: "")
-        editor.putString("task_row_2", tasks.getOrNull(2)?.formattedRow ?: "")
-        editor.putInt("tasks_count", tasks.size)
+        editor.putString("task_row_0", pendingRows.getOrNull(0) ?: "")
+        editor.putString("task_row_1", pendingRows.getOrNull(1) ?: "")
+        editor.putString("task_row_2", pendingRows.getOrNull(2) ?: "")
+        editor.putInt("tasks_count", pendingRows.size)
         editor.putInt("issues_count", issueCount)
         editor.putString("last_sync", "Synced $syncTime")
+
+        // New 4x4 widget data
+        editor.putString("overdue_task_row_0", overdueTasks.getOrNull(0)?.summary ?: "")
+        editor.putString("overdue_task_row_1", overdueTasks.getOrNull(1)?.summary ?: "")
+        editor.putString("overdue_task_row_2", overdueTasks.getOrNull(2)?.summary ?: "")
+        editor.putInt("overdue_tasks_count", overdueTasks.size)
+        editor.putInt("events_remaining_today", eventsRemainingToday)
+        // Note: pomodoro_sessions_today is only updated from the JS side; don't overwrite here
+
         editor.apply()
 
         // ── Schedule event alarms ─────────────────────────────────────────────
@@ -110,11 +139,9 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val notifMinutes = prefs.getString("notif_minutes", "15")?.toIntOrNull() ?: 15
         if (notifEnabled) {
             scheduleEventAlarms(allFutureEvents, notifMinutes)
-            val futureTasks = tasks.filter { it.dueMs > now }
-            scheduleTaskAlarms(futureTasks, notifMinutes)
         }
 
-        // ── Trigger widget refresh ────────────────────────────────────────────
+        // ── Trigger widget refresh (both old and new widgets) ─────────────────
         val intent = Intent(applicationContext, DashboardWidgetProvider::class.java)
         intent.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
         applicationContext.sendBroadcast(intent)
@@ -133,14 +160,11 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val atTimeId = baseId
             val remindBeforeId = baseId + 50_000
 
-            // Cancel existing pending intents for both IDs (idempotent)
             cancelAlarm(alarmManager, atTimeId)
             cancelAlarm(alarmManager, remindBeforeId)
 
-            // at-time alarm
             scheduleAlarm(alarmManager, event, "at_time", atTimeId, event.epochMs, notifMinutes)
 
-            // remind-before alarm
             if (notifMinutes > 0) {
                 val remindMs = event.epochMs - notifMinutes * 60_000L
                 if (remindMs > now) {
@@ -172,43 +196,6 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         try {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
         } catch (_: SecurityException) {}
-    }
-
-    private fun scheduleTaskAlarms(tasks: List<TaskInfo>, notifMinutes: Int) {
-        val alarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val now = System.currentTimeMillis()
-
-        for (task in tasks) {
-            val baseId = abs(task.uid.hashCode()) % 50_000
-            val atDueId = baseId + 100_000
-            val remindBeforeId = baseId + 150_000
-
-            cancelAlarm(alarmManager, atDueId)
-            cancelAlarm(alarmManager, remindBeforeId)
-
-            scheduleAlarm(
-                alarmManager,
-                EventInfo(task.formattedRow, task.dueMs, task.uid, task.summary, null),
-                "at_time",
-                atDueId,
-                task.dueMs,
-                notifMinutes
-            )
-
-            if (notifMinutes > 0) {
-                val remindMs = task.dueMs - notifMinutes * 60_000L
-                if (remindMs > now) {
-                    scheduleAlarm(
-                        alarmManager,
-                        EventInfo(task.formattedRow, task.dueMs, task.uid, task.summary, null),
-                        "remind_before",
-                        remindBeforeId,
-                        remindMs,
-                        notifMinutes
-                    )
-                }
-            }
-        }
     }
 
     private fun cancelAlarm(alarmManager: AlarmManager, notifId: Int) {
@@ -251,7 +238,7 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
     // ── CalDAV REPORT for VTODO ───────────────────────────────────────────────
     private fun fetchCalendarTasks(
         server: String, user: String, pass: String, href: String
-    ): List<String> {
+    ): List<TaskInfo> {
         val body = """<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:prop><D:getetag/><C:calendar-data/></D:prop>
@@ -273,7 +260,6 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private fun makeCalDavRequest(
         server: String, user: String, pass: String, href: String, body: String
     ): String {
-        // Build full URL: if href starts with /, append to scheme+host portion of server
         val base = server.trimEnd('/')
         val path = if (href.startsWith("/")) href else "/$href"
         val fullUrl = if (href.startsWith("http")) href else "$base$path"
@@ -344,18 +330,15 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         var inVTodo = false
         var summary = ""
         var due = 0L
-        var uid = ""
 
         for (rawLine in unfoldIcal(ical)) {
             val line = rawLine.trim()
             when {
-                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L; uid = "" }
+                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L }
                 line == "END:VTODO" -> {
                     inVTodo = false
                     if (summary.isNotEmpty()) {
-                        val prefix = if (due > 0 && due < System.currentTimeMillis()) "⚠ " else "• "
-                        val effectiveUid = uid.ifEmpty { "$summary$due" }
-                        results.add(TaskInfo("$prefix$summary", due, effectiveUid, summary))
+                        results.add(TaskInfo(summary, due))
                     }
                 }
                 inVTodo && line.startsWith("SUMMARY") -> {
@@ -363,9 +346,6 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 }
                 inVTodo && (line.startsWith("DUE:") || line.startsWith("DUE;")) -> {
                     due = parseICalDate(line.substringAfter(':').trim())
-                }
-                inVTodo && line.startsWith("UID:") -> {
-                    uid = line.substringAfter(':').trim()
                 }
             }
         }
@@ -392,16 +372,16 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private fun parseICalDate(value: String): Long {
         return try {
             when {
-                value.length == 8 -> { // DATE: 20240115
+                value.length == 8 -> {
                     SimpleDateFormat("yyyyMMdd", Locale.US).parse(value)?.time ?: 0L
                 }
-                value.endsWith("Z") -> { // UTC datetime
+                value.endsWith("Z") -> {
                     val fmt = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US).apply {
                         timeZone = TimeZone.getTimeZone("UTC")
                     }
                     fmt.parse(value)?.time ?: 0L
                 }
-                value.length >= 15 -> { // Local datetime
+                value.length >= 15 -> {
                     SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.US).parse(value.take(15))?.time ?: 0L
                 }
                 else -> 0L
@@ -421,7 +401,6 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         if (conn.responseCode !in 200..299) return 0
 
-        // Gitea returns X-Total-Count header
         val total = conn.getHeaderField("X-Total-Count")
         conn.inputStream.close()
         return total?.toIntOrNull() ?: 0

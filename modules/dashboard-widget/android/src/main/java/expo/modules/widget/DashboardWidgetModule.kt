@@ -118,6 +118,31 @@ class DashboardWidgetModule : Module() {
         }
 
         /**
+         * Store per-day stats for the 4x4 main widget.
+         * eventsRemainingToday: events today that haven't started yet.
+         * pomodoroSessionsToday: sessions completed today (only JS side knows).
+         * overdueTaskRowsStr: pipe-separated list of overdue task summaries (up to 3).
+         */
+        Function("updateWidgetStats") { eventsRemainingToday: Int, pomodoroSessionsToday: Int, overdueTaskRowsStr: String ->
+            val context = appContext.reactContext ?: return@Function false
+
+            val overdueParts = overdueTaskRowsStr.split("|").map { it.trim() }
+
+            val prefs = context.getSharedPreferences("cross_dashboard_widget", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putInt("events_remaining_today", eventsRemainingToday)
+                .putInt("pomodoro_sessions_today", pomodoroSessionsToday)
+                .putString("overdue_task_row_0", overdueParts.getOrNull(0) ?: "")
+                .putString("overdue_task_row_1", overdueParts.getOrNull(1) ?: "")
+                .putString("overdue_task_row_2", overdueParts.getOrNull(2) ?: "")
+                .putInt("overdue_tasks_count", overdueParts.count { it.isNotEmpty() })
+                .apply()
+
+            triggerRefresh(context)
+            true
+        }
+
+        /**
          * Save notification settings for the background worker.
          * If enabled, ensures the periodic worker is running.
          */

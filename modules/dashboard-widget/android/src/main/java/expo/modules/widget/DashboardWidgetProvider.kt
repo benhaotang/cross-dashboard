@@ -10,6 +10,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.RemoteViews
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 
 class DashboardWidgetProvider : AppWidgetProvider() {
 
@@ -31,20 +35,33 @@ class DashboardWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_UPDATE_WIDGET) {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(
-                ComponentName(context, DashboardWidgetProvider::class.java)
-            )
-            for (id in ids) {
-                val options = manager.getAppWidgetOptions(id)
-                updateWidget(context, manager, id, options)
+        when (intent.action) {
+            ACTION_UPDATE_WIDGET -> {
+                val manager = AppWidgetManager.getInstance(context)
+                val ids = manager.getAppWidgetIds(
+                    ComponentName(context, DashboardWidgetProvider::class.java)
+                )
+                for (id in ids) {
+                    val options = manager.getAppWidgetOptions(id)
+                    updateWidget(context, manager, id, options)
+                }
+            }
+            ACTION_FORCE_SYNC -> {
+                // Enqueue a one-shot worker to fetch fresh data
+                val constraints = Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+                val request = OneTimeWorkRequestBuilder<WidgetSyncWorker>()
+                    .setConstraints(constraints)
+                    .build()
+                WorkManager.getInstance(context).enqueue(request)
             }
         }
     }
 
     companion object {
         const val ACTION_UPDATE_WIDGET = "expo.modules.widget.UPDATE_WIDGET"
+        const val ACTION_FORCE_SYNC = "expo.modules.widget.FORCE_SYNC"
         private const val PREFS_NAME = "cross_dashboard_widget"
 
         /**
@@ -123,6 +140,15 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             val issuesLabel = if (issuesCount > 0) "● $issuesCount open issues" else ""
             views.setTextViewText(R.id.widget_issues_label, issuesLabel)
             views.setTextViewText(R.id.widget_last_sync, lastSync)
+
+            // ── Sync FAB: trigger force sync ───────────────────────────────────
+            val syncIntent = Intent(context, DashboardWidgetProvider::class.java)
+            syncIntent.action = ACTION_FORCE_SYNC
+            val syncPending = PendingIntent.getBroadcast(
+                context, 2, syncIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_sync_fab, syncPending)
 
             // ── FAB: open app to Tasks screen with add action ──────────────────
             val fabIntent = Intent(Intent.ACTION_VIEW, Uri.parse("crossdashboard://tasks?action=add"))

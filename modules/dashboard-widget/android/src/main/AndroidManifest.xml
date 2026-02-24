@@ -4,6 +4,7 @@
   <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <application>
+    <!-- Original compact widget -->
     <receiver
       android:name="expo.modules.widget.DashboardWidgetProvider"
       android:exported="true"
@@ -15,6 +16,33 @@
         android:name="android.appwidget.provider"
         android:resource="@xml/dashboard_widget_info" />
     </receiver>
+
+    <!-- 4x4 main dashboard widget -->
+    <receiver
+      android:name="expo.modules.widget.MainDashboardWidgetProvider"
+      android:exported="true"
+      android:label="Dashboard Main">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/main_dashboard_widget_info" />
+    </receiver>
+
+    <!-- 1x1 quick-add widget -->
+    <receiver
+      android:name="expo.modules.widget.QuickAddWidgetProvider"
+      android:exported="true"
+      android:label="Quick Add Task">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/quick_add_widget_info" />
+    </receiver>
+
     <receiver android:name="expo.modules.widget.EventAlarmReceiver" android:exported="false" />
     <receiver android:name="expo.modules.widget.BootReceiver" android:exported="true">
       <intent-filter>

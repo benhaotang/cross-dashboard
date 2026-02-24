@@ -123,6 +123,28 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
           openIssues.length,
           syncLabel
         );
+
+        // Update 4x4 widget stats: overdue tasks, events remaining today, pomodoro sessions
+        const endOfToday = new Date(now);
+        endOfToday.setHours(23, 59, 59, 999);
+        const eventsRemainingToday = freshEvents.filter(
+          (e) => e.start >= now && e.start <= endOfToday
+        ).length;
+
+        const overdueTasks = freshTasks
+          .filter((t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && t.due && t.due < now)
+          .slice(0, 3);
+        const overdueTaskRows = overdueTasks.map((t) => t.summary).join('|');
+
+        const statsStore = await cache.loadStatsStore();
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const todayStats = statsStore[todayKey] ?? { tasksCompleted: 0, pomodoroSessions: 0, issuesClosed: 0 };
+
+        DashboardWidget.updateWidgetStats(
+          eventsRemainingToday,
+          todayStats.pomodoroSessions,
+          overdueTaskRows
+        );
       }
     } catch (error) {
       console.error('Error syncing data:', error);

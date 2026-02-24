@@ -3,6 +3,7 @@ import { requireNativeModule } from 'expo-modules-core';
 
 interface WidgetNativeModule {
   updateWidgetData(eventRowsStr: string, taskRowsStr: string, issuesCount: number, lastSync: string): boolean;
+  updateWidgetStats(eventsRemainingToday: number, pomodoroSessionsToday: number, overdueTaskRowsStr: string): boolean;
   saveWorkerCredentials(
     caldavServer: string,
     caldavUser: string,
@@ -41,6 +42,15 @@ export function updateWidgetData(
 ): boolean {
   if (!nativeModule) return false;
   return nativeModule.updateWidgetData(eventRowsStr, taskRowsStr, issuesCount, lastSync);
+}
+
+export function updateWidgetStats(
+  eventsRemainingToday: number,
+  pomodoroSessionsToday: number,
+  overdueTaskRowsStr: string
+): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.updateWidgetStats(eventsRemainingToday, pomodoroSessionsToday, overdueTaskRowsStr);
 }
 
 export function saveWorkerCredentials(

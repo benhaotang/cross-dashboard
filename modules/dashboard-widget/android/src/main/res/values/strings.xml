@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Shows upcoming events and open issues</string>
+    <string name="main_widget_description">Cross-Dashboard: events, overdue tasks &amp; stats (4x4)</string>
+    <string name="quick_add_widget_description">Quick add task</string>
 </resources>
