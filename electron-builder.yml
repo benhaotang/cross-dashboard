@@ -1,0 +1,26 @@
+appId: com.crossdashboard.app
+productName: Cross Dashboard
+copyright: "Copyright © 2024 Cross Dashboard"
+
+# Override main entry for the packaged Electron app
+# (package.json main points to index.ts for Expo; this overrides it for Electron)
+extraMetadata:
+  main: electron/main.js
+
+directories:
+  output: dist-electron
+  buildResources: assets
+
+files:
+  - electron/**/*
+  - dist/**/*
+  - "!node_modules/**/*"
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  synopsis: "Unified web dashboard for CalDAV, Notes, and Gitea"
+  icon: assets/icon.png
+
+artifactName: "${productName}-${version}-linux-${arch}.AppImage"

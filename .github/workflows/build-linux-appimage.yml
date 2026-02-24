@@ -1,0 +1,56 @@
+name: Build Linux AppImage
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build AppImage (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            electron_arch: x64
+          - arch: aarch64
+            electron_arch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web export
+        run: pnpm exec expo export --platform web
+
+      - name: Build AppImage (${{ matrix.arch }})
+        run: pnpm exec electron-builder --linux AppImage --${{ matrix.electron_arch }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-dashboard-linux-${{ matrix.arch }}
+          path: dist-electron/*.AppImage
+
+      - name: Attach AppImage to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-electron/*.AppImage
