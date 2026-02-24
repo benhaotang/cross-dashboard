@@ -16,10 +16,21 @@ import AppIcon, { Icons } from '../components/Icon';
 
 type FilterType = 'all' | 'today' | 'week' | 'month';
 
+function useCalendarColorMap(calendars: CalDavCalendar[]): Map<string, string> {
+  return React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cal of calendars) {
+      if (cal.color) map.set(cal.href, cal.color);
+    }
+    return map;
+  }, [calendars]);
+}
+
 export default function EventsScreen() {
   const { state, setEvents, setLoading } = useApp();
   const theme = useTheme();
   const [filter, setFilter] = useState<FilterType>('all');
+  const calColorMap = useCalendarColorMap(state.selectedCalendars);
 
   useEffect(() => {
     if (state.caldavConfigured && state.events.length === 0) {
@@ -78,9 +89,11 @@ export default function EventsScreen() {
   const c = theme.colors;
 
   function renderEvent({ item }: { item: CalendarEvent }) {
+    const calColor = item.calendarHref ? calColorMap.get(item.calendarHref) : undefined;
     return (
       <View style={[styles.eventCard, { backgroundColor: c.surface }]}>
         <View style={styles.eventHeader}>
+          {calColor && <View style={[styles.eventCalDot, { backgroundColor: calColor }]} />}
           <Text style={[styles.eventTitle, { color: c.text }]}>{item.summary}</Text>
         </View>
         <Text style={[styles.eventTime, { color: c.primary }]}>{formatEventTime(item)}</Text>
@@ -186,11 +199,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   eventHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 8,
+  },
+  eventCalDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
+    flex: 1,
   },
   eventTime: {
     fontSize: 14,

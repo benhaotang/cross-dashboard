@@ -14,6 +14,7 @@ import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
+import * as keyring from '../services/keyring';
 import { parseTaskInput, TaskDefaults, DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
@@ -115,9 +116,20 @@ const STATUS_OPTIONS: { label: string; value: TaskStatus }[] = [
 
 const PRIORITY_OPTIONS = ['None', 'Low', 'Medium', 'High'];
 
+function useCalendarColorMap(calendars: CalDavCalendar[]): Map<string, string> {
+  return React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cal of calendars) {
+      if (cal.color) map.set(cal.href, cal.color);
+    }
+    return map;
+  }, [calendars]);
+}
+
 export default function TasksScreen() {
   const { state, setTasks } = useApp();
   const theme = useTheme();
+  const calColorMap = useCalendarColorMap(state.selectedCalendars);
   const [modalVisible, setModalVisible] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -126,6 +138,7 @@ export default function TasksScreen() {
   // Quick input state
   const [quickInput, setQuickInput] = useState('');
   const [taskDefaults, setTaskDefaults] = useState<TaskDefaults>(DEFAULT_TASK_DEFAULTS);
+  const [defaultTaskCal, setDefaultTaskCal] = useState<string | null>(null);
 
   // Modal form state
   const [editTask, setEditTask] = useState<CalDavTask | null>(null);
@@ -145,8 +158,12 @@ export default function TasksScreen() {
   }, [state.caldavConfigured]);
 
   async function loadDefaults() {
-    const saved = await cache.loadTaskDefaults();
+    const [saved, defCal] = await Promise.all([
+      cache.loadTaskDefaults(),
+      keyring.getCredential('caldav_default_task_calendar'),
+    ]);
     if (saved) setTaskDefaults(saved);
+    if (defCal) setDefaultTaskCal(defCal);
   }
 
   // Live parse preview
@@ -160,6 +177,11 @@ export default function TasksScreen() {
       .filter((c: CalDavCalendar) => c.components.includes('VTODO'))
       .map((c: CalDavCalendar) => c.href);
     return hrefs.length > 0 ? hrefs : undefined;
+  }
+
+  function getDefaultTaskCalHref(): string | undefined {
+    if (defaultTaskCal) return defaultTaskCal;
+    return getTaskCalendarHrefs()?.[0];
   }
 
   async function syncTasks() {
@@ -220,7 +242,7 @@ export default function TasksScreen() {
       parentUid: undefined as string | undefined,
     };
 
-    const taskCalHref = getTaskCalendarHrefs()?.[0];
+    const taskCalHref = getDefaultTaskCalHref();
     let newTask: CalDavTask;
     if (state.caldavConfigured) {
       const created = await caldav.createTask(taskData, taskCalHref);
@@ -233,7 +255,7 @@ export default function TasksScreen() {
     setTasks(newTasks);
     await cache.saveTasks(newTasks);
     setQuickInput('');
-  }, [quickInput, taskDefaults, state.caldavConfigured, state.selectedCalendars, state.tasks, setTasks]);
+  }, [quickInput, taskDefaults, state.caldavConfigured, state.selectedCalendars, state.tasks, setTasks, defaultTaskCal]);
 
   function openNewTask() {
     setEditTask(null);
@@ -304,7 +326,7 @@ export default function TasksScreen() {
         parentUid: formParentUid || undefined,
       };
 
-      const taskCalHref = getTaskCalendarHrefs()?.[0];
+      const taskCalHref = getDefaultTaskCalHref();
       let newTask: CalDavTask;
       if (state.caldavConfigured) {
         const created = await caldav.createTask(taskData, taskCalHref);
@@ -376,6 +398,9 @@ export default function TasksScreen() {
 
           <View style={styles.taskContent}>
             <View style={styles.taskTitleRow}>
+              {task.calendarHref && calColorMap.get(task.calendarHref) && (
+                <View style={[styles.taskCalDot, { backgroundColor: calColorMap.get(task.calendarHref) }]} />
+              )}
               {priorityColor && (
                 <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
               )}
@@ -814,6 +839,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  taskCalDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   priorityDot: {
     width: 8,

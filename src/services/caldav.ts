@@ -175,6 +175,14 @@ export async function fetchEvents(calendarHrefs?: string[]): Promise<CalendarEve
 
   const allEvents: CalendarEvent[] = [];
 
+  // Build a map from URL to href for tagging
+  const urlToHref = new Map<string, string>();
+  if (calendarHrefs && calendarHrefs.length > 0) {
+    for (const href of calendarHrefs) {
+      urlToHref.set(resolveHref(client.serverUrl, href), href);
+    }
+  }
+
   for (const url of urls) {
     try {
       const response = await fetch(url, {
@@ -202,7 +210,12 @@ export async function fetchEvents(calendarHrefs?: string[]): Promise<CalendarEve
 
       if (response.ok || response.status === 207) {
         const text = await response.text();
-        allEvents.push(...parseICalEvents(text));
+        const events = parseICalEvents(text);
+        const href = urlToHref.get(url);
+        if (href) {
+          for (const ev of events) ev.calendarHref = href;
+        }
+        allEvents.push(...events);
       }
     } catch {
       // skip failed calendars
@@ -445,6 +458,14 @@ export async function fetchTasks(calendarHrefs?: string[]): Promise<CalDavTask[]
 
   const allTasks: CalDavTask[] = [];
 
+  // Build a map from URL to href for tagging
+  const urlToHref = new Map<string, string>();
+  if (calendarHrefs && calendarHrefs.length > 0) {
+    for (const href of calendarHrefs) {
+      urlToHref.set(resolveHref(client.serverUrl, href), href);
+    }
+  }
+
   for (const url of urls) {
     try {
       const response = await fetch(url, {
@@ -470,7 +491,12 @@ export async function fetchTasks(calendarHrefs?: string[]): Promise<CalDavTask[]
 
       if (response.ok || response.status === 207) {
         const text = await response.text();
-        allTasks.push(...parseVTodoEntries(text));
+        const tasks = parseVTodoEntries(text);
+        const href = urlToHref.get(url);
+        if (href) {
+          for (const t of tasks) t.calendarHref = href;
+        }
+        allTasks.push(...tasks);
       }
     } catch {
       // skip failed calendars

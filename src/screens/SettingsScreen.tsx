@@ -44,6 +44,8 @@ export default function SettingsScreen() {
   const [availableCalendars, setAvailableCalendars] = useState<CalDavCalendar[]>([]);
   const [calendarSelection, setCalendarSelection] = useState<Set<string>>(new Set());
   const [fetchingCalendars, setFetchingCalendars] = useState(false);
+  const [defaultEventCalendar, setDefaultEventCalendar] = useState<string>('');
+  const [defaultTaskCalendar, setDefaultTaskCalendar] = useState<string>('');
 
   // Gitea settings
   const [giteaInstance, setGiteaInstance] = useState('');
@@ -111,13 +113,15 @@ export default function SettingsScreen() {
   }, []);
 
   async function loadSettings() {
-    const [server, username, instance, customKey, savedAuthMethod, savedCalendars] = await Promise.all([
+    const [server, username, instance, customKey, savedAuthMethod, savedCalendars, savedDefEvent, savedDefTask] = await Promise.all([
       keyring.getCredential('caldav_server'),
       keyring.getCredential('caldav_username'),
       keyring.getCredential('gitea_instance'),
       crypto.hasCustomKey(),
       keyring.getCredential('caldav_auth_method'),
       keyring.getCredential('caldav_selected_calendars'),
+      keyring.getCredential('caldav_default_event_calendar'),
+      keyring.getCredential('caldav_default_task_calendar'),
     ]);
 
     if (server) setCaldavServer(server);
@@ -135,6 +139,8 @@ export default function SettingsScreen() {
         setCalendarSelection(new Set(cals.map((c) => c.href)));
       } catch { /* ignore parse errors */ }
     }
+    if (savedDefEvent) setDefaultEventCalendar(savedDefEvent);
+    if (savedDefTask) setDefaultTaskCalendar(savedDefTask);
   }
 
   async function loadNotificationSettings() {
@@ -363,6 +369,16 @@ export default function SettingsScreen() {
     showAlert('Saved', `${selected.length} calendar(s) selected for sync`);
   }
 
+  async function setDefaultEventCal(href: string) {
+    setDefaultEventCalendar(href);
+    await keyring.setCredential('caldav_default_event_calendar', href);
+  }
+
+  async function setDefaultTaskCal(href: string) {
+    setDefaultTaskCalendar(href);
+    await keyring.setCredential('caldav_default_task_calendar', href);
+  }
+
   async function saveGitea() {
     if (!giteaInstance || !giteaToken) {
       showAlert('Error', 'Please fill in Gitea instance URL and token');
@@ -451,6 +467,8 @@ export default function SettingsScreen() {
     setAvailableCalendars([]);
     setCalendarSelection(new Set());
     setSelectedCalendars([]);
+    setDefaultEventCalendar('');
+    setDefaultTaskCalendar('');
     showAlert('Cleared', 'All credentials have been removed');
   }
 
@@ -918,6 +936,69 @@ export default function SettingsScreen() {
               <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalendarSelection}>
                 <Text style={styles.buttonText}>Save Calendar Selection</Text>
               </TouchableOpacity>
+
+              {/* Default calendar pickers */}
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+              <Text style={[styles.subsectionTitle, { color: c.text }]}>Default Calendars</Text>
+              <Text style={[styles.hint, { color: c.textTertiary, marginBottom: 8 }]}>
+                New events and tasks will be saved to these calendars.
+              </Text>
+
+              <Text style={[styles.label, { color: c.text }]}>Default Event Calendar</Text>
+              <View style={styles.defaultCalPicker}>
+                {availableCalendars
+                  .filter((cal) => calendarSelection.has(cal.href) && cal.components.includes('VEVENT'))
+                  .map((cal) => (
+                    <TouchableOpacity
+                      key={cal.href}
+                      style={[
+                        styles.defaultCalOption,
+                        { borderColor: c.border },
+                        defaultEventCalendar === cal.href && { backgroundColor: c.primary, borderColor: c.primary },
+                      ]}
+                      onPress={() => setDefaultEventCal(cal.href)}
+                    >
+                      {cal.color && <View style={[styles.defaultCalDot, { backgroundColor: cal.color }]} />}
+                      <Text
+                        style={[
+                          styles.defaultCalText,
+                          { color: defaultEventCalendar === cal.href ? '#fff' : c.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {cal.displayName}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+
+              <Text style={[styles.label, { color: c.text }]}>Default Task Calendar</Text>
+              <View style={styles.defaultCalPicker}>
+                {availableCalendars
+                  .filter((cal) => calendarSelection.has(cal.href) && cal.components.includes('VTODO'))
+                  .map((cal) => (
+                    <TouchableOpacity
+                      key={cal.href}
+                      style={[
+                        styles.defaultCalOption,
+                        { borderColor: c.border },
+                        defaultTaskCalendar === cal.href && { backgroundColor: c.primary, borderColor: c.primary },
+                      ]}
+                      onPress={() => setDefaultTaskCal(cal.href)}
+                    >
+                      {cal.color && <View style={[styles.defaultCalDot, { backgroundColor: cal.color }]} />}
+                      <Text
+                        style={[
+                          styles.defaultCalText,
+                          { color: defaultTaskCalendar === cal.href ? '#fff' : c.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {cal.displayName}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
             </>
           ) : (
             <>
@@ -1185,5 +1266,30 @@ const styles = StyleSheet.create({
   calBadgeText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  defaultCalPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  defaultCalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    maxWidth: 180,
+  },
+  defaultCalDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  defaultCalText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

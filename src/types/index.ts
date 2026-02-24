@@ -20,6 +20,7 @@ export interface CalendarEvent {
   description?: string;
   location?: string;
   calendar?: string;
+  calendarHref?: string;  // href of the calendar this event was fetched from
 }
 
 export interface Note {
@@ -49,6 +50,7 @@ export interface CalDavTask {
   categories?: string[];
   location?: string;
   parentUid?: string;      // RELATED-TO;RELTYPE=PARENT value
+  calendarHref?: string;   // href of the calendar this task was fetched from
 }
 
 // Gitea Types
