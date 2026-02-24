@@ -89,12 +89,8 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState('15');
 
-  // UnifiedPush settings
-  const [upAvailable, setUpAvailable] = useState(false);
-  const [upDistributors, setUpDistributors] = useState<string[]>([]);
-  const [upDistributor, setUpDistributor] = useState('');
-  const [upEndpoint, setUpEndpoint] = useState<string | null>(null);
-  const [upRegistered, setUpRegistered] = useState(false);
+  // Alarm permission (Android only)
+  const [canScheduleAlarms, setCanScheduleAlarms] = useState(true);
 
   // Security / Encryption
   const [isCustomKey, setIsCustomKey] = useState(false);
@@ -131,34 +127,6 @@ export default function SettingsScreen() {
     if (Platform.OS === 'android') {
       cache.loadWidgetSyncInterval().then((v) => setWidgetSyncInterval(String(v)));
     }
-  }, []);
-
-  // Listen for UP endpoint changes
-  useEffect(() => {
-    const cleanup = notifications.onUPEndpoint((endpoint, _instance) => {
-      setUpEndpoint(endpoint);
-      setUpRegistered(true);
-      notifications.saveUPEndpoint(endpoint);
-      showAlert('UnifiedPush', `Registered! Endpoint:\n${endpoint}`);
-    });
-    const cleanupFail = notifications.onUPRegistrationFailed((_instance) => {
-      setUpRegistered(false);
-      showAlert('UnifiedPush', 'Registration failed. Is the distributor running?');
-    });
-    const cleanupUnreg = notifications.onUPUnregistered((_instance) => {
-      setUpRegistered(false);
-      setUpEndpoint(null);
-    });
-    const cleanupMsg = notifications.onUPMessage((_message, _instance) => {
-      // Message is auto-displayed as notification by the service
-    });
-
-    return () => {
-      cleanup?.();
-      cleanupFail?.();
-      cleanupUnreg?.();
-      cleanupMsg?.();
-    };
   }, []);
 
   async function loadSettings() {
@@ -217,19 +185,9 @@ export default function SettingsScreen() {
     const settings = await notifications.getNotificationSettings();
     setNotifEnabled(settings.enabled);
     setReminderMinutes(String(settings.minutesBefore));
-    if (settings.upEndpoint) {
-      setUpEndpoint(settings.upEndpoint);
-      setUpRegistered(true);
-    }
 
-    // Check UP availability (Android only)
-    const available = notifications.isUnifiedPushAvailable();
-    setUpAvailable(available);
-    if (available) {
-      const distributors = notifications.getUPDistributors();
-      setUpDistributors(distributors);
-      const current = notifications.getUPDistributor();
-      if (current) setUpDistributor(current);
+    if (Platform.OS === 'android' && DashboardWidget.isAvailable()) {
+      setCanScheduleAlarms(DashboardWidget.canScheduleExactAlarms());
     }
   }
 
@@ -278,6 +236,11 @@ export default function SettingsScreen() {
   async function toggleNotifications() {
     const newValue = !notifEnabled;
     if (newValue) {
+      if (Platform.OS === 'android' && DashboardWidget.isAvailable() && !canScheduleAlarms) {
+        DashboardWidget.requestExactAlarmPermission();
+        showAlert('Permission Required', 'Please grant "Alarms & Reminders" permission, then try enabling notifications again.');
+        return;
+      }
       const granted = await notifications.requestPermissions();
       if (!granted) {
         showAlert('Permissions', 'Notification permission not granted');
@@ -289,6 +252,14 @@ export default function SettingsScreen() {
     setNotifEnabled(newValue);
     await notifications.saveNotificationEnabled(newValue);
 
+    if (Platform.OS === 'android' && DashboardWidget.isAvailable()) {
+      const minutes = parseInt(reminderMinutes, 10) || 15;
+      DashboardWidget.saveWorkerNotificationSettings(newValue, minutes);
+      if (newValue) {
+        DashboardWidget.scheduleSync(parseInt(widgetSyncInterval, 10) || 60);
+      }
+    }
+
     if (newValue && state.events.length > 0) {
       const minutes = parseInt(reminderMinutes, 10) || 15;
       await notifications.scheduleEventReminders(state.events, minutes);
@@ -298,29 +269,13 @@ export default function SettingsScreen() {
   async function saveReminderMinutes() {
     const minutes = parseInt(reminderMinutes, 10) || 15;
     await notifications.saveReminderMinutes(minutes);
+    if (notifEnabled && Platform.OS === 'android' && DashboardWidget.isAvailable()) {
+      DashboardWidget.saveWorkerNotificationSettings(true, minutes);
+    }
     if (notifEnabled && state.events.length > 0) {
       await notifications.scheduleEventReminders(state.events, minutes);
     }
     showAlert('Saved', `Reminders set to ${minutes} minutes before events`);
-  }
-
-  function selectDistributor(distributor: string) {
-    notifications.selectUPDistributor(distributor);
-    setUpDistributor(distributor);
-  }
-
-  function registerUP() {
-    if (!upDistributor) {
-      showAlert('UnifiedPush', 'Please select a distributor first');
-      return;
-    }
-    notifications.registerUnifiedPush('default');
-  }
-
-  function unregisterUP() {
-    notifications.unregisterUnifiedPush('default');
-    setUpRegistered(false);
-    setUpEndpoint(null);
   }
 
   async function saveCalDav() {
@@ -917,80 +872,22 @@ export default function SettingsScreen() {
             </>
           )}
 
-          {/* UnifiedPush section */}
-          {upAvailable && (
+          {/* Alarm permission button */}
+          {Platform.OS === 'android' && notifEnabled && !canScheduleAlarms && (
             <>
               <View style={[styles.divider, { backgroundColor: c.border }]} />
-              <Text style={[styles.subsectionTitle, { color: c.text }]}>UnifiedPush</Text>
-              <Text style={[styles.hint, { color: c.textTertiary }]}>
-                Receive push notifications from Gitea and other services via your installed UP distributor.
+              <Text style={[styles.hint, { color: c.textTertiary, marginTop: 8 }]}>
+                Background event alarms require the "Alarms &amp; Reminders" permission.
               </Text>
-
-              {upDistributors.length === 0 ? (
-                <Text style={[styles.hint, { color: c.textTertiary, marginTop: 8 }]}>
-                  No UP distributors found. Install ntfy or NextPush.
-                </Text>
-              ) : (
-                <>
-                  <Text style={[styles.label, { color: c.text, marginTop: 8 }]}>Distributor</Text>
-                  <View style={styles.themeRow}>
-                    {upDistributors.map((dist) => {
-                      const shortName = dist.split('.').pop() || dist;
-                      return (
-                        <TouchableOpacity
-                          key={dist}
-                          style={[
-                            styles.themeButton,
-                            { backgroundColor: c.filterChip },
-                            upDistributor === dist && { backgroundColor: c.primary },
-                          ]}
-                          onPress={() => selectDistributor(dist)}
-                        >
-                          <Text
-                            style={[
-                              styles.themeButtonText,
-                              { color: upDistributor === dist ? '#fff' : c.textSecondary },
-                            ]}
-                          >
-                            {shortName}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {!upRegistered ? (
-                    <TouchableOpacity
-                      style={[styles.button, { backgroundColor: c.primary }]}
-                      onPress={registerUP}
-                    >
-                      <Text style={styles.buttonText}>Register with UnifiedPush</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <>
-                      {upEndpoint && (
-                        <View style={[styles.endpointBox, { backgroundColor: c.inputBackground, borderColor: c.border }]}>
-                          <Text style={[styles.label, { color: c.text, marginBottom: 4 }]}>Endpoint URL</Text>
-                          <Text style={[styles.endpointText, { color: c.textSecondary }]} selectable>
-                            {upEndpoint}
-                          </Text>
-                          <Text style={[styles.hint, { color: c.textTertiary, marginTop: 4 }]}>
-                            Use this URL as a webhook target in Gitea or other services.
-                          </Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={[styles.button, styles.dangerButton]}
-                        onPress={unregisterUP}
-                      >
-                        <Text style={styles.buttonText}>Unregister</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </>
-              )}
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: c.primary, marginTop: 8 }]}
+                onPress={() => DashboardWidget.requestExactAlarmPermission()}
+              >
+                <Text style={styles.buttonText}>Grant "Alarms &amp; Reminders" Permission</Text>
+              </TouchableOpacity>
             </>
           )}
+
         </View>
       )}
 
@@ -1504,16 +1401,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginVertical: 16,
-  },
-  endpointBox: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 8,
-  },
-  endpointText: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
   button: {
     padding: 14,

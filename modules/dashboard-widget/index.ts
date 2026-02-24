@@ -15,6 +15,9 @@ interface WidgetNativeModule {
   scheduleSync(intervalMinutes: number): boolean;
   cancelSync(): boolean;
   forceRefresh(): boolean;
+  saveWorkerNotificationSettings(enabled: boolean, minutesBefore: number): boolean;
+  canScheduleExactAlarms(): boolean;
+  requestExactAlarmPermission(): boolean;
 }
 
 let nativeModule: WidgetNativeModule | null = null;
@@ -68,4 +71,19 @@ export function cancelSync(): boolean {
 export function forceRefresh(): boolean {
   if (!nativeModule) return false;
   return nativeModule.forceRefresh();
+}
+
+export function saveWorkerNotificationSettings(enabled: boolean, minutesBefore: number): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.saveWorkerNotificationSettings(enabled, minutesBefore);
+}
+
+export function canScheduleExactAlarms(): boolean {
+  if (!nativeModule) return true;
+  return nativeModule.canScheduleExactAlarms();
+}
+
+export function requestExactAlarmPermission(): boolean {
+  if (!nativeModule) return false;
+  return nativeModule.requestExactAlarmPermission();
 }

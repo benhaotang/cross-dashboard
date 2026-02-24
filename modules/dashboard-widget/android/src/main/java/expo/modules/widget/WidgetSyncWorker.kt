@@ -1,9 +1,12 @@
 package expo.modules.widget
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import java.net.HttpURLConnection
@@ -12,6 +15,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.math.abs
+
+data class EventInfo(
+    val formattedRow: String,
+    val epochMs: Long,
+    val uid: String,
+    val summary: String,
+    val location: String?
+)
 
 class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -36,7 +48,7 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val giteaRepos = if (giteaReposRaw.isNullOrEmpty()) emptyList()
                          else giteaReposRaw.split("|").filter { it.isNotBlank() }
 
-        val events = mutableListOf<Pair<String, Long>>()   // (formatted row, sort epoch)
+        val events = mutableListOf<EventInfo>()
         val tasks = mutableListOf<String>()
         var issueCount = 0
 
@@ -56,9 +68,11 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         val now = System.currentTimeMillis()
         val upcoming = events
-            .filter { it.second >= now }
-            .sortedBy { it.second }
+            .filter { it.epochMs >= now }
+            .sortedBy { it.epochMs }
             .take(3)
+
+        val allFutureEvents = events.filter { it.epochMs >= now }.sortedBy { it.epochMs }
 
         // ── Gitea ─────────────────────────────────────────────────────────────
         if (giteaUrl != null && !giteaToken.isNullOrEmpty()) {
@@ -72,9 +86,9 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         // ── Persist widget data ───────────────────────────────────────────────
         val syncTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val editor = prefs.edit()
-        editor.putString("event_row_0", upcoming.getOrNull(0)?.first ?: "")
-        editor.putString("event_row_1", upcoming.getOrNull(1)?.first ?: "")
-        editor.putString("event_row_2", upcoming.getOrNull(2)?.first ?: "")
+        editor.putString("event_row_0", upcoming.getOrNull(0)?.formattedRow ?: "")
+        editor.putString("event_row_1", upcoming.getOrNull(1)?.formattedRow ?: "")
+        editor.putString("event_row_2", upcoming.getOrNull(2)?.formattedRow ?: "")
         editor.putInt("events_count", upcoming.size)
         editor.putString("task_row_0", tasks.getOrNull(0) ?: "")
         editor.putString("task_row_1", tasks.getOrNull(1) ?: "")
@@ -84,6 +98,13 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         editor.putString("last_sync", "Synced $syncTime")
         editor.apply()
 
+        // ── Schedule event alarms ─────────────────────────────────────────────
+        val notifEnabled = prefs.getString("notif_enabled", "false") == "true"
+        val notifMinutes = prefs.getString("notif_minutes", "15")?.toIntOrNull() ?: 15
+        if (notifEnabled) {
+            scheduleEventAlarms(allFutureEvents, notifMinutes)
+        }
+
         // ── Trigger widget refresh ────────────────────────────────────────────
         val intent = Intent(applicationContext, DashboardWidgetProvider::class.java)
         intent.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
@@ -92,10 +113,74 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         return Result.success()
     }
 
+    private fun scheduleEventAlarms(events: List<EventInfo>, notifMinutes: Int) {
+        EventAlarmReceiver.createChannel(applicationContext)
+
+        val alarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val now = System.currentTimeMillis()
+
+        for (event in events) {
+            val baseId = abs(event.uid.hashCode()) % 50_000
+            val atTimeId = baseId
+            val remindBeforeId = baseId + 50_000
+
+            // Cancel existing pending intents for both IDs (idempotent)
+            cancelAlarm(alarmManager, atTimeId)
+            cancelAlarm(alarmManager, remindBeforeId)
+
+            // at-time alarm
+            scheduleAlarm(alarmManager, event, "at_time", atTimeId, event.epochMs, notifMinutes)
+
+            // remind-before alarm
+            if (notifMinutes > 0) {
+                val remindMs = event.epochMs - notifMinutes * 60_000L
+                if (remindMs > now) {
+                    scheduleAlarm(alarmManager, event, "remind_before", remindBeforeId, remindMs, notifMinutes)
+                }
+            }
+        }
+    }
+
+    private fun scheduleAlarm(
+        alarmManager: AlarmManager,
+        event: EventInfo,
+        type: String,
+        notifId: Int,
+        triggerMs: Long,
+        minutes: Int
+    ) {
+        val alarmIntent = Intent(applicationContext, EventAlarmReceiver::class.java).apply {
+            putExtra(EventAlarmReceiver.EXTRA_SUMMARY, event.summary)
+            event.location?.let { putExtra(EventAlarmReceiver.EXTRA_LOCATION, it) }
+            putExtra(EventAlarmReceiver.EXTRA_TYPE, type)
+            putExtra(EventAlarmReceiver.EXTRA_MINUTES, minutes)
+            putExtra(EventAlarmReceiver.EXTRA_NOTIF_ID, notifId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            applicationContext, notifId, alarmIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
+        } catch (_: SecurityException) {}
+    }
+
+    private fun cancelAlarm(alarmManager: AlarmManager, notifId: Int) {
+        val intent = Intent(applicationContext, EventAlarmReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            applicationContext, notifId, intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+        }
+    }
+
     // ── CalDAV REPORT for VEVENT ──────────────────────────────────────────────
     private fun fetchCalendarEvents(
         server: String, user: String, pass: String, href: String
-    ): List<Pair<String, Long>> {
+    ): List<EventInfo> {
         val utcFmt = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
@@ -167,22 +252,27 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
     }
 
     // ── iCal parser: events ───────────────────────────────────────────────────
-    private fun parseICalEvents(ical: String): List<Pair<String, Long>> {
-        val results = mutableListOf<Pair<String, Long>>()
+    private fun parseICalEvents(ical: String): List<EventInfo> {
+        val results = mutableListOf<EventInfo>()
         val displayFmt = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
         var inVEvent = false
         var summary = ""
         var dtstart = 0L
+        var uid = ""
+        var location: String? = null
 
         for (rawLine in unfoldIcal(ical)) {
             val line = rawLine.trim()
             when {
-                line == "BEGIN:VEVENT" -> { inVEvent = true; summary = ""; dtstart = 0L }
+                line == "BEGIN:VEVENT" -> {
+                    inVEvent = true; summary = ""; dtstart = 0L; uid = ""; location = null
+                }
                 line == "END:VEVENT" -> {
                     inVEvent = false
                     if (summary.isNotEmpty() && dtstart > 0) {
                         val label = "${displayFmt.format(Date(dtstart))} $summary"
-                        results.add(Pair(label, dtstart))
+                        val effectiveUid = uid.ifEmpty { "$summary$dtstart" }
+                        results.add(EventInfo(label, dtstart, effectiveUid, summary, location))
                     }
                 }
                 inVEvent && line.startsWith("SUMMARY") -> {
@@ -190,6 +280,12 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 }
                 inVEvent && (line.startsWith("DTSTART") || line.startsWith("DTSTART;")) -> {
                     dtstart = parseICalDate(line.substringAfter(':').trim())
+                }
+                inVEvent && line.startsWith("UID:") -> {
+                    uid = line.substringAfter(':').trim()
+                }
+                inVEvent && line.startsWith("LOCATION:") -> {
+                    location = line.substringAfter(':').trim().ifEmpty { null }
                 }
             }
         }

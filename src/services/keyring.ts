@@ -17,7 +17,6 @@ export type CredentialKey =
   | 'nextcloud_server'
   | 'notif_enabled'
   | 'notif_minutes'
-  | 'up_endpoint'
   | 'encryption_key'
   | 'encryption_key_custom';
 
