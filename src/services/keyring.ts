@@ -7,6 +7,8 @@ export type CredentialKey =
   | 'caldav_password'
   | 'caldav_server'
   | 'caldav_username'
+  | 'caldav_auth_method'
+  | 'caldav_selected_calendars'
   | 'gitea_token'
   | 'gitea_instance'
   | 'notif_enabled'
@@ -64,6 +66,8 @@ export async function clearAllCredentials(): Promise<void> {
     'caldav_password',
     'caldav_server',
     'caldav_username',
+    'caldav_auth_method',
+    'caldav_selected_calendars',
     'gitea_token',
     'gitea_instance',
   ];

@@ -5,6 +5,7 @@
 Cross-Dashboard is a React Native application providing a unified web dashboard for:
 - **CalDAV Events** - Calendar synchronization and event management
 - **Notes** - Note-taking with CalDAV backend storage
+- **CalDAV Tasks** - VTODO-based task management with subtasks, intelligent quick input
 - **Gitea Issues** - Issue tracking and management from Gitea repositories
 
 ### Target Platforms
@@ -20,7 +21,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 - **UI**: React Native components with platform-specific adaptations
 - **Icons**: Iconify (`@iconify/react`) - MDI icon set
 - **Navigation**: React Navigation (bottom tabs for mobile, sidebar for web/desktop)
-- **State Management**: React Context (`src/store/AppContext.tsx`)
+- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues
 - **Secure Storage**: expo-secure-store (keyring integration)
 
 ---
@@ -33,8 +34,8 @@ cross-dashboard/
 ├── src/
 │   ├── components/     # Reusable UI components (Icon.tsx)
 │   ├── navigation/     # Navigation configuration (AppNavigator, SidebarNavigator)
-│   ├── screens/        # Screen components (Dashboard, Events, Notes, Issues, Settings)
-│   ├── services/       # API clients (caldav.ts, gitea.ts, keyring.ts)
+│   ├── screens/        # Screen components (Dashboard, Events, Notes, Tasks, Issues, Settings)
+│   ├── services/       # API clients (caldav.ts, gitea.ts, keyring.ts, taskParser.ts)
 │   ├── hooks/          # Custom React hooks
 │   ├── types/          # TypeScript type definitions (index.ts)
 │   ├── utils/          # Helper utilities
@@ -57,9 +58,19 @@ cross-dashboard/
 
 #### CalDAV Service (`src/services/caldav.ts`)
 - Authentication via stored credentials
-- Event CRUD operations
+- Event CRUD operations (VEVENT)
 - Calendar synchronization
-- Notes storage (using VJOURNAL or custom collection)
+- Notes storage (VJOURNAL fetch/create/update/delete)
+- Task CRUD operations (VTODO with `fetchTasks`, `createTask`, `updateTask`, `deleteTask`)
+- Subtask support via `RELATED-TO;RELTYPE=PARENT` property
+
+#### Task Parser (`src/services/taskParser.ts`)
+- Intelligent single-line task input parser (Todoist-style)
+- Priority: `!` (low), `!!` (medium), `!!!` (high) — maps to CalDAV priority numbers
+- Tags: `#word` — maps to CalDavTask `categories[]`
+- Time keywords: `today`, `tonight`, `tomorrow`, `tomorrow morning/afternoon/night`, weekday names (`monday`-`sunday`), `next week`
+- Configurable time-of-day defaults (`TaskDefaults`): morning, afternoon, night, and bare-day hours
+- Pure function with no React dependencies
 
 #### Gitea Service (`src/services/gitea.ts`)
 - Personal access token authentication
@@ -82,14 +93,18 @@ cross-dashboard/
 - Native fallback for Android (placeholder, can extend with react-native-vector-icons)
 - Centralized icon names in `Icons` constant:
   ```typescript
-  Icons.dashboard   // mdi:view-dashboard
-  Icons.calendar    // mdi:calendar
-  Icons.notes       // mdi:note-text
-  Icons.issues      // mdi:bug
-  Icons.settings    // mdi:cog
-  Icons.refresh     // mdi:refresh
-  Icons.add         // mdi:plus
-  Icons.delete      // mdi:delete
+  Icons.dashboard    // mdi:view-dashboard
+  Icons.calendar     // mdi:calendar
+  Icons.notes        // mdi:note-text
+  Icons.task         // mdi:checkbox-marked
+  Icons.taskOutline  // mdi:checkbox-blank-outline
+  Icons.subtask      // mdi:subdirectory-arrow-right
+  Icons.priority     // mdi:alert-circle
+  Icons.issues       // mdi:bug
+  Icons.settings     // mdi:cog
+  Icons.refresh      // mdi:refresh
+  Icons.add          // mdi:plus
+  Icons.delete       // mdi:delete
   ```
 
 ### Navigation (`src/navigation/`)
@@ -104,11 +119,13 @@ cross-dashboard/
 ### Screens (`src/screens/`)
 | Screen | Description |
 |--------|-------------|
-| DashboardScreen | Overview with upcoming events and open issues |
+| DashboardScreen | Overview with upcoming events, tasks due soon, and open issues |
 | EventsScreen | CalDAV events with day/week/month filters |
 | NotesScreen | Note management with create/edit/delete |
+| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal |
 | IssuesScreen | Gitea issues with state filtering |
-| SettingsScreen | Credential configuration for CalDAV and Gitea |
+| InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones |
+| SettingsScreen | Credential configuration, theme, task input defaults, notifications |
 
 ---
 
@@ -152,7 +169,35 @@ interface CalendarEvent {
   description?: string;
   location?: string;
 }
+
+type TaskStatus = 'NEEDS-ACTION' | 'IN-PROCESS' | 'COMPLETED' | 'CANCELLED';
+
+interface CalDavTask {
+  uid: string;
+  summary: string;
+  description?: string;
+  status: TaskStatus;
+  priority: number;        // 0=undefined, 1-4=high, 5=medium, 6-9=low
+  percentComplete: number; // 0-100
+  due?: Date;
+  dtstart?: Date;
+  completed?: Date;
+  created: Date;
+  lastModified: Date;
+  categories?: string[];   // tags from #word quick input
+  location?: string;
+  parentUid?: string;      // RELATED-TO;RELTYPE=PARENT (subtask support)
+}
 ```
+
+### Task Quick Input Syntax
+```
+!! meet friends #social tonight    → priority=medium, tag=social, due=today 21:00
+!!! deploy hotfix tomorrow morning → priority=high, due=tomorrow 08:00
+buy milk #errands                  → no priority, tag=errands, no due
+call mom monday                    → due=next Monday 10:00
+```
+Time-of-day hours are configurable in Settings > Task Input.
 
 ### Gitea
 ```typescript
@@ -209,7 +254,7 @@ npx expo install --fix
 - [x] React Context state management
 - [x] Platform-aware navigation (sidebar for web, tabs for mobile)
 - [x] Iconify icon integration for web
-- [x] All 5 main screens implemented
+- [x] All main screens implemented (Dashboard, Inbox, Events, Notes, Tasks, Issues, Settings)
 
 ### Completed (continued)
 - [x] Dark/light mode theming (system/light/dark toggle, persisted via AsyncStorage, all screens themed)
@@ -223,6 +268,16 @@ npx expo install --fix
 
 ### Completed (continued 3)
 - [x] Widget support (Android home screen widget showing upcoming events count, open issues, next event, last sync)
+
+### Completed (continued 4)
+- [x] CalDAV VTODO task support (full CRUD via `fetchTasks`, `createTask`, `updateTask`, `deleteTask`)
+- [x] TasksScreen with nested subtask tree, filter bar (all/active/completed), CRUD modal
+- [x] Subtask hierarchy via `RELATED-TO;RELTYPE=PARENT` with expand/collapse
+- [x] Tasks integrated into InboxScreen (replaces note-based heuristic) and DashboardScreen ("Tasks Due Soon" section)
+- [x] Intelligent task quick input parser (Todoist-style: `!! task #tag tonight`)
+- [x] Configurable time-of-day defaults in Settings (morning/afternoon/night/default hours)
+- [x] Live parse preview showing extracted priority, tags, and due date as chips
+- [x] Task cache with encrypted storage (`saveTasks`/`loadTasks`)
 
 ---
 
@@ -263,6 +318,6 @@ npx expo install --fix
 
 ## Future Considerations
 - Offline mode with local SQLite caching
-- Push notifications for calendar events
-- Widget support (Android/macOS/Linux)
 - Multi-account support for CalDAV/Gitea
+- Task recurrence (RRULE in VTODO)
+- CalDAV task list (collection) selection

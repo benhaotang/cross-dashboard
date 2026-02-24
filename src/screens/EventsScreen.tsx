@@ -11,7 +11,7 @@ import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import * as caldav from '../services/caldav';
 import * as cache from '../services/cache';
-import { CalendarEvent } from '../types';
+import { CalendarEvent, CalDavCalendar } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
 type FilterType = 'all' | 'today' | 'week' | 'month';
@@ -30,7 +30,10 @@ export default function EventsScreen() {
   async function loadEvents() {
     setLoading(true);
     try {
-      const events = await caldav.fetchEvents();
+      const eventHrefs = state.selectedCalendars
+        .filter((c: CalDavCalendar) => c.components.includes('VEVENT'))
+        .map((c: CalDavCalendar) => c.href);
+      const events = await caldav.fetchEvents(eventHrefs.length > 0 ? eventHrefs : undefined);
       setEvents(events);
       await cache.saveEvents(events);
     } catch (error) {

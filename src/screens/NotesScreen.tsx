@@ -13,7 +13,7 @@ import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
-import { Note } from '../types';
+import { Note, CalDavCalendar } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function NotesScreen() {
@@ -31,10 +31,17 @@ export default function NotesScreen() {
     }
   }, [state.caldavConfigured]);
 
+  function getNoteCalendarHrefs(): string[] | undefined {
+    const hrefs = state.selectedCalendars
+      .filter((c: CalDavCalendar) => c.components.includes('VJOURNAL'))
+      .map((c: CalDavCalendar) => c.href);
+    return hrefs.length > 0 ? hrefs : undefined;
+  }
+
   async function syncNotes() {
     setSyncing(true);
     try {
-      const notes = await caldav.fetchNotes();
+      const notes = await caldav.fetchNotes(getNoteCalendarHrefs());
       if (notes.length > 0) {
         setNotes(notes);
         await cache.saveNotes(notes);
@@ -76,9 +83,10 @@ export default function NotesScreen() {
         n.uid === selectedNote.uid ? { ...n, title: newTitle, content: newContent, updatedAt: now } : n
       );
     } else {
+      const noteCalHref = getNoteCalendarHrefs()?.[0];
       let newNote: Note;
       if (state.caldavConfigured) {
-        const created = await caldav.createNote(newTitle, newContent);
+        const created = await caldav.createNote(newTitle, newContent, undefined, noteCalHref);
         newNote = created || { uid: `note-${Date.now()}`, title: newTitle, content: newContent, createdAt: now, updatedAt: now };
       } else {
         newNote = { uid: `note-${Date.now()}`, title: newTitle, content: newContent, createdAt: now, updatedAt: now };

@@ -15,7 +15,7 @@ import { useTheme } from '../hooks/useTheme';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
 import { parseTaskInput, TaskDefaults, DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
-import { CalDavTask, TaskStatus } from '../types';
+import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
 type FilterMode = 'all' | 'active' | 'completed';
@@ -155,10 +155,17 @@ export default function TasksScreen() {
     return parseTaskInput(quickInput, taskDefaults);
   }, [quickInput, taskDefaults]);
 
+  function getTaskCalendarHrefs(): string[] | undefined {
+    const hrefs = state.selectedCalendars
+      .filter((c: CalDavCalendar) => c.components.includes('VTODO'))
+      .map((c: CalDavCalendar) => c.href);
+    return hrefs.length > 0 ? hrefs : undefined;
+  }
+
   async function syncTasks() {
     setSyncing(true);
     try {
-      const tasks = await caldav.fetchTasks();
+      const tasks = await caldav.fetchTasks(getTaskCalendarHrefs());
       if (tasks.length > 0 || state.tasks.length > 0) {
         setTasks(tasks);
         await cache.saveTasks(tasks);
@@ -213,9 +220,10 @@ export default function TasksScreen() {
       parentUid: undefined as string | undefined,
     };
 
+    const taskCalHref = getTaskCalendarHrefs()?.[0];
     let newTask: CalDavTask;
     if (state.caldavConfigured) {
-      const created = await caldav.createTask(taskData);
+      const created = await caldav.createTask(taskData, taskCalHref);
       newTask = created || { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };
     } else {
       newTask = { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };
@@ -225,7 +233,7 @@ export default function TasksScreen() {
     setTasks(newTasks);
     await cache.saveTasks(newTasks);
     setQuickInput('');
-  }, [quickInput, taskDefaults, state.caldavConfigured, state.tasks, setTasks]);
+  }, [quickInput, taskDefaults, state.caldavConfigured, state.selectedCalendars, state.tasks, setTasks]);
 
   function openNewTask() {
     setEditTask(null);
@@ -296,9 +304,10 @@ export default function TasksScreen() {
         parentUid: formParentUid || undefined,
       };
 
+      const taskCalHref = getTaskCalendarHrefs()?.[0];
       let newTask: CalDavTask;
       if (state.caldavConfigured) {
-        const created = await caldav.createTask(taskData);
+        const created = await caldav.createTask(taskData, taskCalHref);
         newTask = created || { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };
       } else {
         newTask = { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };

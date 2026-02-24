@@ -4,6 +4,14 @@ export interface CalDavConfig {
   username: string;
 }
 
+export interface CalDavCalendar {
+  href: string;          // e.g. /remote.php/dav/calendars/user/personal/
+  displayName: string;   // e.g. "Personal"
+  color?: string;        // e.g. "#795AAB" (from apple:calendar-color)
+  ctag?: string;         // change tag for cache invalidation
+  components: string[];  // ['VEVENT', 'VTODO', 'VJOURNAL']
+}
+
 export interface CalendarEvent {
   uid: string;
   summary: string;

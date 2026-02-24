@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,27 +8,42 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { ThemePreference } from '../theme';
+import { CalDavCalendar } from '../types';
 import * as keyring from '../services/keyring';
 import * as caldav from '../services/caldav';
+import * as nextcloud from '../services/nextcloud';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
 import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 
+type AuthMethod = 'manual' | 'nextcloud';
+
 export default function SettingsScreen() {
-  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setThemePreference, setLastSync, state } =
+  const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setSelectedCalendars, setThemePreference, setLastSync, state } =
     useApp();
   const theme = useTheme();
 
   // CalDAV settings
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('manual');
   const [caldavServer, setCaldavServer] = useState('');
   const [caldavUsername, setCaldavUsername] = useState('');
   const [caldavPassword, setCaldavPassword] = useState('');
+  const [ncServer, setNcServer] = useState('');
+  const [ncLogging, setNcLogging] = useState(false);
+  const ncAbort = useRef<AbortController | null>(null);
+
+  // Calendar picker
+  const [availableCalendars, setAvailableCalendars] = useState<CalDavCalendar[]>([]);
+  const [calendarSelection, setCalendarSelection] = useState<Set<string>>(new Set());
+  const [fetchingCalendars, setFetchingCalendars] = useState(false);
 
   // Gitea settings
   const [giteaInstance, setGiteaInstance] = useState('');
@@ -96,11 +111,13 @@ export default function SettingsScreen() {
   }, []);
 
   async function loadSettings() {
-    const [server, username, instance, customKey] = await Promise.all([
+    const [server, username, instance, customKey, savedAuthMethod, savedCalendars] = await Promise.all([
       keyring.getCredential('caldav_server'),
       keyring.getCredential('caldav_username'),
       keyring.getCredential('gitea_instance'),
       crypto.hasCustomKey(),
+      keyring.getCredential('caldav_auth_method'),
+      keyring.getCredential('caldav_selected_calendars'),
     ]);
 
     if (server) setCaldavServer(server);
@@ -108,6 +125,16 @@ export default function SettingsScreen() {
     if (instance) setGiteaInstance(instance);
     if (state.giteaRepositories.length > 0) setGiteaRepos(state.giteaRepositories.join('\n'));
     setIsCustomKey(customKey);
+    if (savedAuthMethod === 'nextcloud' || savedAuthMethod === 'manual') {
+      setAuthMethod(savedAuthMethod);
+    }
+    if (savedCalendars) {
+      try {
+        const cals: CalDavCalendar[] = JSON.parse(savedCalendars);
+        setSelectedCalendars(cals);
+        setCalendarSelection(new Set(cals.map((c) => c.href)));
+      } catch { /* ignore parse errors */ }
+    }
   }
 
   async function loadNotificationSettings() {
@@ -209,6 +236,7 @@ export default function SettingsScreen() {
       keyring.setCredential('caldav_server', caldavServer),
       keyring.setCredential('caldav_username', caldavUsername),
       keyring.setCredential('caldav_password', caldavPassword),
+      keyring.setCredential('caldav_auth_method', authMethod),
     ]);
 
     setCaldavStatus('testing');
@@ -218,10 +246,121 @@ export default function SettingsScreen() {
       setCaldavStatus('success');
       setCaldavConfigured(true);
       showAlert('Success', 'CalDAV connection successful!');
+      loadCalendars();
     } else {
       setCaldavStatus('error');
       showAlert('Error', `CalDAV connection failed: ${result.error}`);
     }
+  }
+
+  async function startNextcloudLogin() {
+    if (!ncServer.trim()) {
+      showAlert('Error', 'Please enter your Nextcloud server URL');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      showAlert('Not supported', 'Nextcloud Login Flow is not available on web due to CORS restrictions. Please use manual CalDAV entry with an app password instead.');
+      return;
+    }
+
+    setNcLogging(true);
+    const abort = new AbortController();
+    ncAbort.current = abort;
+
+    try {
+      const flow = await nextcloud.initiateLoginFlow(ncServer.trim());
+      await Linking.openURL(flow.loginUrl);
+      const creds = await nextcloud.pollForCredentials(flow.pollEndpoint, flow.pollToken, abort.signal);
+
+      const caldavUrl = nextcloud.discoverCalDavUrl(creds.server, creds.loginName);
+      setCaldavServer(caldavUrl);
+      setCaldavUsername(creds.loginName);
+      setCaldavPassword(creds.appPassword);
+
+      await Promise.all([
+        keyring.setCredential('caldav_server', caldavUrl),
+        keyring.setCredential('caldav_username', creds.loginName),
+        keyring.setCredential('caldav_password', creds.appPassword),
+        keyring.setCredential('caldav_auth_method', 'nextcloud'),
+      ]);
+
+      setCaldavStatus('testing');
+      const result = await caldav.testConnection();
+      if (result.success) {
+        setCaldavStatus('success');
+        setCaldavConfigured(true);
+        showAlert('Success', `Logged in as ${creds.loginName}`);
+        loadCalendars();
+      } else {
+        setCaldavStatus('error');
+        showAlert('Error', `Connection test failed: ${result.error}`);
+      }
+    } catch (error) {
+      if (!abort.signal.aborted) {
+        showAlert('Error', error instanceof Error ? error.message : 'Login flow failed');
+      }
+    } finally {
+      setNcLogging(false);
+      ncAbort.current = null;
+    }
+  }
+
+  function cancelNextcloudLogin() {
+    ncAbort.current?.abort();
+    setNcLogging(false);
+  }
+
+  async function loadCalendars() {
+    setFetchingCalendars(true);
+    try {
+      const cals = await caldav.fetchCalendars();
+      setAvailableCalendars(cals);
+      // Pre-select all if no prior selection
+      const savedRaw = await keyring.getCredential('caldav_selected_calendars');
+      if (savedRaw) {
+        try {
+          const saved: CalDavCalendar[] = JSON.parse(savedRaw);
+          setCalendarSelection(new Set(saved.map((c) => c.href)));
+        } catch {
+          setCalendarSelection(new Set(cals.map((c) => c.href)));
+        }
+      } else {
+        setCalendarSelection(new Set(cals.map((c) => c.href)));
+      }
+    } catch {
+      showAlert('Error', 'Failed to fetch calendar list');
+    } finally {
+      setFetchingCalendars(false);
+    }
+  }
+
+  function toggleCalendarSelection(href: string) {
+    setCalendarSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(href)) next.delete(href);
+      else next.add(href);
+      return next;
+    });
+  }
+
+  function selectAllCalendars() {
+    setCalendarSelection(new Set(availableCalendars.map((c) => c.href)));
+  }
+
+  function deselectAllCalendars() {
+    setCalendarSelection(new Set());
+  }
+
+  async function saveCalendarSelection() {
+    const selected = availableCalendars.filter((c) => calendarSelection.has(c.href));
+    if (selected.length === 0) {
+      showAlert('Warning', 'No calendars selected. Please select at least one calendar.');
+      return;
+    }
+    await keyring.setCredential('caldav_selected_calendars', JSON.stringify(selected));
+    setSelectedCalendars(selected);
+    showAlert('Saved', `${selected.length} calendar(s) selected for sync`);
   }
 
   async function saveGitea() {
@@ -300,6 +439,7 @@ export default function SettingsScreen() {
     setCaldavServer('');
     setCaldavUsername('');
     setCaldavPassword('');
+    setNcServer('');
     setGiteaInstance('');
     setGiteaToken('');
     setGiteaRepos('');
@@ -307,6 +447,10 @@ export default function SettingsScreen() {
     setGiteaConfigured(false);
     setCaldavStatus('unknown');
     setGiteaStatus('unknown');
+    setAuthMethod('manual');
+    setAvailableCalendars([]);
+    setCalendarSelection(new Set());
+    setSelectedCalendars([]);
     showAlert('Cleared', 'All credentials have been removed');
   }
 
@@ -592,43 +736,199 @@ export default function SettingsScreen() {
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(caldavStatus) }]} />
         </View>
 
-        <Text style={[styles.label, { color: c.text }]}>Server URL</Text>
-        <TextInput
-          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
-          value={caldavServer}
-          onChangeText={setCaldavServer}
-          placeholder="https://caldav.example.com/dav"
-          placeholderTextColor={c.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <Text style={[styles.label, { color: c.text }]}>Login Method</Text>
+        <View style={styles.themeRow}>
+          {([{ value: 'manual' as AuthMethod, label: 'Manual' }, { value: 'nextcloud' as AuthMethod, label: 'Nextcloud' }]).map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.themeButton,
+                { backgroundColor: c.filterChip },
+                authMethod === opt.value && { backgroundColor: c.primary },
+              ]}
+              onPress={() => setAuthMethod(opt.value)}
+            >
+              <Text
+                style={[
+                  styles.themeButtonText,
+                  { color: authMethod === opt.value ? '#fff' : c.textSecondary },
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <Text style={[styles.label, { color: c.text }]}>Username</Text>
-        <TextInput
-          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
-          value={caldavUsername}
-          onChangeText={setCaldavUsername}
-          placeholder="username"
-          placeholderTextColor={c.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        {authMethod === 'nextcloud' ? (
+          <>
+            <Text style={[styles.label, { color: c.text, marginTop: 12 }]}>Nextcloud Server URL</Text>
+            <TextInput
+              style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={ncServer}
+              onChangeText={setNcServer}
+              placeholder="https://cloud.example.com"
+              placeholderTextColor={c.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!ncLogging}
+            />
 
-        <Text style={[styles.label, { color: c.text }]}>Password</Text>
-        <TextInput
-          style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
-          value={caldavPassword}
-          onChangeText={setCaldavPassword}
-          placeholder="••••••••"
-          placeholderTextColor={c.textTertiary}
-          secureTextEntry
-          autoCapitalize="none"
-        />
+            {Platform.OS === 'web' && (
+              <Text style={[styles.hint, { color: '#FF9800', marginBottom: 8 }]}>
+                Nextcloud Login Flow is not available on web (CORS). Use manual entry with an app password instead.
+              </Text>
+            )}
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalDav}>
-          <Text style={styles.buttonText}>Save & Test CalDAV</Text>
-        </TouchableOpacity>
+            {ncLogging ? (
+              <View style={styles.ncPollingRow}>
+                <ActivityIndicator size="small" color={c.primary} />
+                <Text style={[styles.hint, { color: c.textSecondary, marginLeft: 8, flex: 1 }]}>
+                  Waiting for login in browser...
+                </Text>
+                <TouchableOpacity onPress={cancelNextcloudLogin}>
+                  <Text style={{ color: '#F44336', fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#0082C9' }]}
+                onPress={startNextcloudLogin}
+              >
+                <Text style={styles.buttonText}>Login with Nextcloud</Text>
+              </TouchableOpacity>
+            )}
+
+            {caldavServer !== '' && (
+              <>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 4 }]}>
+                  Logged in as: {caldavUsername}
+                </Text>
+                <Text style={[styles.hint, { color: c.textTertiary, marginBottom: 8, fontSize: 12 }]}>
+                  {caldavServer}
+                </Text>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={[styles.label, { color: c.text, marginTop: 12 }]}>Server URL</Text>
+            <TextInput
+              style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={caldavServer}
+              onChangeText={setCaldavServer}
+              placeholder="https://caldav.example.com/dav"
+              placeholderTextColor={c.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={[styles.label, { color: c.text }]}>Username</Text>
+            <TextInput
+              style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={caldavUsername}
+              onChangeText={setCaldavUsername}
+              placeholder="username"
+              placeholderTextColor={c.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={[styles.label, { color: c.text }]}>Password</Text>
+            <TextInput
+              style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={caldavPassword}
+              onChangeText={setCaldavPassword}
+              placeholder="••••••••"
+              placeholderTextColor={c.textTertiary}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalDav}>
+              <Text style={styles.buttonText}>Save & Test CalDAV</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
+
+      {/* Calendar Picker */}
+      {caldavStatus === 'success' && (
+        <View style={[styles.section, { backgroundColor: c.surface }]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Calendars</Text>
+
+          {fetchingCalendars ? (
+            <ActivityIndicator size="small" color={c.primary} style={{ marginVertical: 12 }} />
+          ) : availableCalendars.length > 0 ? (
+            <>
+              <View style={[styles.calPickerActions, { marginBottom: 8 }]}>
+                <TouchableOpacity onPress={selectAllCalendars}>
+                  <Text style={{ color: c.primary, fontWeight: '600', fontSize: 13 }}>Select All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={deselectAllCalendars} style={{ marginLeft: 16 }}>
+                  <Text style={{ color: c.primary, fontWeight: '600', fontSize: 13 }}>Deselect All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {availableCalendars.map((cal) => (
+                <TouchableOpacity
+                  key={cal.href}
+                  style={[styles.calendarRow, { borderColor: c.border }]}
+                  onPress={() => toggleCalendarSelection(cal.href)}
+                >
+                  <View
+                    style={[
+                      styles.calCheckbox,
+                      { borderColor: c.border },
+                      calendarSelection.has(cal.href) && { backgroundColor: c.primary, borderColor: c.primary },
+                    ]}
+                  >
+                    {calendarSelection.has(cal.href) && (
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✓</Text>
+                    )}
+                  </View>
+
+                  {cal.color && (
+                    <View style={[styles.calColorDot, { backgroundColor: cal.color }]} />
+                  )}
+
+                  <Text style={[styles.calName, { color: c.text }]} numberOfLines={1}>
+                    {cal.displayName}
+                  </Text>
+
+                  <View style={styles.calBadges}>
+                    {cal.components.map((comp) => (
+                      <View key={comp} style={[styles.calBadge, { backgroundColor: c.filterChip }]}>
+                        <Text style={[styles.calBadgeText, { color: c.textSecondary }]}>
+                          {comp === 'VEVENT' ? 'Events' : comp === 'VTODO' ? 'Tasks' : comp === 'VJOURNAL' ? 'Notes' : comp}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {calendarSelection.size === 0 && (
+                <Text style={[styles.hint, { color: '#FF9800', marginTop: 4 }]}>
+                  No calendars selected. Select at least one to sync.
+                </Text>
+              )}
+
+              <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveCalendarSelection}>
+                <Text style={styles.buttonText}>Save Calendar Selection</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.hint, { color: c.textTertiary }]}>No calendars found.</Text>
+              <TouchableOpacity style={[styles.button, styles.secondaryButton, { backgroundColor: c.filterChip }]} onPress={loadCalendars}>
+                <Text style={[styles.buttonText, { color: c.text }]}>Refresh Calendars</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
 
       {/* Gitea */}
       <View style={[styles.section, { backgroundColor: c.surface }]}>
@@ -838,5 +1138,52 @@ const styles = StyleSheet.create({
     width: 64,
     textAlign: 'center',
     flex: 0,
+  },
+  ncPollingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  calPickerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  calCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calColorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  calName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  calBadges: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  calBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  calBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

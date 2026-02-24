@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
-import { CalendarEvent, Note, GiteaIssue, CalDavTask } from '../types';
+import { CalendarEvent, Note, GiteaIssue, CalDavTask, CalDavCalendar } from '../types';
 import { ThemePreference } from '../theme';
 import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
@@ -14,6 +14,7 @@ interface AppState {
   caldavConfigured: boolean;
   giteaConfigured: boolean;
   giteaRepositories: string[];
+  selectedCalendars: CalDavCalendar[];
   themePreference: ThemePreference;
   lastSync: Date | null;
 }
@@ -28,6 +29,7 @@ type AppAction =
   | { type: 'SET_CALDAV_CONFIGURED'; payload: boolean }
   | { type: 'SET_GITEA_CONFIGURED'; payload: boolean }
   | { type: 'SET_GITEA_REPOSITORIES'; payload: string[] }
+  | { type: 'SET_SELECTED_CALENDARS'; payload: CalDavCalendar[] }
   | { type: 'SET_THEME'; payload: ThemePreference }
   | { type: 'SET_LAST_SYNC'; payload: Date | null };
 
@@ -41,6 +43,7 @@ const initialState: AppState = {
   caldavConfigured: false,
   giteaConfigured: false,
   giteaRepositories: [],
+  selectedCalendars: [],
   themePreference: 'system',
   lastSync: null,
 };
@@ -65,6 +68,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, giteaConfigured: action.payload };
     case 'SET_GITEA_REPOSITORIES':
       return { ...state, giteaRepositories: action.payload };
+    case 'SET_SELECTED_CALENDARS':
+      return { ...state, selectedCalendars: action.payload };
     case 'SET_THEME':
       return { ...state, themePreference: action.payload };
     case 'SET_LAST_SYNC':
@@ -85,6 +90,7 @@ interface AppContextType {
   setCaldavConfigured: (configured: boolean) => void;
   setGiteaConfigured: (configured: boolean) => void;
   setGiteaRepositories: (repos: string[]) => void;
+  setSelectedCalendars: (calendars: CalDavCalendar[]) => void;
   setThemePreference: (theme: ThemePreference) => void;
   setLastSync: (date: Date | null) => void;
 }
@@ -161,6 +167,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_GITEA_REPOSITORIES', payload: repos });
   }, []);
 
+  const setSelectedCalendars = useCallback((calendars: CalDavCalendar[]) => {
+    dispatch({ type: 'SET_SELECTED_CALENDARS', payload: calendars });
+  }, []);
+
   const setThemePreference = useCallback((theme: ThemePreference) => {
     dispatch({ type: 'SET_THEME', payload: theme });
     cache.saveThemePreference(theme);
@@ -181,6 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCaldavConfigured,
     setGiteaConfigured,
     setGiteaRepositories,
+    setSelectedCalendars,
     setThemePreference,
     setLastSync,
   };

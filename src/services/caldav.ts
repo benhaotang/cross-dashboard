@@ -1,4 +1,4 @@
-import { CalendarEvent, Note, CalDavTask, TaskStatus } from '../types';
+import { CalendarEvent, Note, CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import { getCredential } from './keyring';
 
 export interface CalDavClient {
@@ -27,6 +27,18 @@ function createAuthHeader(username: string, password: string): string {
 export async function isConfigured(): Promise<boolean> {
   const client = await getClient();
   return client !== null;
+}
+
+/**
+ * Resolve a calendar href (absolute path) to a full URL using the server origin.
+ * If href is already a full URL, return it as-is.
+ */
+function resolveHref(serverUrl: string, href: string): string {
+  if (href.startsWith('http://') || href.startsWith('https://')) {
+    return href;
+  }
+  const url = new URL(serverUrl);
+  return `${url.origin}${href}`;
 }
 
 export async function testConnection(): Promise<{ success: boolean; error?: string }> {
@@ -58,7 +70,7 @@ export async function testConnection(): Promise<{ success: boolean; error?: stri
   }
 }
 
-export async function fetchCalendars(): Promise<string[]> {
+export async function fetchCalendars(): Promise<CalDavCalendar[]> {
   const client = await getClient();
   if (!client) return [];
 
@@ -71,10 +83,15 @@ export async function fetchCalendars(): Promise<string[]> {
         'Content-Type': 'application/xml',
       },
       body: `<?xml version="1.0" encoding="UTF-8"?>
-        <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+        <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"
+                    xmlns:apple="http://apple.com/ns/ical/"
+                    xmlns:cs="http://calendarserver.org/ns/">
           <d:prop>
             <d:displayname/>
             <d:resourcetype/>
+            <apple:calendar-color/>
+            <cs:getctag/>
+            <c:supported-calendar-component-set/>
           </d:prop>
         </d:propfind>`,
     });
@@ -84,60 +101,115 @@ export async function fetchCalendars(): Promise<string[]> {
     }
 
     const text = await response.text();
-    const calendars: string[] = [];
-    const matches = text.matchAll(/<d:displayname>([^<]+)<\/d:displayname>/gi);
-    for (const match of matches) {
-      calendars.push(match[1]);
-    }
-    return calendars;
+    return parseCalendarList(text);
   } catch {
     return [];
   }
 }
 
-export async function fetchEvents(calendarPath?: string): Promise<CalendarEvent[]> {
+function parseCalendarList(xmlText: string): CalDavCalendar[] {
+  const calendars: CalDavCalendar[] = [];
+
+  // Split into individual responses
+  const responseBlocks = xmlText.split(/<d:response>/gi).slice(1);
+
+  for (const block of responseBlocks) {
+    // Must be a calendar collection (has both <d:collection/> and <c:calendar/>)
+    const hasCollection = /<d:collection\s*\/?>|<d:collection>/i.test(block);
+    const hasCalendar = /<c:calendar\s*\/?>|<c:calendar>/i.test(block);
+    if (!hasCollection || !hasCalendar) continue;
+
+    // Extract href
+    const hrefMatch = block.match(/<d:href>([^<]+)<\/d:href>/i);
+    if (!hrefMatch) continue;
+    const href = hrefMatch[1];
+
+    // Extract display name
+    const nameMatch = block.match(/<d:displayname>([^<]+)<\/d:displayname>/i);
+    const displayName = nameMatch ? nameMatch[1] : href.split('/').filter(Boolean).pop() || 'Unknown';
+
+    // Extract color (strip alpha from #RRGGBBAA → #RRGGBB)
+    let color: string | undefined;
+    const colorMatch = block.match(/<apple:calendar-color>([^<]+)<\/apple:calendar-color>/i);
+    if (colorMatch) {
+      let c = colorMatch[1].trim();
+      if (c.length === 9 && c.startsWith('#')) {
+        c = c.slice(0, 7);
+      }
+      color = c;
+    }
+
+    // Extract ctag
+    let ctag: string | undefined;
+    const ctagMatch = block.match(/<cs:getctag>([^<]+)<\/cs:getctag>/i);
+    if (ctagMatch) ctag = ctagMatch[1];
+
+    // Extract supported components
+    const components: string[] = [];
+    const compMatches = block.matchAll(/<c:comp\s+name="([^"]+)"/gi);
+    for (const cm of compMatches) {
+      components.push(cm[1].toUpperCase());
+    }
+    // If no component info, assume VEVENT
+    if (components.length === 0) {
+      components.push('VEVENT');
+    }
+
+    calendars.push({ href, displayName, color, ctag, components });
+  }
+
+  return calendars;
+}
+
+export async function fetchEvents(calendarHrefs?: string[]): Promise<CalendarEvent[]> {
   const client = await getClient();
   if (!client) return [];
 
-  const url = calendarPath ? `${client.serverUrl}${calendarPath}` : client.serverUrl;
+  const urls = calendarHrefs && calendarHrefs.length > 0
+    ? calendarHrefs.map((href) => resolveHref(client.serverUrl, href))
+    : [client.serverUrl];
 
-  try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
-    const response = await fetch(url, {
-      method: 'REPORT',
-      headers: {
-        Authorization: createAuthHeader(client.username, client.password),
-        Depth: '1',
-        'Content-Type': 'application/xml',
-      },
-      body: `<?xml version="1.0" encoding="UTF-8"?>
-        <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
-          <d:prop>
-            <d:getetag/>
-            <c:calendar-data/>
-          </d:prop>
-          <c:filter>
-            <c:comp-filter name="VCALENDAR">
-              <c:comp-filter name="VEVENT">
-                <c:time-range start="${formatICalDate(startOfMonth)}" end="${formatICalDate(endOfMonth)}"/>
+  const allEvents: CalendarEvent[] = [];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: 'REPORT',
+        headers: {
+          Authorization: createAuthHeader(client.username, client.password),
+          Depth: '1',
+          'Content-Type': 'application/xml',
+        },
+        body: `<?xml version="1.0" encoding="UTF-8"?>
+          <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+            <d:prop>
+              <d:getetag/>
+              <c:calendar-data/>
+            </d:prop>
+            <c:filter>
+              <c:comp-filter name="VCALENDAR">
+                <c:comp-filter name="VEVENT">
+                  <c:time-range start="${formatICalDate(startOfMonth)}" end="${formatICalDate(endOfMonth)}"/>
+                </c:comp-filter>
               </c:comp-filter>
-            </c:comp-filter>
-          </c:filter>
-        </c:calendar-query>`,
-    });
+            </c:filter>
+          </c:calendar-query>`,
+      });
 
-    if (!response.ok && response.status !== 207) {
-      return [];
+      if (response.ok || response.status === 207) {
+        const text = await response.text();
+        allEvents.push(...parseICalEvents(text));
+      }
+    } catch {
+      // skip failed calendars
     }
-
-    const text = await response.text();
-    return parseICalEvents(text);
-  } catch {
-    return [];
   }
+
+  return allEvents;
 }
 
 function formatICalDate(date: Date): string {
@@ -197,41 +269,49 @@ function parseICalDate(dateStr: string): Date {
 }
 
 // Notes support via VJOURNAL
-export async function fetchNotes(): Promise<Note[]> {
+export async function fetchNotes(calendarHrefs?: string[]): Promise<Note[]> {
   const client = await getClient();
   if (!client) return [];
 
-  try {
-    const response = await fetch(client.serverUrl, {
-      method: 'REPORT',
-      headers: {
-        Authorization: createAuthHeader(client.username, client.password),
-        Depth: '1',
-        'Content-Type': 'application/xml',
-      },
-      body: `<?xml version="1.0" encoding="UTF-8"?>
-        <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
-          <d:prop>
-            <d:getetag/>
-            <c:calendar-data/>
-          </d:prop>
-          <c:filter>
-            <c:comp-filter name="VCALENDAR">
-              <c:comp-filter name="VJOURNAL"/>
-            </c:comp-filter>
-          </c:filter>
-        </c:calendar-query>`,
-    });
+  const urls = calendarHrefs && calendarHrefs.length > 0
+    ? calendarHrefs.map((href) => resolveHref(client.serverUrl, href))
+    : [client.serverUrl];
 
-    if (!response.ok && response.status !== 207) {
-      return [];
+  const allNotes: Note[] = [];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: 'REPORT',
+        headers: {
+          Authorization: createAuthHeader(client.username, client.password),
+          Depth: '1',
+          'Content-Type': 'application/xml',
+        },
+        body: `<?xml version="1.0" encoding="UTF-8"?>
+          <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+            <d:prop>
+              <d:getetag/>
+              <c:calendar-data/>
+            </d:prop>
+            <c:filter>
+              <c:comp-filter name="VCALENDAR">
+                <c:comp-filter name="VJOURNAL"/>
+              </c:comp-filter>
+            </c:filter>
+          </c:calendar-query>`,
+      });
+
+      if (response.ok || response.status === 207) {
+        const text = await response.text();
+        allNotes.push(...parseVJournalEntries(text));
+      }
+    } catch {
+      // skip failed calendars
     }
-
-    const text = await response.text();
-    return parseVJournalEntries(text);
-  } catch {
-    return [];
   }
+
+  return allNotes.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 function parseVJournalEntries(xmlText: string): Note[] {
@@ -283,16 +363,17 @@ function buildVJournal(uid: string, title: string, content: string, createdAt: D
   return vjournal;
 }
 
-export async function createNote(title: string, content: string, tags?: string[]): Promise<Note | null> {
+export async function createNote(title: string, content: string, tags?: string[], calendarHref?: string): Promise<Note | null> {
   const client = await getClient();
   if (!client) return null;
 
   const uid = `note-${Date.now()}@cross-dashboard`;
   const now = new Date();
   const vjournal = buildVJournal(uid, title, content, now, tags);
+  const baseUrl = calendarHref ? resolveHref(client.serverUrl, calendarHref) : client.serverUrl;
 
   try {
-    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+    const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/${uid}.ics`, {
       method: 'PUT',
       headers: {
         Authorization: createAuthHeader(client.username, client.password),
@@ -354,41 +435,49 @@ export async function deleteNote(uid: string): Promise<boolean> {
 
 // VTODO (Tasks) support
 
-export async function fetchTasks(): Promise<CalDavTask[]> {
+export async function fetchTasks(calendarHrefs?: string[]): Promise<CalDavTask[]> {
   const client = await getClient();
   if (!client) return [];
 
-  try {
-    const response = await fetch(client.serverUrl, {
-      method: 'REPORT',
-      headers: {
-        Authorization: createAuthHeader(client.username, client.password),
-        Depth: '1',
-        'Content-Type': 'application/xml',
-      },
-      body: `<?xml version="1.0" encoding="UTF-8"?>
-        <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
-          <d:prop>
-            <d:getetag/>
-            <c:calendar-data/>
-          </d:prop>
-          <c:filter>
-            <c:comp-filter name="VCALENDAR">
-              <c:comp-filter name="VTODO"/>
-            </c:comp-filter>
-          </c:filter>
-        </c:calendar-query>`,
-    });
+  const urls = calendarHrefs && calendarHrefs.length > 0
+    ? calendarHrefs.map((href) => resolveHref(client.serverUrl, href))
+    : [client.serverUrl];
 
-    if (!response.ok && response.status !== 207) {
-      return [];
+  const allTasks: CalDavTask[] = [];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        method: 'REPORT',
+        headers: {
+          Authorization: createAuthHeader(client.username, client.password),
+          Depth: '1',
+          'Content-Type': 'application/xml',
+        },
+        body: `<?xml version="1.0" encoding="UTF-8"?>
+          <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+            <d:prop>
+              <d:getetag/>
+              <c:calendar-data/>
+            </d:prop>
+            <c:filter>
+              <c:comp-filter name="VCALENDAR">
+                <c:comp-filter name="VTODO"/>
+              </c:comp-filter>
+            </c:filter>
+          </c:calendar-query>`,
+      });
+
+      if (response.ok || response.status === 207) {
+        const text = await response.text();
+        allTasks.push(...parseVTodoEntries(text));
+      }
+    } catch {
+      // skip failed calendars
     }
-
-    const text = await response.text();
-    return parseVTodoEntries(text);
-  } catch {
-    return [];
   }
+
+  return allTasks.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
 }
 
 function parseVTodoEntries(xmlText: string): CalDavTask[] {
@@ -480,7 +569,7 @@ function buildVTodo(task: CalDavTask): string {
   return vtodo;
 }
 
-export async function createTask(task: Omit<CalDavTask, 'uid' | 'created' | 'lastModified'>): Promise<CalDavTask | null> {
+export async function createTask(task: Omit<CalDavTask, 'uid' | 'created' | 'lastModified'>, calendarHref?: string): Promise<CalDavTask | null> {
   const client = await getClient();
   if (!client) return null;
 
@@ -488,9 +577,10 @@ export async function createTask(task: Omit<CalDavTask, 'uid' | 'created' | 'las
   const uid = `task-${Date.now()}@cross-dashboard`;
   const fullTask: CalDavTask = { ...task, uid, created: now, lastModified: now };
   const vtodo = buildVTodo(fullTask);
+  const baseUrl = calendarHref ? resolveHref(client.serverUrl, calendarHref) : client.serverUrl;
 
   try {
-    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+    const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/${uid}.ics`, {
       method: 'PUT',
       headers: {
         Authorization: createAuthHeader(client.username, client.password),
