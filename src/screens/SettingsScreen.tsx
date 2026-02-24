@@ -194,10 +194,16 @@ export default function SettingsScreen() {
         const cals: CalDavCalendar[] = JSON.parse(savedCalendars);
         setSelectedCalendars(cals);
         setCalendarSelection(new Set(cals.map((c) => c.href)));
+        setAvailableCalendars(cals);
       } catch { /* ignore parse errors */ }
     }
     if (savedDefEvent) setDefaultEventCalendar(savedDefEvent);
     if (savedDefTask) setDefaultTaskCalendar(savedDefTask);
+
+    // If all credentials are present, the connection was previously configured — mark as success
+    if (server && username && password) {
+      setCaldavStatus('success');
+    }
   }
 
   async function loadNotificationSettings() {

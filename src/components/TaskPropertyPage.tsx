@@ -91,6 +91,7 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
   useEffect(() => {
     cache.loadKanbanColumns().then((cols) => {
       if (cols && cols.length > 0) setKanbanColumns(cols);
+      else setKanbanColumns(['backlog', 'planned', 'inprogress', 'done']);
     });
   }, []);
 
