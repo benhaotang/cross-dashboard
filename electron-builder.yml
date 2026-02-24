@@ -5,7 +5,7 @@ copyright: "Copyright © 2024 Cross Dashboard"
 # Override main entry for the packaged Electron app
 # (package.json main points to index.ts for Expo; this overrides it for Electron)
 extraMetadata:
-  main: electron/main.js
+  main: electron/main.bundle.js
 
 directories:
   output: dist-electron

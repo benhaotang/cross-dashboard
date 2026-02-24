@@ -69,6 +69,7 @@ coverage/
 # Build artifacts
 build/
 dist-electron/
+electron/main.bundle.js
 *.log
 
 # Credentials - NEVER commit these

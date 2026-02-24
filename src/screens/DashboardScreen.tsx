@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -17,19 +17,8 @@ import * as DashboardWidget from '../../modules/dashboard-widget';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
-  const { state, setEvents, setIssues, setTasks, setLoading, setCaldavConfigured, setGiteaConfigured, setLastSync } =
-    useApp();
+  const { state, setEvents, setIssues, setTasks, setLoading, setLastSync } = useApp();
   const theme = useTheme();
-
-  useEffect(() => {
-    checkConfiguration();
-  }, []);
-
-  async function checkConfiguration() {
-    const [caldavOk, giteaOk] = await Promise.all([caldav.isConfigured(), gitea.isConfigured()]);
-    setCaldavConfigured(caldavOk);
-    setGiteaConfigured(giteaOk);
-  }
 
   async function refreshData() {
     setLoading(true);
@@ -168,7 +157,7 @@ export default function DashboardScreen() {
           upcomingTasks.map((task) => (
             <View key={task.uid} style={[styles.card, { backgroundColor: c.surface }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <AppIcon name={Icons.task} size={16} color={task.priority >= 1 && task.priority <= 4 ? '#F44336' : '#FF9800'} />
+                <AppIcon name={Icons.taskOutline} size={16} color={task.priority >= 1 && task.priority <= 4 ? '#F44336' : '#FF9800'} />
                 <Text style={[styles.cardTitle, { color: c.text, marginBottom: 0 }]}>{task.summary}</Text>
               </View>
               {task.due && (
