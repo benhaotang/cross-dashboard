@@ -66,6 +66,7 @@ export default function InboxScreen() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
     loadAllData();
@@ -160,6 +161,7 @@ export default function InboxScreen() {
         title: task.summary,
         description: task.description,
         date: task.due || task.created,
+        state: (task.status === 'COMPLETED' || task.status === 'CANCELLED') ? 'closed' : 'open',
         source: 'CalDAV Tasks',
         priority: task.priority >= 1 && task.priority <= 4 ? 'high' : task.priority === 5 ? 'medium' : 'low',
       });
@@ -182,8 +184,16 @@ export default function InboxScreen() {
       items = items.filter((item) => item.date <= to);
     }
 
+    if (activeOnly) {
+      const now = new Date();
+      items = items.filter((item) => {
+        if (item.type === 'event') return item.date >= now;
+        return item.state === 'open';
+      });
+    }
+
     return items.sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [inboxItems, selectedTypes, dateFrom, dateTo]);
+  }, [inboxItems, selectedTypes, dateFrom, dateTo, activeOnly]);
 
   // Total time estimate from filtered items
   const totalMinutes = useMemo(() => {
@@ -221,6 +231,68 @@ export default function InboxScreen() {
 
     return total;
   }, [filteredItems, state.tasks]);
+
+  function toDateString(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function applyDatePreset(preset: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    switch (preset) {
+      case 'today':
+        setDateFrom(toDateString(today));
+        setDateTo(toDateString(today));
+        break;
+      case 'tomorrow': {
+        const tom = new Date(today);
+        tom.setDate(today.getDate() + 1);
+        setDateFrom(toDateString(tom));
+        setDateTo(toDateString(tom));
+        break;
+      }
+      case 'overdue': {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        setDateFrom('');
+        setDateTo(toDateString(yesterday));
+        break;
+      }
+      case 'yesterday': {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        setDateFrom(toDateString(y));
+        setDateTo(toDateString(y));
+        break;
+      }
+      case 'thisWeek': {
+        const start = new Date(today);
+        start.setDate(today.getDate() - today.getDay());
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        setDateFrom(toDateString(start));
+        setDateTo(toDateString(end));
+        break;
+      }
+      case 'thisMonth': {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        setDateFrom(toDateString(start));
+        setDateTo(toDateString(end));
+        break;
+      }
+      case 'next7': {
+        const end = new Date(today);
+        end.setDate(today.getDate() + 6);
+        setDateFrom(toDateString(today));
+        setDateTo(toDateString(end));
+        break;
+      }
+    }
+  }
 
   function toggleType(type: InboxItemType) {
     setSelectedTypes((prev) =>
@@ -343,7 +415,39 @@ export default function InboxScreen() {
             ))}
           </View>
 
-          <Text style={[styles.filterLabel, { color: c.textSecondary }]}>Date Range</Text>
+          <TouchableOpacity
+            style={[
+              styles.activeOnlyToggle,
+              { backgroundColor: activeOnly ? c.primary : c.filterChip },
+            ]}
+            onPress={() => setActiveOnly((v) => !v)}
+          >
+            <AppIcon name={Icons.check} size={14} color={activeOnly ? '#fff' : c.textSecondary} />
+            <Text style={[styles.activeOnlyText, { color: activeOnly ? '#fff' : c.textSecondary }]}>
+              Active only
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.filterLabel, { color: c.textSecondary, marginTop: 16 }]}>Date Range</Text>
+          <View style={styles.datePresets}>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'tomorrow', label: 'Tomorrow' },
+              { key: 'overdue', label: 'Overdue' },
+              { key: 'yesterday', label: 'Yesterday' },
+              { key: 'thisWeek', label: 'This Week' },
+              { key: 'thisMonth', label: 'This Month' },
+              { key: 'next7', label: 'Next 7 Days' },
+            ].map((preset) => (
+              <TouchableOpacity
+                key={preset.key}
+                style={[styles.presetChip, { backgroundColor: c.filterChip }]}
+                onPress={() => applyDatePreset(preset.key)}
+              >
+                <Text style={[styles.presetChipText, { color: c.textSecondary }]}>{preset.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <View style={styles.dateFilters}>
             <TextInput
               style={[styles.dateInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
@@ -478,6 +582,35 @@ const styles = StyleSheet.create({
   },
   dateSeparator: {
     fontSize: 14,
+  },
+  activeOnlyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    marginBottom: 4,
+  },
+  activeOnlyText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  datePresets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   clearDates: {
     marginTop: 8,

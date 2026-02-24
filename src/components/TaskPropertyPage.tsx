@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { useTheme } from '../hooks/useTheme';
 import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from './Icon';
 import { usePomodoro } from '../store/PomodoroContext';
+import * as cache from '../services/cache';
 import {
   PropertyPageModal,
   PropertyPageHeader,
@@ -18,6 +19,9 @@ import {
   SectionHeader,
   resolveCalendar,
 } from './PropertyPageShared';
+
+const QUADRANT_QUICK_TAGS = ['do', 'delay', 'delegate', 'eliminate'];
+const TIME_QUICK_TAGS = ['5m', '30m', '1h', '2h'];
 
 interface Props {
   task: CalDavTask;
@@ -82,6 +86,13 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
   const c = theme.colors;
   const pomodoro = usePomodoro();
   const [editing, setEditing] = useState(false);
+  const [kanbanColumns, setKanbanColumns] = useState<string[]>([]);
+
+  useEffect(() => {
+    cache.loadKanbanColumns().then((cols) => {
+      if (cols && cols.length > 0) setKanbanColumns(cols);
+    });
+  }, []);
 
   // Form state
   const [formSummary, setFormSummary] = useState(task.summary);
@@ -288,8 +299,44 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
               placeholder="work, personal"
               placeholderTextColor={c.textTertiary}
             />
+            {/* Quick-add tag chips */}
+            {(() => {
+              const existingTags = new Set(
+                formCategories.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+              );
+              const appendTag = (tag: string) => {
+                const current = formCategories.trim();
+                setFormCategories(current ? `${current}, ${tag}` : tag);
+              };
+              const allQuickTags = [
+                ...kanbanColumns,
+                ...QUADRANT_QUICK_TAGS,
+                ...TIME_QUICK_TAGS,
+              ].filter((tag, idx, arr) => arr.indexOf(tag) === idx); // dedupe
+              return (
+                <View style={styles.quickTagsRow}>
+                  {allQuickTags.map((tag) => {
+                    const active = existingTags.has(tag.toLowerCase());
+                    return (
+                      <TouchableOpacity
+                        key={tag}
+                        style={[
+                          styles.quickTagChip,
+                          { borderColor: c.primary, backgroundColor: active ? c.primary : 'transparent' },
+                        ]}
+                        onPress={() => !active && appendTag(tag)}
+                      >
+                        <Text style={[styles.quickTagChipText, { color: active ? '#fff' : c.primary }]}>
+                          #{tag}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })()}
 
-            <Text style={[styles.formLabel, { color: c.textSecondary }]}>Parent Task</Text>
+            <Text style={[styles.formLabel, { color: c.textSecondary, marginTop: 8 }]}>Parent Task</Text>
             <View style={styles.parentPicker}>
               <TouchableOpacity
                 style={[styles.parentOption, { borderColor: c.border }, !formParentUid && { backgroundColor: c.primary, borderColor: c.primary }]}
@@ -498,6 +545,9 @@ const styles = StyleSheet.create({
   parentPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
   parentOption: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 160 },
   parentOptionText: { fontSize: 12 },
+  quickTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  quickTagChip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  quickTagChipText: { fontSize: 12, fontWeight: '500' },
   saveButton: { padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 8 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   deleteButtonOuter: { marginHorizontal: 20, marginTop: 24, padding: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center' },

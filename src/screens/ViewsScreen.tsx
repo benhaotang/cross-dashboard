@@ -8,7 +8,10 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+
+const WINDOW_HEIGHT = Dimensions.get('window').height;
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { CalDavTask, GiteaIssue } from '../types';
@@ -453,40 +456,43 @@ export default function ViewsScreen() {
       <Modal visible={assignVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.assignModalContent, { backgroundColor: c.surface }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: c.text }]}>Assign Items</Text>
-              <TouchableOpacity onPress={() => setAssignVisible(false)}>
-                <AppIcon name={Icons.close} size={22} color={c.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Target tag selector */}
-            <Text style={[styles.assignLabel, { color: c.textSecondary }]}>Move to:</Text>
-            <View style={styles.assignTargetRow}>
-              {(viewMode === 'kanban' ? columns : QUADRANTS.map((q) => q.tag)).map((tag) => (
-                <TouchableOpacity
-                  key={tag}
-                  style={[
-                    styles.assignTargetChip,
-                    {
-                      backgroundColor: assignTarget.toLowerCase() === tag.toLowerCase() ? c.primary : c.filterChip,
-                    },
-                  ]}
-                  onPress={() => setAssignTarget(tag)}
-                >
-                  <Text
-                    style={[
-                      styles.assignTargetChipText,
-                      { color: assignTarget.toLowerCase() === tag.toLowerCase() ? '#fff' : c.textSecondary },
-                    ]}
-                  >
-                    #{tag}
-                  </Text>
+            {/* Fixed header section */}
+            <View style={styles.assignModalFixed}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: c.text }]}>Assign Items</Text>
+                <TouchableOpacity onPress={() => setAssignVisible(false)}>
+                  <AppIcon name={Icons.close} size={22} color={c.textSecondary} />
                 </TouchableOpacity>
-              ))}
+              </View>
+
+              {/* Target tag selector */}
+              <Text style={[styles.assignLabel, { color: c.textSecondary }]}>Move to:</Text>
+              <View style={styles.assignTargetRow}>
+                {(viewMode === 'kanban' ? columns : QUADRANTS.map((q) => q.tag)).map((tag) => (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[
+                      styles.assignTargetChip,
+                      {
+                        backgroundColor: assignTarget.toLowerCase() === tag.toLowerCase() ? c.primary : c.filterChip,
+                      },
+                    ]}
+                    onPress={() => setAssignTarget(tag)}
+                  >
+                    <Text
+                      style={[
+                        styles.assignTargetChipText,
+                        { color: assignTarget.toLowerCase() === tag.toLowerCase() ? '#fff' : c.textSecondary },
+                      ]}
+                    >
+                      #{tag}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
-            {/* Assignable items list */}
+            {/* Scrollable items list */}
             <ScrollView style={styles.assignList} contentContainerStyle={styles.assignListContent}>
               {assignableItems.length === 0 && (
                 <Text style={[styles.emptyColumnText, { color: c.textQuaternary }]}>
@@ -755,9 +761,15 @@ const styles = StyleSheet.create({
   assignModalContent: {
     width: 440,
     maxWidth: '95%',
-    maxHeight: '80%',
+    height: WINDOW_HEIGHT * 0.75,
     borderRadius: 12,
-    padding: 20,
+    overflow: 'hidden',
+    paddingBottom: 8,
+  },
+  assignModalFixed: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 4,
   },
   assignLabel: {
     fontSize: 13,
@@ -781,9 +793,10 @@ const styles = StyleSheet.create({
   },
   assignList: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   assignListContent: {
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   assignItemRow: {
     flexDirection: 'row',

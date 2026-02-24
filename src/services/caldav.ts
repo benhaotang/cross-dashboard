@@ -603,7 +603,7 @@ export async function createTask(task: Omit<CalDavTask, 'uid' | 'created' | 'las
 
   const now = new Date();
   const uid = `task-${Date.now()}@cross-dashboard`;
-  const fullTask: CalDavTask = { ...task, uid, created: now, lastModified: now };
+  const fullTask: CalDavTask = { ...task, uid, created: now, lastModified: now, calendarHref };
   const vtodo = buildVTodo(fullTask);
   const baseUrl = calendarHref ? resolveHref(client.serverUrl, calendarHref) : client.serverUrl;
 
@@ -633,9 +633,15 @@ export async function updateTask(task: CalDavTask): Promise<boolean> {
   if (!client) return false;
 
   const vtodo = buildVTodo(task);
+  // Use the task's own calendar href for the correct PUT URL; fall back to
+  // serverUrl only when calendarHref is not set (e.g. locally-created tasks).
+  const baseUrl = task.calendarHref
+    ? resolveHref(client.serverUrl, task.calendarHref)
+    : client.serverUrl;
+  const taskUrl = `${baseUrl.replace(/\/+$/, '')}/${task.uid}.ics`;
 
   try {
-    const response = await fetch(`${client.serverUrl}/${task.uid}.ics`, {
+    const response = await fetch(taskUrl, {
       method: 'PUT',
       headers: {
         Authorization: createAuthHeader(client.username, client.password),
@@ -650,12 +656,17 @@ export async function updateTask(task: CalDavTask): Promise<boolean> {
   }
 }
 
-export async function deleteTask(uid: string): Promise<boolean> {
+export async function deleteTask(uid: string, calendarHref?: string): Promise<boolean> {
   const client = await getClient();
   if (!client) return false;
 
+  const baseUrl = calendarHref
+    ? resolveHref(client.serverUrl, calendarHref)
+    : client.serverUrl;
+  const taskUrl = `${baseUrl.replace(/\/+$/, '')}/${uid}.ics`;
+
   try {
-    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+    const response = await fetch(taskUrl, {
       method: 'DELETE',
       headers: {
         Authorization: createAuthHeader(client.username, client.password),

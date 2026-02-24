@@ -354,8 +354,9 @@ export default function TasksScreen() {
   }
 
   async function deleteTask(uid: string) {
+    const task = state.tasks.find((t) => t.uid === uid);
     if (state.caldavConfigured) {
-      await caldav.deleteTask(uid);
+      await caldav.deleteTask(uid, task?.calendarHref);
     }
     const newTasks = state.tasks.filter((t) => t.uid !== uid);
     setTasks(newTasks);
