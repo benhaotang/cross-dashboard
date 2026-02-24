@@ -21,7 +21,7 @@ Cross-Dashboard is a React Native application providing a unified web dashboard 
 - **UI**: React Native components with platform-specific adaptations
 - **Icons**: Iconify (`@iconify/react`) - MDI icon set
 - **Navigation**: React Navigation (bottom tabs for mobile, sidebar for web/desktop)
-- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues
+- **State Management**: React Context (`src/store/AppContext.tsx`) — events, notes, tasks, issues, selectedCalendars
 - **Secure Storage**: expo-secure-store (keyring integration)
 
 ---
@@ -35,7 +35,7 @@ cross-dashboard/
 │   ├── components/     # Reusable UI components (Icon.tsx)
 │   ├── navigation/     # Navigation configuration (AppNavigator, SidebarNavigator)
 │   ├── screens/        # Screen components (Dashboard, Events, Notes, Tasks, Issues, Settings)
-│   ├── services/       # API clients (caldav.ts, gitea.ts, keyring.ts, taskParser.ts)
+│   ├── services/       # API clients (caldav.ts, nextcloud.ts, gitea.ts, keyring.ts, taskParser.ts)
 │   ├── hooks/          # Custom React hooks
 │   ├── types/          # TypeScript type definitions (index.ts)
 │   ├── utils/          # Helper utilities
@@ -57,12 +57,22 @@ cross-dashboard/
 ### Key Services
 
 #### CalDAV Service (`src/services/caldav.ts`)
-- Authentication via stored credentials
+- Authentication via stored credentials (manual or Nextcloud Login Flow v2)
+- Calendar discovery via PROPFIND (`fetchCalendars()` → `CalDavCalendar[]` with href, displayName, color, components)
+- Calendar-aware fetching: `fetchEvents`, `fetchTasks`, `fetchNotes` accept optional `calendarHrefs` parameter
+- Each fetched event/task is tagged with `calendarHref` for calendar color identification
 - Event CRUD operations (VEVENT)
 - Calendar synchronization
 - Notes storage (VJOURNAL fetch/create/update/delete)
 - Task CRUD operations (VTODO with `fetchTasks`, `createTask`, `updateTask`, `deleteTask`)
 - Subtask support via `RELATED-TO;RELTYPE=PARENT` property
+- `createTask` and `createNote` accept optional `calendarHref` for target calendar selection
+
+#### Nextcloud Service (`src/services/nextcloud.ts`)
+- **Login Flow v2**: `initiateLoginFlow(serverUrl)` → `{pollToken, pollEndpoint, loginUrl}`
+- **Credential polling**: `pollForCredentials(pollEndpoint, pollToken, signal?)` — polls every 2s for up to 5 min
+- **CalDAV URL discovery**: `discoverCalDavUrl(serverUrl, username)` → `{base}/remote.php/dav/calendars/{user}/`
+- CORS limitation: Login Flow v2 does not work on web platform (falls back to manual entry)
 
 #### Task Parser (`src/services/taskParser.ts`)
 - Intelligent single-line task input parser (Todoist-style)
@@ -83,6 +93,7 @@ cross-dashboard/
 - Platform-specific implementations for secure credential storage
 - Methods: `setCredential`, `getCredential`, `deleteCredential`, `hasCredential`, `clearAllCredentials`
 - Web fallback uses localStorage (less secure)
+- Credential keys include: `caldav_password`, `caldav_server`, `caldav_username`, `caldav_auth_method` (manual/nextcloud), `caldav_selected_calendars` (JSON CalDavCalendar[]), `caldav_default_event_calendar`, `caldav_default_task_calendar`, `gitea_token`, `gitea_instance`, `notif_*`, `up_endpoint`, `encryption_key*`
 
 ---
 
@@ -120,12 +131,12 @@ cross-dashboard/
 | Screen | Description |
 |--------|-------------|
 | DashboardScreen | Overview with upcoming events, tasks due soon, and open issues |
-| EventsScreen | CalDAV events with day/week/month filters |
-| NotesScreen | Note management with create/edit/delete |
-| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal |
+| EventsScreen | CalDAV events with day/week/month filters, calendar color dots per event |
+| NotesScreen | Note management with create/edit/delete, calendar-aware fetching |
+| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots per task |
 | IssuesScreen | Gitea issues with state filtering |
 | InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones |
-| SettingsScreen | Credential configuration, theme, task input defaults, notifications |
+| SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, task input defaults, notifications |
 
 ---
 
@@ -161,6 +172,14 @@ interface CalDavConfig {
   // password retrieved from secure store
 }
 
+interface CalDavCalendar {
+  href: string;          // e.g. /remote.php/dav/calendars/user/personal/
+  displayName: string;
+  color?: string;        // from apple:calendar-color, normalized to #RRGGBB
+  ctag?: string;         // change tag for cache invalidation
+  components: string[];  // ['VEVENT', 'VTODO', 'VJOURNAL']
+}
+
 interface CalendarEvent {
   uid: string;
   summary: string;
@@ -168,6 +187,8 @@ interface CalendarEvent {
   end: Date;
   description?: string;
   location?: string;
+  calendar?: string;
+  calendarHref?: string;  // href of the calendar this event was fetched from
 }
 
 type TaskStatus = 'NEEDS-ACTION' | 'IN-PROCESS' | 'COMPLETED' | 'CANCELLED';
@@ -187,6 +208,7 @@ interface CalDavTask {
   categories?: string[];   // tags from #word quick input
   location?: string;
   parentUid?: string;      // RELATED-TO;RELTYPE=PARENT (subtask support)
+  calendarHref?: string;   // href of the calendar this task was fetched from
 }
 ```
 
@@ -279,6 +301,17 @@ npx expo install --fix
 - [x] Live parse preview showing extracted priority, tags, and due date as chips
 - [x] Task cache with encrypted storage (`saveTasks`/`loadTasks`)
 
+### Completed (continued 5)
+- [x] Nextcloud Login Flow v2 (`src/services/nextcloud.ts`) — browser-based login, auto-fills CalDAV credentials
+- [x] Auth method toggle in Settings (Manual / Nextcloud) with CORS warning on web
+- [x] Calendar discovery via PROPFIND — returns `CalDavCalendar[]` with href, displayName, color, components
+- [x] Calendar picker UI in Settings — color dots, display names, component badges (Events/Tasks/Notes), checkboxes, Select All/Deselect All
+- [x] Calendar-aware fetching — events, tasks, notes fetch from selected calendars only
+- [x] Selected calendars persisted to keyring and AppContext (`selectedCalendars`)
+- [x] Default event/task calendar settings — user picks which calendar new events/tasks are saved to
+- [x] Calendar color dots on EventsScreen and TasksScreen — each item shows a colored dot matching its source calendar
+- [x] Events and tasks tagged with `calendarHref` during fetch for calendar identification
+
 ---
 
 ## Agent Task Guidelines
@@ -320,4 +353,4 @@ npx expo install --fix
 - Offline mode with local SQLite caching
 - Multi-account support for CalDAV/Gitea
 - Task recurrence (RRULE in VTODO)
-- CalDAV task list (collection) selection
+- Nextcloud Android SSO (native Expo module using `Android-SingleSignOn` AIDL IPC — deferred, Login Flow v2 covers Android)
