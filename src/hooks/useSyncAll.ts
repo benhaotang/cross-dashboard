@@ -5,6 +5,7 @@ import { CalDavCalendar, CalendarEvent, GiteaIssue, CalDavTask } from '../types'
 import * as caldav from '../services/caldav';
 import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
+import * as keyring from '../services/keyring';
 import * as notifications from '../services/notifications';
 import * as DashboardWidget from '../../modules/dashboard-widget';
 
@@ -13,6 +14,11 @@ import * as DashboardWidget from '../../modules/dashboard-widget';
  * Fetches events, tasks, notes, and issues in parallel, respecting
  * selectedCalendars. Guards against clearing existing data when a
  * fetch returns empty (e.g. a transient network error).
+ *
+ * On Android, after every successful sync this also refreshes the
+ * WidgetSyncWorker's credentials (saveWorkerCredentials) so the
+ * background worker can independently keep the widget up to date
+ * even when the app is closed.
  */
 export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean } {
   const { state, setEvents, setTasks, setNotes, setIssues, setLoading, setLastSync } = useApp();
@@ -87,7 +93,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
         await notifications.scheduleTaskReminders(freshTasks, notifSettings.minutesBefore);
       }
 
-      // Update home screen widget (Android only) — use fresh data from fetches
+      // ── Android widget update ─────────────────────────────────────────────
       if (Platform.OS === 'android' && DashboardWidget.isAvailable()) {
         const upcoming = freshEvents
           .filter((e) => e.start >= now)
@@ -145,6 +151,36 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
           todayStats.pomodoroSessions,
           overdueTaskRows
         );
+
+        // Refresh the background worker's credentials so it can independently
+        // fetch CalDAV/Gitea data on its periodic schedule even when the app
+        // is closed. Without this the worker silently has no credentials and
+        // the widget stops updating once the user leaves the app.
+        try {
+          const [caldavServer, caldavUser, caldavPass, giteaInstance, giteaToken] =
+            await Promise.all([
+              keyring.getCredential('caldav_server'),
+              keyring.getCredential('caldav_username'),
+              keyring.getCredential('caldav_password'),
+              keyring.getCredential('gitea_instance'),
+              keyring.getCredential('gitea_token'),
+            ]);
+
+          const calendarHrefs = state.selectedCalendars.map((c) => c.href).join('|');
+          const giteaRepos = state.giteaRepositories.join('|');
+
+          DashboardWidget.saveWorkerCredentials(
+            caldavServer ?? '',
+            caldavUser ?? '',
+            caldavPass ?? '',
+            calendarHrefs,
+            giteaInstance ?? '',
+            giteaToken ?? '',
+            giteaRepos
+          );
+        } catch {
+          // Non-fatal — widget background sync will fall back to last saved credentials
+        }
       }
     } catch (error) {
       console.error('Error syncing data:', error);

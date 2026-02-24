@@ -55,15 +55,23 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val tasks = mutableListOf<TaskInfo>()
         var issueCount = 0
 
+        // Whether this worker has credentials to actually fetch each data source.
+        // If not configured, we must NOT overwrite rows — the JS side (useSyncAll)
+        // owns that data and overwrites here would blank the widget every cycle.
+        val hasCaldavConfig = caldavServer != null && caldavUser != null &&
+                caldavPass != null && calendarHrefs.isNotEmpty()
+        val hasGiteaConfig = giteaUrl != null && !giteaToken.isNullOrEmpty() &&
+                giteaRepos.isNotEmpty()
+
         // ── CalDAV ────────────────────────────────────────────────────────────
-        if (caldavServer != null && caldavUser != null && caldavPass != null) {
+        if (hasCaldavConfig) {
             for (href in calendarHrefs) {
                 try {
-                    val fetched = fetchCalendarEvents(caldavServer, caldavUser, caldavPass, href)
+                    val fetched = fetchCalendarEvents(caldavServer!!, caldavUser!!, caldavPass!!, href)
                     events.addAll(fetched)
                 } catch (_: Exception) {}
                 try {
-                    val fetched = fetchCalendarTasks(caldavServer, caldavUser, caldavPass, href)
+                    val fetched = fetchCalendarTasks(caldavServer!!, caldavUser!!, caldavPass!!, href)
                     tasks.addAll(fetched)
                 } catch (_: Exception) {}
             }
@@ -100,37 +108,52 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             }
 
         // ── Gitea ─────────────────────────────────────────────────────────────
-        if (giteaUrl != null && !giteaToken.isNullOrEmpty()) {
+        if (hasGiteaConfig) {
             for (repo in giteaRepos) {
                 try {
-                    issueCount += fetchGiteaOpenIssueCount(giteaUrl, giteaToken, repo)
+                    issueCount += fetchGiteaOpenIssueCount(giteaUrl!!, giteaToken!!, repo)
                 } catch (_: Exception) {}
             }
         }
 
         // ── Persist widget data ───────────────────────────────────────────────
+        // IMPORTANT: only overwrite a section's rows if this worker actually has
+        // credentials configured for that source. Without this guard the worker
+        // runs on its schedule, fetches nothing (no creds), writes empty strings
+        // to SharedPrefs, and blanks every widget row — even though the JS side
+        // (useSyncAll) already wrote correct data there.
         val syncTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val editor = prefs.edit()
 
-        // Old widget data (event rows + task rows)
-        editor.putString("event_row_0", upcoming.getOrNull(0)?.formattedRow ?: "")
-        editor.putString("event_row_1", upcoming.getOrNull(1)?.formattedRow ?: "")
-        editor.putString("event_row_2", upcoming.getOrNull(2)?.formattedRow ?: "")
-        editor.putInt("events_count", upcoming.size)
-        editor.putString("task_row_0", pendingRows.getOrNull(0) ?: "")
-        editor.putString("task_row_1", pendingRows.getOrNull(1) ?: "")
-        editor.putString("task_row_2", pendingRows.getOrNull(2) ?: "")
-        editor.putInt("tasks_count", pendingRows.size)
-        editor.putInt("issues_count", issueCount)
-        editor.putString("last_sync", "Synced $syncTime")
+        if (hasCaldavConfig) {
+            // Old widget rows
+            editor.putString("event_row_0", upcoming.getOrNull(0)?.formattedRow ?: "")
+            editor.putString("event_row_1", upcoming.getOrNull(1)?.formattedRow ?: "")
+            editor.putString("event_row_2", upcoming.getOrNull(2)?.formattedRow ?: "")
+            editor.putInt("events_count", upcoming.size)
+            editor.putString("task_row_0", pendingRows.getOrNull(0) ?: "")
+            editor.putString("task_row_1", pendingRows.getOrNull(1) ?: "")
+            editor.putString("task_row_2", pendingRows.getOrNull(2) ?: "")
+            editor.putInt("tasks_count", pendingRows.size)
+            // 4x4 widget rows
+            editor.putString("overdue_task_row_0", overdueTasks.getOrNull(0)?.summary ?: "")
+            editor.putString("overdue_task_row_1", overdueTasks.getOrNull(1)?.summary ?: "")
+            editor.putString("overdue_task_row_2", overdueTasks.getOrNull(2)?.summary ?: "")
+            editor.putInt("overdue_tasks_count", overdueTasks.size)
+            editor.putInt("events_remaining_today", eventsRemainingToday)
+        }
 
-        // New 4x4 widget data
-        editor.putString("overdue_task_row_0", overdueTasks.getOrNull(0)?.summary ?: "")
-        editor.putString("overdue_task_row_1", overdueTasks.getOrNull(1)?.summary ?: "")
-        editor.putString("overdue_task_row_2", overdueTasks.getOrNull(2)?.summary ?: "")
-        editor.putInt("overdue_tasks_count", overdueTasks.size)
-        editor.putInt("events_remaining_today", eventsRemainingToday)
-        // Note: pomodoro_sessions_today is only updated from the JS side; don't overwrite here
+        if (hasGiteaConfig) {
+            editor.putInt("issues_count", issueCount)
+        }
+
+        // Only stamp last_sync when at least one data source was actually queried,
+        // so the widget footer reflects a real fetch, not a no-op worker run.
+        if (hasCaldavConfig || hasGiteaConfig) {
+            editor.putString("last_sync", "Synced $syncTime")
+        }
+
+        // Note: pomodoro_sessions_today is owned by the JS side — never overwrite here.
 
         editor.apply()
 
