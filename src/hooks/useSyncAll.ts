@@ -80,10 +80,11 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
       const now = new Date();
       setLastSync(now);
 
-      // Reschedule event reminders
+      // Reschedule event and task reminders
       const notifSettings = await notifications.getNotificationSettings();
-      if (notifSettings.enabled && freshEvents.length > 0) {
+      if (notifSettings.enabled) {
         await notifications.scheduleEventReminders(freshEvents, notifSettings.minutesBefore);
+        await notifications.scheduleTaskReminders(freshTasks, notifSettings.minutesBefore);
       }
 
       // Update home screen widget (Android only) — use fresh data from fetches

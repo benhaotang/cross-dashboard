@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { CalendarEvent } from '../types';
+import { CalendarEvent, CalDavTask } from '../types';
 import { getCredential, setCredential, type CredentialKey } from './keyring';
 
 // Configure notification handler
@@ -76,6 +76,54 @@ function formatEventBody(event: CalendarEvent, minutesBefore: number): string {
 
 export async function cancelAllEventReminders(): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+// --- Task due-date notifications ---
+// Must be called AFTER scheduleEventReminders (which cancels all first).
+
+export async function scheduleTaskReminders(
+  tasks: CalDavTask[],
+  minutesBefore: number = 15
+): Promise<void> {
+  const now = new Date();
+  const triggerOffsetMs = minutesBefore * 60 * 1000;
+
+  for (const task of tasks) {
+    if (!task.due) continue;
+    if (task.status === 'COMPLETED' || task.status === 'CANCELLED') continue;
+    if (task.due <= now) continue;
+
+    // remind-before
+    if (minutesBefore > 0) {
+      const remindTime = new Date(task.due.getTime() - triggerOffsetMs);
+      if (remindTime > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: task.summary,
+            body: `Due in ${minutesBefore} minutes`,
+            data: { type: 'task_reminder', uid: task.uid },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: remindTime,
+          },
+        });
+      }
+    }
+
+    // at-due
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: task.summary,
+        body: 'Due now',
+        data: { type: 'task_due', uid: task.uid },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: task.due,
+      },
+    });
+  }
 }
 
 // --- Notification settings persistence ---

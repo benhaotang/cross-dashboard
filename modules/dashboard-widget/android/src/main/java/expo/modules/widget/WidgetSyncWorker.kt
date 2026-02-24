@@ -25,6 +25,13 @@ data class EventInfo(
     val location: String?
 )
 
+data class TaskInfo(
+    val formattedRow: String,
+    val dueMs: Long,
+    val uid: String,
+    val summary: String
+)
+
 class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     companion object {
@@ -49,7 +56,7 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                          else giteaReposRaw.split("|").filter { it.isNotBlank() }
 
         val events = mutableListOf<EventInfo>()
-        val tasks = mutableListOf<String>()
+        val tasks = mutableListOf<TaskInfo>()
         var issueCount = 0
 
         // ── CalDAV ────────────────────────────────────────────────────────────
@@ -90,9 +97,9 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         editor.putString("event_row_1", upcoming.getOrNull(1)?.formattedRow ?: "")
         editor.putString("event_row_2", upcoming.getOrNull(2)?.formattedRow ?: "")
         editor.putInt("events_count", upcoming.size)
-        editor.putString("task_row_0", tasks.getOrNull(0) ?: "")
-        editor.putString("task_row_1", tasks.getOrNull(1) ?: "")
-        editor.putString("task_row_2", tasks.getOrNull(2) ?: "")
+        editor.putString("task_row_0", tasks.getOrNull(0)?.formattedRow ?: "")
+        editor.putString("task_row_1", tasks.getOrNull(1)?.formattedRow ?: "")
+        editor.putString("task_row_2", tasks.getOrNull(2)?.formattedRow ?: "")
         editor.putInt("tasks_count", tasks.size)
         editor.putInt("issues_count", issueCount)
         editor.putString("last_sync", "Synced $syncTime")
@@ -103,6 +110,8 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val notifMinutes = prefs.getString("notif_minutes", "15")?.toIntOrNull() ?: 15
         if (notifEnabled) {
             scheduleEventAlarms(allFutureEvents, notifMinutes)
+            val futureTasks = tasks.filter { it.dueMs > now }
+            scheduleTaskAlarms(futureTasks, notifMinutes)
         }
 
         // ── Trigger widget refresh ────────────────────────────────────────────
@@ -163,6 +172,43 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         try {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
         } catch (_: SecurityException) {}
+    }
+
+    private fun scheduleTaskAlarms(tasks: List<TaskInfo>, notifMinutes: Int) {
+        val alarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val now = System.currentTimeMillis()
+
+        for (task in tasks) {
+            val baseId = abs(task.uid.hashCode()) % 50_000
+            val atDueId = baseId + 100_000
+            val remindBeforeId = baseId + 150_000
+
+            cancelAlarm(alarmManager, atDueId)
+            cancelAlarm(alarmManager, remindBeforeId)
+
+            scheduleAlarm(
+                alarmManager,
+                EventInfo(task.formattedRow, task.dueMs, task.uid, task.summary, null),
+                "at_time",
+                atDueId,
+                task.dueMs,
+                notifMinutes
+            )
+
+            if (notifMinutes > 0) {
+                val remindMs = task.dueMs - notifMinutes * 60_000L
+                if (remindMs > now) {
+                    scheduleAlarm(
+                        alarmManager,
+                        EventInfo(task.formattedRow, task.dueMs, task.uid, task.summary, null),
+                        "remind_before",
+                        remindBeforeId,
+                        remindMs,
+                        notifMinutes
+                    )
+                }
+            }
+        }
     }
 
     private fun cancelAlarm(alarmManager: AlarmManager, notifId: Int) {
@@ -293,28 +339,33 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
     }
 
     // ── iCal parser: tasks ────────────────────────────────────────────────────
-    private fun parseICalTasks(ical: String): List<String> {
-        val results = mutableListOf<String>()
+    private fun parseICalTasks(ical: String): List<TaskInfo> {
+        val results = mutableListOf<TaskInfo>()
         var inVTodo = false
         var summary = ""
         var due = 0L
+        var uid = ""
 
         for (rawLine in unfoldIcal(ical)) {
             val line = rawLine.trim()
             when {
-                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L }
+                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L; uid = "" }
                 line == "END:VTODO" -> {
                     inVTodo = false
                     if (summary.isNotEmpty()) {
                         val prefix = if (due > 0 && due < System.currentTimeMillis()) "⚠ " else "• "
-                        results.add("$prefix$summary")
+                        val effectiveUid = uid.ifEmpty { "$summary$due" }
+                        results.add(TaskInfo("$prefix$summary", due, effectiveUid, summary))
                     }
                 }
                 inVTodo && line.startsWith("SUMMARY") -> {
                     summary = line.substringAfter(':').trim()
                 }
-                inVTodo && (line.startsWith("DUE") || line.startsWith("DUE;")) -> {
+                inVTodo && (line.startsWith("DUE:") || line.startsWith("DUE;")) -> {
                     due = parseICalDate(line.substringAfter(':').trim())
+                }
+                inVTodo && line.startsWith("UID:") -> {
+                    uid = line.substringAfter(':').trim()
                 }
             }
         }

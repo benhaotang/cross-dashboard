@@ -260,9 +260,10 @@ export default function SettingsScreen() {
       }
     }
 
-    if (newValue && state.events.length > 0) {
+    if (newValue) {
       const minutes = parseInt(reminderMinutes, 10) || 15;
       await notifications.scheduleEventReminders(state.events, minutes);
+      await notifications.scheduleTaskReminders(state.tasks, minutes);
     }
   }
 
@@ -272,8 +273,9 @@ export default function SettingsScreen() {
     if (notifEnabled && Platform.OS === 'android' && DashboardWidget.isAvailable()) {
       DashboardWidget.saveWorkerNotificationSettings(true, minutes);
     }
-    if (notifEnabled && state.events.length > 0) {
+    if (notifEnabled) {
       await notifications.scheduleEventReminders(state.events, minutes);
+      await notifications.scheduleTaskReminders(state.tasks, minutes);
     }
     showAlert('Saved', `Reminders set to ${minutes} minutes before events`);
   }
