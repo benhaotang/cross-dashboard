@@ -2,8 +2,11 @@
 
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const serve = require('electron-serve');
 
-function createWindow() {
+const loadURL = serve({ directory: path.join(__dirname, '../dist') });
+
+async function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -18,7 +21,7 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, '../dist/index.html'));
+  await loadURL(win);
 }
 
 app.whenReady().then(() => {

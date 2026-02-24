@@ -44,6 +44,7 @@
     "@types/react": "~19.1.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
+    "electron-serve": "^3.0.1",
     "typescript": "~5.9.2"
   },
   "private": true
