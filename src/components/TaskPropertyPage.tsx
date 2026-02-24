@@ -127,6 +127,7 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
   const isOverdue = task.due && task.due < new Date() && task.status !== 'COMPLETED';
 
   const handlePomodoroSession = useCallback((sessionNumber: number, totalMinutes: number) => {
+    cache.incrementStat('pomodoroSessions');
     const now = new Date();
     const timestamp = now.toISOString().replace('T', ' ').slice(0, 16);
     const sessionLog = `[Pomodoro] Session #${sessionNumber} completed (${totalMinutes}min) - ${timestamp}`;

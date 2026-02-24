@@ -195,6 +195,7 @@ export default function IssuesScreen() {
               setIssues(newIssues);
               cache.saveIssues(newIssues);
               setSelectedIssue(updated);
+              if (newState === 'closed') cache.incrementStat('issuesClosed');
             }
           }}
         />

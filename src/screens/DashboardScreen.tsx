@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,19 @@ import {
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useSyncAll } from '../hooks/useSyncAll';
+import * as cache from '../services/cache';
+import { StatsStore, DailyStats } from '../services/cache';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
   const { state } = useApp();
   const theme = useTheme();
   const { syncAll } = useSyncAll();
+  const [statsStore, setStatsStore] = useState<StatsStore>({});
+
+  useEffect(() => {
+    cache.loadStatsStore().then(setStatsStore);
+  }, [state.lastSync]);
 
   const upcomingEvents = state.events
     .filter((e) => e.start >= new Date())
@@ -32,6 +39,10 @@ export default function DashboardScreen() {
     .slice(0, 5);
 
   const openIssues = state.issues.filter((i) => i.state === 'open').slice(0, 5);
+
+  const this7: DailyStats = cache.sumStatRange(statsStore, 0, 7);
+  const prev7: DailyStats = cache.sumStatRange(statsStore, 7, 7);
+  const hasPrev = prev7.tasksCompleted + prev7.pomodoroSessions + prev7.issuesClosed > 0;
 
   const c = theme.colors;
 
@@ -53,6 +64,70 @@ export default function DashboardScreen() {
       </View>
 
       {state.isLoading && <ActivityIndicator size="large" color={c.primary} style={styles.loader} />}
+
+      {/* Activity Stats — last 7 days */}
+      {(state.caldavConfigured || state.giteaConfigured) && (
+        <View style={[styles.statsCard, { backgroundColor: c.surface }]}>
+          <Text style={[styles.statsTitle, { color: c.text }]}>Last 7 Days</Text>
+          <View style={styles.statsRow}>
+            {/* Tasks */}
+            <View style={[styles.statTile, { backgroundColor: c.background }]}>
+              <AppIcon name={Icons.task} size={18} color="#4CAF50" />
+              <Text style={[styles.statValue, { color: c.text }]}>{this7.tasksCompleted}</Text>
+              <Text style={[styles.statLabel, { color: c.textSecondary }]}>tasks done</Text>
+              {hasPrev && (
+                <Text style={[styles.statDelta, {
+                  color: this7.tasksCompleted > prev7.tasksCompleted ? '#4CAF50'
+                    : this7.tasksCompleted < prev7.tasksCompleted ? '#FF9800' : c.textTertiary,
+                }]}>
+                  {this7.tasksCompleted > prev7.tasksCompleted ? `↑${this7.tasksCompleted - prev7.tasksCompleted}`
+                    : this7.tasksCompleted < prev7.tasksCompleted ? `↓${prev7.tasksCompleted - this7.tasksCompleted}`
+                    : '–'}
+                </Text>
+              )}
+            </View>
+
+            {/* Pomodoro */}
+            <View style={[styles.statTile, { backgroundColor: c.background }]}>
+              <AppIcon name={Icons.timer} size={18} color="#FF5722" />
+              <Text style={[styles.statValue, { color: c.text }]}>{this7.pomodoroSessions}</Text>
+              <Text style={[styles.statLabel, { color: c.textSecondary }]}>pomodoros</Text>
+              {hasPrev && (
+                <Text style={[styles.statDelta, {
+                  color: this7.pomodoroSessions > prev7.pomodoroSessions ? '#4CAF50'
+                    : this7.pomodoroSessions < prev7.pomodoroSessions ? '#FF9800' : c.textTertiary,
+                }]}>
+                  {this7.pomodoroSessions > prev7.pomodoroSessions ? `↑${this7.pomodoroSessions - prev7.pomodoroSessions}`
+                    : this7.pomodoroSessions < prev7.pomodoroSessions ? `↓${prev7.pomodoroSessions - this7.pomodoroSessions}`
+                    : '–'}
+                </Text>
+              )}
+            </View>
+
+            {/* Issues */}
+            {state.giteaConfigured && (
+              <View style={[styles.statTile, { backgroundColor: c.background }]}>
+                <AppIcon name={Icons.issues} size={18} color="#9C27B0" />
+                <Text style={[styles.statValue, { color: c.text }]}>{this7.issuesClosed}</Text>
+                <Text style={[styles.statLabel, { color: c.textSecondary }]}>issues closed</Text>
+                {hasPrev && (
+                  <Text style={[styles.statDelta, {
+                    color: this7.issuesClosed > prev7.issuesClosed ? '#4CAF50'
+                      : this7.issuesClosed < prev7.issuesClosed ? '#FF9800' : c.textTertiary,
+                  }]}>
+                    {this7.issuesClosed > prev7.issuesClosed ? `↑${this7.issuesClosed - prev7.issuesClosed}`
+                      : this7.issuesClosed < prev7.issuesClosed ? `↓${prev7.issuesClosed - this7.issuesClosed}`
+                      : '–'}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+          {hasPrev && (
+            <Text style={[styles.statCaption, { color: c.textTertiary }]}>vs previous 7 days</Text>
+          )}
+        </View>
+      )}
 
       {!state.caldavConfigured && !state.giteaConfigured && (
         <View style={[styles.card, { backgroundColor: c.surface }]}>
@@ -222,5 +297,55 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
     fontWeight: '600',
+  },
+  statsCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statTile: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    gap: 2,
+  },
+  statValue: {
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 30,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  statDelta: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  statCaption: {
+    fontSize: 10,
+    textAlign: 'right',
+    marginTop: 6,
   },
 });

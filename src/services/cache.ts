@@ -13,6 +13,7 @@ const CACHE_TASK_DEFAULTS = '@cache/task_defaults';
 const CACHE_POMODORO = '@cache/pomodoro_settings';
 const CACHE_VISIBLE_SCREENS = '@cache/visible_screens';
 const CACHE_KANBAN_COLUMNS = '@cache/kanban_columns';
+const CACHE_DAILY_STATS = '@cache/daily_stats';
 
 export type ScreenName = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Views';
 
@@ -163,6 +164,59 @@ export async function loadVisibleScreens(): Promise<ScreenName[] | null> {
   if (!data) return null;
   return JSON.parse(data) as ScreenName[];
 }
+
+// ─── Daily Activity Stats ────────────────────────────────────────────────────
+
+export interface DailyStats {
+  tasksCompleted: number;
+  pomodoroSessions: number;
+  issuesClosed: number;
+}
+
+/** All days we have records for, keyed by 'YYYY-MM-DD'. */
+export type StatsStore = Record<string, DailyStats>;
+
+function dateKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export async function loadStatsStore(): Promise<StatsStore> {
+  const data = await AsyncStorage.getItem(CACHE_DAILY_STATS);
+  if (!data) return {};
+  return JSON.parse(data) as StatsStore;
+}
+
+async function saveStatsStore(store: StatsStore): Promise<void> {
+  await AsyncStorage.setItem(CACHE_DAILY_STATS, JSON.stringify(store));
+}
+
+/** Atomically increment one counter for today. Fire-and-forget safe. */
+export async function incrementStat(stat: keyof DailyStats): Promise<void> {
+  const store = await loadStatsStore();
+  const key = dateKey();
+  const today = store[key] ?? { tasksCompleted: 0, pomodoroSessions: 0, issuesClosed: 0 };
+  store[key] = { ...today, [stat]: today[stat] + 1 };
+  await saveStatsStore(store);
+}
+
+/** Sum one stat across a range of days. daysAgo=0 means today. */
+export function sumStatRange(store: StatsStore, startDaysAgo: number, count: number): DailyStats {
+  let tasksCompleted = 0, pomodoroSessions = 0, issuesClosed = 0;
+  const now = new Date();
+  for (let i = startDaysAgo; i < startDaysAgo + count; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const day = store[dateKey(d)];
+    if (day) {
+      tasksCompleted += day.tasksCompleted;
+      pomodoroSessions += day.pomodoroSessions;
+      issuesClosed += day.issuesClosed;
+    }
+  }
+  return { tasksCompleted, pomodoroSessions, issuesClosed };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function saveKanbanColumns(columns: string[]): Promise<void> {
   await AsyncStorage.setItem(CACHE_KANBAN_COLUMNS, JSON.stringify(columns));

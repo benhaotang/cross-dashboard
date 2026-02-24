@@ -303,6 +303,7 @@ export default function TasksScreen() {
       const newTasks = state.tasks.map((t) => (t.uid === editTask.uid ? updated : t));
       setTasks(newTasks);
       await cache.saveTasks(newTasks);
+      if (isCompleted && editTask.status !== 'COMPLETED') cache.incrementStat('tasksCompleted');
     } else {
       const taskData = {
         summary: formSummary,
@@ -353,6 +354,7 @@ export default function TasksScreen() {
     const newTasks = state.tasks.map((t) => (t.uid === task.uid ? updated : t));
     setTasks(newTasks);
     await cache.saveTasks(newTasks);
+    if (isCompleting) cache.incrementStat('tasksCompleted');
   }
 
   async function deleteTask(uid: string) {
@@ -583,6 +585,9 @@ export default function TasksScreen() {
             const newTasks = state.tasks.map((t) => (t.uid === updated.uid ? updated : t));
             setTasks(newTasks);
             await cache.saveTasks(newTasks);
+            if (updated.status === 'COMPLETED' && propertyTask?.status !== 'COMPLETED') {
+              cache.incrementStat('tasksCompleted');
+            }
             setPropertyTask(null);
           }}
           onDelete={async (uid) => {
