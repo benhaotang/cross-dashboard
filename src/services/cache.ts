@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarEvent, Note, GiteaIssue, CalDavTask } from '../types';
+import { TaskDefaults } from './taskParser';
 import { encrypt, decrypt } from './crypto';
 
 const CACHE_EVENTS = '@cache/events';
@@ -8,6 +9,7 @@ const CACHE_ISSUES = '@cache/issues';
 const CACHE_TASKS = '@cache/tasks';
 const CACHE_LAST_SYNC = '@cache/last_sync';
 const CACHE_THEME = '@cache/theme';
+const CACHE_TASK_DEFAULTS = '@cache/task_defaults';
 
 function reviveEventDates(raw: unknown): CalendarEvent {
   const e = raw as Record<string, unknown>;
@@ -111,6 +113,16 @@ export async function loadThemePreference(): Promise<string | null> {
   return AsyncStorage.getItem(CACHE_THEME);
 }
 
+export async function saveTaskDefaults(defaults: TaskDefaults): Promise<void> {
+  await AsyncStorage.setItem(CACHE_TASK_DEFAULTS, JSON.stringify(defaults));
+}
+
+export async function loadTaskDefaults(): Promise<TaskDefaults | null> {
+  const data = await AsyncStorage.getItem(CACHE_TASK_DEFAULTS);
+  if (!data) return null;
+  return JSON.parse(data) as TaskDefaults;
+}
+
 export async function clearCache(): Promise<void> {
-  await AsyncStorage.multiRemove([CACHE_EVENTS, CACHE_NOTES, CACHE_ISSUES, CACHE_TASKS, CACHE_LAST_SYNC]);
+  await AsyncStorage.multiRemove([CACHE_EVENTS, CACHE_NOTES, CACHE_ISSUES, CACHE_TASKS, CACHE_TASK_DEFAULTS, CACHE_LAST_SYNC]);
 }

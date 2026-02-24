@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useApp } from '../store/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import * as cache from '../services/cache';
 import * as caldav from '../services/caldav';
+import { parseTaskInput, TaskDefaults, DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 import { CalDavTask, TaskStatus } from '../types';
 import AppIcon, { Icons } from '../components/Icon';
 
@@ -86,6 +88,24 @@ function priorityFromLabel(label: string): number {
   return 0;
 }
 
+function formatDuePreview(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const taskDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (taskDay.getTime() === today.getTime()) {
+    return `Today ${time}`;
+  }
+  if (taskDay.getTime() === tomorrow.getTime()) {
+    return `Tomorrow ${time}`;
+  }
+  return `${date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} ${time}`;
+}
+
 const STATUS_OPTIONS: { label: string; value: TaskStatus }[] = [
   { label: 'Needs Action', value: 'NEEDS-ACTION' },
   { label: 'In Progress', value: 'IN-PROCESS' },
@@ -103,6 +123,10 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<FilterMode>('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  // Quick input state
+  const [quickInput, setQuickInput] = useState('');
+  const [taskDefaults, setTaskDefaults] = useState<TaskDefaults>(DEFAULT_TASK_DEFAULTS);
+
   // Modal form state
   const [editTask, setEditTask] = useState<CalDavTask | null>(null);
   const [formSummary, setFormSummary] = useState('');
@@ -114,10 +138,22 @@ export default function TasksScreen() {
   const [formParentUid, setFormParentUid] = useState('');
 
   useEffect(() => {
+    loadDefaults();
     if (state.caldavConfigured && state.tasks.length === 0) {
       syncTasks();
     }
   }, [state.caldavConfigured]);
+
+  async function loadDefaults() {
+    const saved = await cache.loadTaskDefaults();
+    if (saved) setTaskDefaults(saved);
+  }
+
+  // Live parse preview
+  const parsedPreview = useMemo(() => {
+    if (!quickInput.trim()) return null;
+    return parseTaskInput(quickInput, taskDefaults);
+  }, [quickInput, taskDefaults]);
 
   async function syncTasks() {
     setSyncing(true);
@@ -155,6 +191,41 @@ export default function TasksScreen() {
       return next;
     });
   }
+
+  // Quick input submit
+  const submitQuickInput = useCallback(async () => {
+    if (!quickInput.trim()) return;
+    const parsed = parseTaskInput(quickInput, taskDefaults);
+    if (!parsed.summary.trim()) return;
+
+    const now = new Date();
+    const taskData = {
+      summary: parsed.summary,
+      description: undefined as string | undefined,
+      status: 'NEEDS-ACTION' as TaskStatus,
+      priority: parsed.priority,
+      percentComplete: 0,
+      due: parsed.due,
+      dtstart: undefined as Date | undefined,
+      completed: undefined as Date | undefined,
+      categories: parsed.categories.length > 0 ? parsed.categories : undefined,
+      location: undefined as string | undefined,
+      parentUid: undefined as string | undefined,
+    };
+
+    let newTask: CalDavTask;
+    if (state.caldavConfigured) {
+      const created = await caldav.createTask(taskData);
+      newTask = created || { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };
+    } else {
+      newTask = { ...taskData, uid: `task-${Date.now()}@cross-dashboard`, created: now, lastModified: now };
+    }
+
+    const newTasks = [newTask, ...state.tasks];
+    setTasks(newTasks);
+    await cache.saveTasks(newTasks);
+    setQuickInput('');
+  }, [quickInput, taskDefaults, state.caldavConfigured, state.tasks, setTasks]);
 
   function openNewTask() {
     setEditTask(null);
@@ -317,6 +388,15 @@ export default function TasksScreen() {
                   {task.due.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                 </Text>
               )}
+              {task.categories && task.categories.length > 0 && (
+                <View style={styles.tagRow}>
+                  {task.categories.map((cat) => (
+                    <View key={cat} style={[styles.tagChipSmall, { backgroundColor: '#E3F2FD' }]}>
+                      <Text style={styles.tagChipSmallText}>#{cat}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
               {task.percentComplete > 0 && task.percentComplete < 100 && (
                 <View style={styles.progressContainer}>
                   <View style={styles.progressBar}>
@@ -380,6 +460,53 @@ export default function TasksScreen() {
         </View>
       </View>
 
+      {/* Quick Input Bar */}
+      <View style={[styles.quickInputContainer, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+        <View style={styles.quickInputRow}>
+          <TextInput
+            style={[styles.quickInputField, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+            value={quickInput}
+            onChangeText={setQuickInput}
+            placeholder="!! task name #tag tonight"
+            placeholderTextColor={c.textTertiary}
+            onSubmitEditing={submitQuickInput}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={[styles.quickAddButton, { backgroundColor: c.primary, opacity: quickInput.trim() ? 1 : 0.5 }]}
+            onPress={submitQuickInput}
+            disabled={!quickInput.trim()}
+          >
+            <AppIcon name={Icons.add} size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        {parsedPreview && (
+          <View style={styles.previewRow}>
+            {parsedPreview.priority > 0 && (
+              <View style={[styles.previewChip, { backgroundColor: getPriorityColor(parsedPreview.priority) || '#999' }]}>
+                <Text style={styles.previewChipText}>{getPriorityLabel(parsedPreview.priority)}</Text>
+              </View>
+            )}
+            {parsedPreview.categories.map((cat) => (
+              <View key={cat} style={[styles.previewChip, { backgroundColor: '#2196F3' }]}>
+                <Text style={styles.previewChipText}>#{cat}</Text>
+              </View>
+            ))}
+            {parsedPreview.due && (
+              <View style={[styles.previewChip, { backgroundColor: '#4CAF50' }]}>
+                <AppIcon name={Icons.time} size={12} color="#fff" />
+                <Text style={styles.previewChipText}>{formatDuePreview(parsedPreview.due)}</Text>
+              </View>
+            )}
+            {parsedPreview.summary && (
+              <Text style={[styles.previewSummary, { color: c.textSecondary }]} numberOfLines={1}>
+                {parsedPreview.summary}
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+
       <View style={[styles.filterBar, { borderBottomColor: c.border }]}>
         {(['all', 'active', 'completed'] as FilterMode[]).map((mode) => (
           <TouchableOpacity
@@ -408,14 +535,16 @@ export default function TasksScreen() {
           <View style={styles.emptyContainer}>
             <AppIcon name={Icons.task} size={48} color={c.textQuaternary} />
             <Text style={[styles.emptyText, { color: c.textTertiary }]}>No tasks yet</Text>
-            <Text style={[styles.hintText, { color: c.textQuaternary }]}>Tap "+ New" to create your first task</Text>
+            <Text style={[styles.hintText, { color: c.textQuaternary }]}>
+              Type above to quickly add a task, e.g. "!! buy milk #errands tomorrow"
+            </Text>
           </View>
         }
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: c.surface }]}>
+          <ScrollView style={[styles.modalContent, { backgroundColor: c.surface }]} keyboardShouldPersistTaps="handled">
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: c.text }]}>{editTask ? 'Edit Task' : 'New Task'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -539,7 +668,7 @@ export default function TasksScreen() {
             <TouchableOpacity style={[styles.saveButton, { backgroundColor: c.primary }]} onPress={saveTask}>
               <Text style={styles.saveButtonText}>Save</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -581,6 +710,56 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  // Quick input
+  quickInputContainer: {
+    padding: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  quickInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickInputField: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  quickAddButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  previewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  previewChipText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  previewSummary: {
+    fontSize: 12,
+    flex: 1,
+  },
+  // Filter bar
   filterBar: {
     flexDirection: 'row',
     padding: 12,
@@ -655,6 +834,20 @@ const styles = StyleSheet.create({
     color: '#F44336',
     fontWeight: '600',
   },
+  tagRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  tagChipSmall: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  tagChipSmallText: {
+    fontSize: 10,
+    color: '#1565C0',
+    fontWeight: '500',
+  },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -704,6 +897,8 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   modalOverlay: {
     flex: 1,
@@ -788,6 +983,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+    marginBottom: 20,
   },
   saveButtonText: {
     color: '#fff',

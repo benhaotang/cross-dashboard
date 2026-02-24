@@ -18,6 +18,7 @@ import * as gitea from '../services/gitea';
 import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
 import * as notifications from '../services/notifications';
+import { DEFAULT_TASK_DEFAULTS } from '../services/taskParser';
 
 export default function SettingsScreen() {
   const { setCaldavConfigured, setGiteaConfigured, setGiteaRepositories, setThemePreference, setLastSync, state } =
@@ -50,6 +51,12 @@ export default function SettingsScreen() {
   const [passphrase, setPassphrase] = useState('');
   const [securityBusy, setSecurityBusy] = useState(false);
 
+  // Task input defaults
+  const [taskMorning, setTaskMorning] = useState(String(DEFAULT_TASK_DEFAULTS.morningHour));
+  const [taskAfternoon, setTaskAfternoon] = useState(String(DEFAULT_TASK_DEFAULTS.afternoonHour));
+  const [taskNight, setTaskNight] = useState(String(DEFAULT_TASK_DEFAULTS.nightHour));
+  const [taskDefault, setTaskDefault] = useState(String(DEFAULT_TASK_DEFAULTS.defaultHour));
+
   // Status
   const [caldavStatus, setCaldavStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
   const [giteaStatus, setGiteaStatus] = useState<'unknown' | 'testing' | 'success' | 'error'>('unknown');
@@ -57,6 +64,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadSettings();
     loadNotificationSettings();
+    loadTaskDefaults();
   }, []);
 
   // Listen for UP endpoint changes
@@ -120,6 +128,27 @@ export default function SettingsScreen() {
       const current = notifications.getUPDistributor();
       if (current) setUpDistributor(current);
     }
+  }
+
+  async function loadTaskDefaults() {
+    const saved = await cache.loadTaskDefaults();
+    if (saved) {
+      setTaskMorning(String(saved.morningHour));
+      setTaskAfternoon(String(saved.afternoonHour));
+      setTaskNight(String(saved.nightHour));
+      setTaskDefault(String(saved.defaultHour));
+    }
+  }
+
+  async function saveTaskDefaultsHandler() {
+    const defaults = {
+      morningHour: Math.max(0, Math.min(23, parseInt(taskMorning, 10) || DEFAULT_TASK_DEFAULTS.morningHour)),
+      afternoonHour: Math.max(0, Math.min(23, parseInt(taskAfternoon, 10) || DEFAULT_TASK_DEFAULTS.afternoonHour)),
+      nightHour: Math.max(0, Math.min(23, parseInt(taskNight, 10) || DEFAULT_TASK_DEFAULTS.nightHour)),
+      defaultHour: Math.max(0, Math.min(23, parseInt(taskDefault, 10) || DEFAULT_TASK_DEFAULTS.defaultHour)),
+    };
+    await cache.saveTaskDefaults(defaults);
+    showAlert('Saved', 'Task input defaults updated');
   }
 
   async function toggleNotifications() {
@@ -340,6 +369,65 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      {/* Task Input Defaults */}
+      <View style={[styles.section, { backgroundColor: c.surface }]}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Task Input</Text>
+        <Text style={[styles.hint, { color: c.textSecondary, marginBottom: 12 }]}>
+          Configure default hours for time keywords like "tonight" or "tomorrow morning"
+        </Text>
+
+        <View style={styles.taskDefaultsGrid}>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Morning hour</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={taskMorning}
+              onChangeText={setTaskMorning}
+              keyboardType="numeric"
+              placeholder="8"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Afternoon hour</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={taskAfternoon}
+              onChangeText={setTaskAfternoon}
+              keyboardType="numeric"
+              placeholder="14"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Night hour</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={taskNight}
+              onChangeText={setTaskNight}
+              keyboardType="numeric"
+              placeholder="21"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+          <View style={styles.taskDefaultRow}>
+            <Text style={[styles.label, { color: c.text, flex: 1 }]}>Default hour</Text>
+            <TextInput
+              style={[styles.input, styles.taskDefaultInput, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={taskDefault}
+              onChangeText={setTaskDefault}
+              keyboardType="numeric"
+              placeholder="10"
+              placeholderTextColor={c.textTertiary}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity style={[styles.button, { backgroundColor: c.primary }]} onPress={saveTaskDefaultsHandler}>
+          <Text style={styles.buttonText}>Save Defaults</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Security */}
@@ -736,5 +824,19 @@ const styles = StyleSheet.create({
   lastSyncText: {
     fontSize: 13,
     marginBottom: 8,
+  },
+  taskDefaultsGrid: {
+    gap: 4,
+    marginBottom: 8,
+  },
+  taskDefaultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  taskDefaultInput: {
+    width: 64,
+    textAlign: 'center',
+    flex: 0,
   },
 });
