@@ -272,6 +272,15 @@ interface GiteaIssue {
 
 ---
 
+## Version Bumping
+
+When bumping the app version, update **all three** locations:
+1. `package.json` — `"version"` field
+2. `app.json` — `"expo"."version"` field
+3. `src/screens/SettingsScreen.tsx` — version string in the About section (`Cross-Dashboard vX.Y.Z`)
+
+---
+
 ## Development Commands
 
 ```bash
