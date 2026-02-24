@@ -1,8 +1,27 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import serve from 'electron-serve';
 
-const loadURL = serve({ directory: 'dist', isCorsEnabled: false });
+// isCorsEnabled: true (default) is required — without it Chromium won't allow
+// cross-origin fetch at all ("Failed to fetch"). Instead we intercept responses
+// locally via onHeadersReceived and inject CORS approval before Chromium's CORS
+// check runs. The remote server never sees these injected headers.
+const loadURL = serve({ directory: 'dist' });
+
+function bypassCors() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const origin = details.requestHeaders?.Origin ?? details.requestHeaders?.origin ?? '*';
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Access-Control-Allow-Origin': [origin],
+        'Access-Control-Allow-Methods': ['GET, POST, PUT, DELETE, PATCH, OPTIONS, PROPFIND, REPORT, MKCALENDAR'],
+        'Access-Control-Allow-Headers': ['Authorization, Content-Type, Depth, DAV, If-Match, If-None-Match, Prefer'],
+        'Access-Control-Allow-Credentials': ['true'],
+      },
+    });
+  });
+}
 
 async function createWindow() {
   const win = new BrowserWindow({
@@ -23,6 +42,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  bypassCors();
   createWindow();
 
   app.on('activate', () => {
