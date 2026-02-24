@@ -40,6 +40,9 @@ jobs:
       - name: Build web export
         run: pnpm exec expo export --platform web
 
+      - name: Bundle Electron main process
+        run: pnpm electron:bundle
+
       - name: Build AppImage (${{ matrix.arch }})
         run: pnpm exec electron-builder --linux AppImage --${{ matrix.electron_arch }} --publish never
 
