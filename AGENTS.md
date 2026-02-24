@@ -42,7 +42,8 @@ cross-dashboard/
 │   └── store/          # State management (AppContext.tsx, PomodoroContext.tsx)
 ├── modules/            # Expo native modules
 │   ├── unified-push/   # UnifiedPush client (Android)
-│   └── pomodoro-service/ # Pomodoro foreground service (Android)
+│   ├── pomodoro-service/ # Pomodoro foreground service (Android)
+│   └── dashboard-widget/ # Android home screen widget + WorkManager sync
 ├── electron/           # Electron main process (Linux AppImage builds)
 │   └── main.js         # BrowserWindow loading Expo web export
 ├── assets/             # Images, fonts, etc.
@@ -129,9 +130,51 @@ cross-dashboard/
   Icons.views        // mdi:view-column
   ```
 
+### useSyncAll Hook (`src/hooks/useSyncAll.ts`)
+Shared hook used by **every** screen's refresh button to avoid divergent sync logic:
+- Fetches events, tasks, notes (CalDAV) and issues (Gitea) in parallel using `selectedCalendars`
+- Guards against clearing existing data: only calls `setX(data)` if the new or old array is non-empty (prevents wipe on transient failure)
+- Captures fresh data from fetch results (not stale `state.*`) before post-processing
+- After sync: reschedules event reminders, updates Android widget (if available) with formatted event/task/issue rows
+- All screens import `{ useSyncAll }` and call `const { syncAll } = useSyncAll()` for their refresh button
+
+### Daily Activity Stats (`src/services/cache.ts`)
+Local-only activity counter stored in AsyncStorage under `@cache/daily_stats`:
+- `DailyStats` interface: `{ tasksCompleted, pomodoroSessions, issuesClosed }`
+- `StatsStore` = `Record<'YYYY-MM-DD', DailyStats>` — one entry per day
+- `incrementStat(stat)` — atomically increments one counter for today; called:
+  - `tasksCompleted`: in `TasksScreen.toggleCompletion`, `TasksScreen.saveTask`, `TaskPropertyPage.onSave` (all guard against double-count by checking prior status)
+  - `pomodoroSessions`: in `TaskPropertyPage.handlePomodoroSession`
+  - `issuesClosed`: in `IssuesScreen.onStateToggle` when `newState === 'closed'`
+- `sumStatRange(store, startDaysAgo, count)` — pure function, sums stats for a range of days
+- `DashboardScreen` loads `statsStore` on mount and on `lastSync` change, computes `this7` (days 0–6) and `prev7` (days 7–13), shows delta arrows (↑/↓) if prior week has any data
+
+### Android Widget Module (`modules/dashboard-widget/`)
+Expo native module for the Android home screen widget:
+- **`DashboardWidgetModule.kt`** — Expo Module with functions:
+  - `updateWidgetData(eventRowsStr, taskRowsStr, issuesCount, lastSync)` — pipe-separated row strings (up to 3 each), triggers widget redraw
+  - `saveWorkerCredentials(caldavServer, caldavUser, caldavPass, calendarHrefs, giteaUrl, giteaToken, giteaRepos)` — persists credentials to SharedPreferences for background worker use; called from SettingsScreen after CalDAV/Gitea save and calendar selection save
+  - `scheduleSync(intervalMinutes)` — schedules/replaces periodic `PeriodicWorkRequest` (min 15 min, default 60); `ExistingPeriodicWorkPolicy.UPDATE`
+  - `cancelSync()` — cancels the periodic work
+  - `forceRefresh()` — triggers immediate widget redraw
+- **`DashboardWidgetProvider.kt`** — `AppWidgetProvider`:
+  - Size-aware: reads `OPTION_APPWIDGET_MIN_HEIGHT` from options bundle, shows 1–3 rows per section via `setViewVisibility()`
+  - Handles `onAppWidgetOptionsChanged` (live resize)
+  - FAB `PendingIntent` deep-links to `crossdashboard://tasks?action=add`
+  - Content tap opens the app via launch intent
+- **`WidgetSyncWorker.kt`** — `CoroutineWorker` (WorkManager):
+  - Reads credentials from SharedPreferences (set by `saveWorkerCredentials`)
+  - Makes CalDAV `REPORT` for upcoming VEVENTs (next 30 days) and pending VTODOs (non-COMPLETED)
+  - Simple line-by-line iCal parser with fold unfolding; parses SUMMARY, DTSTART, DUE
+  - Calls Gitea `/api/v1/repos/{repo}/issues?state=open` and reads `X-Total-Count` header
+  - Writes formatted row strings + counts to SharedPreferences, broadcasts `ACTION_UPDATE_WIDGET`
+- **`widget_dashboard.xml`** — `RelativeLayout` with EVENTS section (3 rows + empty fallback), TASKS section (3 rows + empty fallback), issues count + last-sync footer, and a circular `+` FAB (`Button` with `@drawable/fab_background` oval shape) pinned bottom-right
+- **`index.ts`** — TypeScript wrapper with `isAvailable()`, `updateWidgetData()`, `saveWorkerCredentials()`, `scheduleSync()`, `cancelSync()`, `forceRefresh()`
+- **SharedPreferences key** (`cross_dashboard_widget`): `event_row_0/1/2`, `task_row_0/1/2`, `events_count`, `tasks_count`, `issues_count`, `last_sync`, `worker_caldav_*`, `worker_gitea_*`, `worker_calendar_hrefs`, `worker_gitea_repos`
+
 ### Property Pages (`src/components/*PropertyPage.tsx`)
 Full-screen modal overlays for viewing/editing item details. Built on shared components from `PropertyPageShared.tsx`:
-- **PropertyPageModal** -- outer modal shell (slide animation, transparent, maxHeight 92%)
+- **PropertyPageModal** -- outer modal shell wrapped in `KeyboardAvoidingView behavior="padding"` (avoids keyboard on both iOS and Android without flying-too-high issue); `minHeight: '70%'`, `maxHeight: '92%'`
 - **PropertyPageHeader** -- header with Close (left), title (center), pencil/cancel edit toggle (right)
 - **ReadField** -- labeled read-only field row
 - **SectionHeader** -- uppercase section divider
@@ -140,32 +183,34 @@ Full-screen modal overlays for viewing/editing item details. Built on shared com
 Property page components:
 - **EventPropertyPage** -- read-only (no edit mode): date/time range, duration, location, description, UID
 - **NotePropertyPage** -- read/edit toggle: tags as chips, full content, title/content/tags editing
-- **TaskPropertyPage** -- read/edit toggle: status badge, priority, due date, progress bar, categories, subtask list with completion toggle, full edit form
+- **TaskPropertyPage** -- read/edit toggle: status badge, priority, due date, progress bar, categories with Kanban quick-tag chips (defaults to `['backlog', 'planned', 'inprogress', 'done']` if none saved), subtask list with completion toggle, full edit form; Pomodoro play button logs sessions
 - **IssuePropertyPage** -- read/edit toggle: state badge, labels, assignees, body, open/close toggle, comments section (fetched from Gitea API), add comment, "Open in Browser" link
 
 ### Navigation (`src/navigation/`)
 - **AppNavigator.tsx**: Platform-aware navigation router
   - Web/macOS/Linux: Uses `SidebarNavigator`
-  - Android: Uses bottom tab navigation
+  - Android: Uses bottom tab navigation with deep link support (`crossdashboard://` scheme)
   - Both navigators filter screens by `visibleScreens` from AppContext (Settings always shown)
+  - `linking` config maps `crossdashboard://tasks?action=add` → TasksScreen with quick input focused
 - **SidebarNavigator.tsx**: Sidebar navigation for desktop/web
   - Collapsible at <900px width
   - Shows icons and labels
   - Active state highlighting
 - **Visible screens**: Configurable in Settings > Navigation; persisted via `cache.saveVisibleScreens()`
   - `ScreenName` type and `ALL_SCREENS` constant exported from `src/services/cache.ts`
+- **Deep linking** (Android): `app.json` declares `crossdashboard://` intent filter; React Navigation `LinkingOptions` handles initial URL and warm-start navigation
 
 ### Screens (`src/screens/`)
 | Screen | Description |
 |--------|-------------|
-| DashboardScreen | Overview with upcoming events, tasks due soon, and open issues |
+| DashboardScreen | Overview with upcoming events, tasks due soon, open issues, and 7-day activity stats card (tasks completed, pomodoros, issues closed) with delta vs previous 7 days |
 | EventsScreen | CalDAV events with day/week/month filters, calendar color dots, tap-to-open read-only property page |
 | NotesScreen | Note management with create/edit/delete, calendar-aware fetching, tap-to-open property page with read/edit modes |
-| TasksScreen | VTODO task management with nested subtrees, quick input bar, CRUD modal, calendar color dots, tap-to-open property page with subtask list, read/edit modes |
+| TasksScreen | VTODO task management with nested subtrees, quick input bar (auto-focused on deep link `action=add`), CRUD modal, calendar color dots, tap-to-open property page with subtask list, read/edit modes |
 | IssuesScreen | Gitea issues with state filtering, tap-to-open property page with comments, read/edit modes |
 | ViewsScreen | Kanban board + Covey's Four Quadrants (Eisenhower matrix) — tasks and issues grouped by `#tag` (categories/labels), assign modal with mutual exclusivity, configurable kanban columns, syncs tag changes back to CalDAV/Gitea |
 | InboxScreen | Unified inbox aggregating events, tasks, issues, and milestones; total estimated time calculation from event durations and `#Xm`/`#Xh` time tags on tasks/issues |
-| SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges, default event/task calendar selection, theme, visible screen toggles, task input defaults, notifications |
+| SettingsScreen | Nextcloud login / manual CalDAV, calendar picker with color dots & component badges (inline refresh button), default event/task calendar selection, theme, visible screen toggles, task input defaults, Pomodoro settings, widget sync interval (Android), notifications |
 
 ---
 
@@ -327,7 +372,7 @@ npx expo install --fix
 - [x] Push notifications (expo-notifications for local event reminders, UnifiedPush client for de-googled Android)
 
 ### Completed (continued 3)
-- [x] Widget support (Android home screen widget showing upcoming events count, open issues, next event, last sync)
+- [x] Widget support (Android home screen widget — see Android Widget Module section for full details)
 
 ### Completed (continued 4)
 - [x] CalDAV VTODO task support (full CRUD via `fetchTasks`, `createTask`, `updateTask`, `deleteTask`)
@@ -413,6 +458,30 @@ npx expo install --fix
 - [x] Issues: time estimated from `#Xm` or `#Xh` labels (same pattern as tasks)
 - [x] Items without time information are excluded from the total
 - [x] Formatted as "Xh Ym" (e.g. "3h 45m"), updates reactively when filters change
+
+### Completed (continued 12 — bug fixes & UX)
+- [x] **Bug**: CalDAV status dot and calendar selector hidden on launch — fixed `loadSettings()` to restore `availableCalendars` from keyring and set `caldavStatus = 'success'` when all credentials exist
+- [x] **CalDAV calendar refresh button** — always-visible refresh icon button next to "Save Selection" in the calendar picker section (not only in the empty-state branch)
+- [x] **Keyboard avoidance** — `PropertyPageShared.tsx` wraps modal in `KeyboardAvoidingView behavior="padding"` (works on both iOS and Android without the modal flying too high); `minHeight` raised from 50% to 70%
+- [x] **Kanban quick tags in TaskPropertyPage** — chips for kanban column tags shown below Categories field; defaults to `['backlog', 'planned', 'inprogress', 'done']` when no columns saved
+- [x] **Unified refresh hook** (`src/hooks/useSyncAll.ts`) — all screen refresh buttons use one hook; guards against clearing state on transient errors; updates Android widget with fresh data
+
+### Completed (continued 13 — dashboard stats)
+- [x] Local daily activity stats stored in AsyncStorage (`@cache/daily_stats`) as `Record<'YYYY-MM-DD', DailyStats>`
+- [x] `DailyStats`: `{ tasksCompleted, pomodoroSessions, issuesClosed }` — incremented at the moment each event occurs
+- [x] `incrementStat(stat)` called in: `TasksScreen.toggleCompletion`, `TasksScreen.saveTask`, `TaskPropertyPage.onSave` (task completions), `TaskPropertyPage.handlePomodoroSession` (pomodoro), `IssuesScreen.onStateToggle` (issue close)
+- [x] Dashboard "Last 7 Days" stats card — 3 tiles (tasks done, pomodoros, issues closed), delta arrows (↑N / ↓N) vs previous 7 days; only shown when CalDAV or Gitea is configured
+
+### Completed (continued 14 — Android widget overhaul)
+- [x] **Title removed** — "Cross Dashboard" label removed from widget layout
+- [x] **Size-aware rows** — `DashboardWidgetProvider` reads `OPTION_APPWIDGET_MIN_HEIGHT`, shows 1–3 rows per section via `setViewVisibility()`; `onAppWidgetOptionsChanged` handles live resize
+- [x] **EVENTS and TASKS sections** — widget now shows upcoming events (formatted `MM/dd HH:mm title`) and pending tasks (with `⚠` overdue prefix) instead of just counts
+- [x] **FAB** — circle `+` button (bottom-right, `@drawable/fab_background` oval) opens app via `crossdashboard://tasks?action=add` deep link; `TasksScreen` auto-focuses quick input on this param
+- [x] **Deep link setup** — `app.json` `intentFilters` for `crossdashboard://` scheme; `AppNavigator.tsx` `LinkingOptions` for all screens; `TasksScreen` uses `useRoute` + `useRef` to focus quick input after 300ms
+- [x] **WorkManager background sync** (`WidgetSyncWorker.kt`) — `CoroutineWorker` making CalDAV REPORT + Gitea REST calls; parses iCal line-by-line; updates SharedPreferences + broadcasts refresh
+- [x] **Configurable sync interval** — Settings > Home Screen Widget (Android only); min 15 min, default 60 min; saved via `cache.saveWidgetSyncInterval()`; calls `DashboardWidget.scheduleSync()`
+- [x] **Worker credentials** — `DashboardWidget.saveWorkerCredentials()` called from SettingsScreen after CalDAV save, Gitea save, and calendar selection save; stores all needed data in SharedPreferences
+- [x] **Fixed "always not synced"** — `useSyncAll` now captures fresh events/tasks/issues from fetch results (not stale `state.*`) before calling `DashboardWidget.updateWidgetData()`; widget update uses `Platform.OS === 'android'` guard
 
 ---
 
