@@ -131,7 +131,18 @@ export function parseTaskInput(input: string, defaults: TaskDefaults = DEFAULT_T
   }
   text = text.replace(/#\w+/g, '');
 
-  // 3. Extract time keywords (first match wins, longest patterns checked first)
+  // 3. Extract explicit HH:MM clock time (e.g. "14:30", "9:00", "21:00")
+  //    Negative look-around prevents matching digits that are part of larger numbers.
+  let explicitHour: number | undefined;
+  let explicitMinute: number | undefined;
+  const clockMatch = text.match(/(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/);
+  if (clockMatch) {
+    explicitHour = parseInt(clockMatch[1], 10);
+    explicitMinute = parseInt(clockMatch[2], 10);
+    text = text.replace(clockMatch[0], '');
+  }
+
+  // 4. Extract time keywords (first match wins, longest patterns checked first)
   const now = new Date();
   const patterns = buildTimePatterns();
   for (const pattern of patterns) {
@@ -143,7 +154,17 @@ export function parseTaskInput(input: string, defaults: TaskDefaults = DEFAULT_T
     }
   }
 
-  // 4. Cleanup: collapse whitespace, trim
+  // 5. Apply explicit HH:MM: overrides the hour set by keyword, or defaults to today
+  if (explicitHour !== undefined && explicitMinute !== undefined) {
+    if (due) {
+      due.setHours(explicitHour, explicitMinute, 0, 0);
+    } else {
+      due = new Date();
+      due.setHours(explicitHour, explicitMinute, 0, 0);
+    }
+  }
+
+  // 6. Cleanup: collapse whitespace, trim
   const summary = text.replace(/\s+/g, ' ').trim();
 
   return { summary, priority, categories, due };

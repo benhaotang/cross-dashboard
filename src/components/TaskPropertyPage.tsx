@@ -101,6 +101,12 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
   const [formStatus, setFormStatus] = useState<TaskStatus>(task.status);
   const [formPriority, setFormPriority] = useState(getPriorityLabel(task.priority));
   const [formDue, setFormDue] = useState(task.due ? task.due.toISOString().split('T')[0] : '');
+  const [formDueTime, setFormDueTime] = useState(() => {
+    if (!task.due) return '';
+    const h = task.due.getHours().toString().padStart(2, '0');
+    const m = task.due.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  });
   const [formPercent, setFormPercent] = useState(String(task.percentComplete));
   const [formParentUid, setFormParentUid] = useState(task.parentUid || '');
   const [formLocation, setFormLocation] = useState(task.location || '');
@@ -152,7 +158,14 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
     const now = new Date();
     const priority = priorityFromLabel(formPriority);
     const percent = Math.max(0, Math.min(100, parseInt(formPercent, 10) || 0));
-    const due = formDue ? new Date(formDue + 'T00:00:00') : undefined;
+    let due: Date | undefined;
+    if (formDue) {
+      due = new Date(formDue + 'T00:00:00');
+      if (formDueTime && /^\d{1,2}:\d{2}$/.test(formDueTime)) {
+        const [hh, mm] = formDueTime.split(':');
+        due.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+      }
+    }
     const isCompleted = formStatus === 'COMPLETED';
     const categories = formCategories.split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -181,6 +194,9 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
       setFormStatus(task.status);
       setFormPriority(getPriorityLabel(task.priority));
       setFormDue(task.due ? task.due.toISOString().split('T')[0] : '');
+      setFormDueTime(task.due
+        ? `${task.due.getHours().toString().padStart(2, '0')}:${task.due.getMinutes().toString().padStart(2, '0')}`
+        : '');
       setFormPercent(String(task.percentComplete));
       setFormParentUid(task.parentUid || '');
       setFormLocation(task.location || '');
@@ -271,18 +287,28 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
                   placeholderTextColor={c.textTertiary}
                 />
               </View>
-              <View style={styles.inlineField}>
-                <Text style={[styles.formLabel, { color: c.textSecondary }]}>% Complete</Text>
+              <View style={[styles.inlineField, { maxWidth: 110 }]}>
+                <Text style={[styles.formLabel, { color: c.textSecondary }]}>Due Time</Text>
                 <TextInput
                   style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
-                  value={formPercent}
-                  onChangeText={setFormPercent}
-                  placeholder="0-100"
+                  value={formDueTime}
+                  onChangeText={setFormDueTime}
+                  placeholder="HH:MM"
                   placeholderTextColor={c.textTertiary}
                   keyboardType="numeric"
                 />
               </View>
             </View>
+
+            <Text style={[styles.formLabel, { color: c.textSecondary }]}>% Complete</Text>
+            <TextInput
+              style={[styles.input, { borderColor: c.border, backgroundColor: c.inputBackground, color: c.text }]}
+              value={formPercent}
+              onChangeText={setFormPercent}
+              placeholder="0-100"
+              placeholderTextColor={c.textTertiary}
+              keyboardType="numeric"
+            />
 
             <Text style={[styles.formLabel, { color: c.textSecondary }]}>Location</Text>
             <TextInput

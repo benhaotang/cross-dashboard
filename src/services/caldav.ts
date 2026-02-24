@@ -270,7 +270,7 @@ function extractICalProp(ical: string, prop: string): string | null {
 }
 
 function parseICalDate(dateStr: string): Date {
-  // Handle formats: 20240115T100000Z or 20240115
+  // Handle formats: 20240115T100000Z (UTC), 20240115T100000 (local/floating), 20240115 (date-only)
   const cleaned = dateStr.replace(/[^0-9TZ]/g, '');
   if (cleaned.length >= 8) {
     const year = parseInt(cleaned.slice(0, 4));
@@ -278,7 +278,14 @@ function parseICalDate(dateStr: string): Date {
     const day = parseInt(cleaned.slice(6, 8));
     const hour = cleaned.length >= 11 ? parseInt(cleaned.slice(9, 11)) : 0;
     const minute = cleaned.length >= 13 ? parseInt(cleaned.slice(11, 13)) : 0;
-    return new Date(Date.UTC(year, month, day, hour, minute));
+    // Only treat as UTC when Z is explicitly present. TZID-qualified times
+    // (DTSTART;TZID=Europe/Berlin:20240115T210000) have the timezone stripped
+    // by extractICalProp, so they arrive without Z and must be treated as
+    // local time to avoid a double-offset shift.
+    if (cleaned.endsWith('Z')) {
+      return new Date(Date.UTC(year, month, day, hour, minute));
+    }
+    return new Date(year, month, day, hour, minute);
   }
   return new Date(dateStr);
 }
