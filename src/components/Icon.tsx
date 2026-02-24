@@ -54,4 +54,7 @@ export const Icons = {
   link: 'mdi:link',
   milestone: 'mdi:flag',
   task: 'mdi:checkbox-marked',
+  taskOutline: 'mdi:checkbox-blank-outline',
+  subtask: 'mdi:subdirectory-arrow-right',
+  priority: 'mdi:alert-circle',
 };

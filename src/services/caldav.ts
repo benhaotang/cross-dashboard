@@ -1,4 +1,4 @@
-import { CalendarEvent, Note } from '../types';
+import { CalendarEvent, Note, CalDavTask, TaskStatus } from '../types';
 import { getCredential } from './keyring';
 
 export interface CalDavClient {
@@ -335,6 +335,204 @@ export async function updateNote(uid: string, title: string, content: string, cr
 }
 
 export async function deleteNote(uid: string): Promise<boolean> {
+  const client = await getClient();
+  if (!client) return false;
+
+  try {
+    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+      },
+    });
+
+    return response.ok || response.status === 204;
+  } catch {
+    return false;
+  }
+}
+
+// VTODO (Tasks) support
+
+export async function fetchTasks(): Promise<CalDavTask[]> {
+  const client = await getClient();
+  if (!client) return [];
+
+  try {
+    const response = await fetch(client.serverUrl, {
+      method: 'REPORT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        Depth: '1',
+        'Content-Type': 'application/xml',
+      },
+      body: `<?xml version="1.0" encoding="UTF-8"?>
+        <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+          <d:prop>
+            <d:getetag/>
+            <c:calendar-data/>
+          </d:prop>
+          <c:filter>
+            <c:comp-filter name="VCALENDAR">
+              <c:comp-filter name="VTODO"/>
+            </c:comp-filter>
+          </c:filter>
+        </c:calendar-query>`,
+    });
+
+    if (!response.ok && response.status !== 207) {
+      return [];
+    }
+
+    const text = await response.text();
+    return parseVTodoEntries(text);
+  } catch {
+    return [];
+  }
+}
+
+function parseVTodoEntries(xmlText: string): CalDavTask[] {
+  const tasks: CalDavTask[] = [];
+  const calDataMatches = xmlText.matchAll(/<c:calendar-data[^>]*>([^<]+)<\/c:calendar-data>/gi);
+
+  for (const match of calDataMatches) {
+    const ical = match[1]
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+
+    const uid = extractICalProp(ical, 'UID');
+    const summary = extractICalProp(ical, 'SUMMARY');
+    if (!uid || !summary) continue;
+
+    const description = extractICalProp(ical, 'DESCRIPTION');
+    const status = (extractICalProp(ical, 'STATUS') || 'NEEDS-ACTION') as TaskStatus;
+    const priorityStr = extractICalProp(ical, 'PRIORITY');
+    const percentStr = extractICalProp(ical, 'PERCENT-COMPLETE');
+    const due = extractICalProp(ical, 'DUE');
+    const dtstart = extractICalProp(ical, 'DTSTART');
+    const completed = extractICalProp(ical, 'COMPLETED');
+    const created = extractICalProp(ical, 'CREATED');
+    const lastModified = extractICalProp(ical, 'LAST-MODIFIED');
+    const categories = extractICalProp(ical, 'CATEGORIES');
+    const location = extractICalProp(ical, 'LOCATION');
+
+    // Parse RELATED-TO with RELTYPE=PARENT or bare RELATED-TO (default is PARENT)
+    const parentMatch = ical.match(/RELATED-TO;RELTYPE=PARENT:([^\r\n]+)/i)
+      || ical.match(/RELATED-TO:([^\r\n]+)/i);
+    const parentUid = parentMatch ? parentMatch[1].trim() : undefined;
+
+    tasks.push({
+      uid,
+      summary,
+      description: description || undefined,
+      status,
+      priority: priorityStr ? parseInt(priorityStr, 10) : 0,
+      percentComplete: percentStr ? parseInt(percentStr, 10) : 0,
+      due: due ? parseICalDate(due) : undefined,
+      dtstart: dtstart ? parseICalDate(dtstart) : undefined,
+      completed: completed ? parseICalDate(completed) : undefined,
+      created: created ? parseICalDate(created) : new Date(),
+      lastModified: lastModified ? parseICalDate(lastModified) : new Date(),
+      categories: categories ? categories.split(',').map((t) => t.trim()) : undefined,
+      location: location || undefined,
+      parentUid,
+    });
+  }
+
+  return tasks.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+}
+
+function buildVTodo(task: CalDavTask): string {
+  const now = new Date();
+  let vtodo = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CrossDashboard//EN\r\nBEGIN:VTODO\r\nUID:${task.uid}\r\nDTSTAMP:${formatICalDate(now)}\r\nCREATED:${formatICalDate(task.created)}\r\nLAST-MODIFIED:${formatICalDate(now)}\r\nSUMMARY:${task.summary}\r\nSTATUS:${task.status}\r\nPRIORITY:${task.priority}\r\nPERCENT-COMPLETE:${task.percentComplete}\r\n`;
+
+  if (task.description) {
+    const escaped = task.description.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+    vtodo += `DESCRIPTION:${escaped}\r\n`;
+  }
+
+  if (task.due) {
+    vtodo += `DUE:${formatICalDate(task.due)}\r\n`;
+  }
+
+  if (task.dtstart) {
+    vtodo += `DTSTART:${formatICalDate(task.dtstart)}\r\n`;
+  }
+
+  if (task.completed) {
+    vtodo += `COMPLETED:${formatICalDate(task.completed)}\r\n`;
+  }
+
+  if (task.categories && task.categories.length > 0) {
+    vtodo += `CATEGORIES:${task.categories.join(',')}\r\n`;
+  }
+
+  if (task.location) {
+    vtodo += `LOCATION:${task.location}\r\n`;
+  }
+
+  if (task.parentUid) {
+    vtodo += `RELATED-TO;RELTYPE=PARENT:${task.parentUid}\r\n`;
+  }
+
+  vtodo += `END:VTODO\r\nEND:VCALENDAR`;
+  return vtodo;
+}
+
+export async function createTask(task: Omit<CalDavTask, 'uid' | 'created' | 'lastModified'>): Promise<CalDavTask | null> {
+  const client = await getClient();
+  if (!client) return null;
+
+  const now = new Date();
+  const uid = `task-${Date.now()}@cross-dashboard`;
+  const fullTask: CalDavTask = { ...task, uid, created: now, lastModified: now };
+  const vtodo = buildVTodo(fullTask);
+
+  try {
+    const response = await fetch(`${client.serverUrl}/${uid}.ics`, {
+      method: 'PUT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'If-None-Match': '*',
+      },
+      body: vtodo,
+    });
+
+    if (!response.ok && response.status !== 201 && response.status !== 204) {
+      return null;
+    }
+
+    return fullTask;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateTask(task: CalDavTask): Promise<boolean> {
+  const client = await getClient();
+  if (!client) return false;
+
+  const vtodo = buildVTodo(task);
+
+  try {
+    const response = await fetch(`${client.serverUrl}/${task.uid}.ics`, {
+      method: 'PUT',
+      headers: {
+        Authorization: createAuthHeader(client.username, client.password),
+        'Content-Type': 'text/calendar; charset=utf-8',
+      },
+      body: vtodo,
+    });
+
+    return response.ok || response.status === 204;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteTask(uid: string): Promise<boolean> {
   const client = await getClient();
   if (!client) return false;
 

@@ -6,13 +6,14 @@ import {
   InboxScreen,
   EventsScreen,
   NotesScreen,
+  TasksScreen,
   IssuesScreen,
   SettingsScreen,
 } from '../screens';
 import AppIcon, { Icons } from '../components/Icon';
 import { useTheme } from '../hooks/useTheme';
 
-type Screen = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Issues' | 'Settings';
+type Screen = 'Dashboard' | 'Inbox' | 'Events' | 'Notes' | 'Tasks' | 'Issues' | 'Settings';
 
 interface NavItem {
   name: Screen;
@@ -25,6 +26,7 @@ const navItems: NavItem[] = [
   { name: 'Inbox', icon: Icons.inbox, component: InboxScreen },
   { name: 'Events', icon: Icons.calendar, component: EventsScreen },
   { name: 'Notes', icon: Icons.notes, component: NotesScreen },
+  { name: 'Tasks', icon: Icons.task, component: TasksScreen },
   { name: 'Issues', icon: Icons.issues, component: IssuesScreen },
   { name: 'Settings', icon: Icons.settings, component: SettingsScreen },
 ];

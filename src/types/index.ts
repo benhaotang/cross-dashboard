@@ -23,6 +23,26 @@ export interface Note {
   tags?: string[];
 }
 
+// CalDAV Task Types
+export type TaskStatus = 'NEEDS-ACTION' | 'IN-PROCESS' | 'COMPLETED' | 'CANCELLED';
+
+export interface CalDavTask {
+  uid: string;
+  summary: string;
+  description?: string;
+  status: TaskStatus;
+  priority: number;       // 0=undefined, 1-4=high, 5=medium, 6-9=low
+  percentComplete: number; // 0-100
+  due?: Date;
+  dtstart?: Date;
+  completed?: Date;        // UTC timestamp when completed
+  created: Date;
+  lastModified: Date;
+  categories?: string[];
+  location?: string;
+  parentUid?: string;      // RELATED-TO;RELTYPE=PARENT value
+}
+
 // Gitea Types
 export interface GiteaConfig {
   instanceUrl: string;

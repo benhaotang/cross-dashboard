@@ -33,7 +33,7 @@ const TYPE_ICONS: Record<InboxItemType, string> = {
 };
 
 export default function InboxScreen() {
-  const { state, setEvents, setIssues, setLoading } = useApp();
+  const { state, setEvents, setIssues, setTasks, setLoading } = useApp();
   const theme = useTheme();
   const [milestones, setMilestones] = useState<GiteaMilestone[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<InboxItemType[]>(['event', 'issue', 'milestone', 'task']);
@@ -55,6 +55,12 @@ export default function InboxScreen() {
           caldav.fetchEvents().then(async (events) => {
             setEvents(events);
             await cache.saveEvents(events);
+          })
+        );
+        promises.push(
+          caldav.fetchTasks().then(async (tasks) => {
+            setTasks(tasks);
+            await cache.saveTasks(tasks);
           })
         );
       }
@@ -121,21 +127,20 @@ export default function InboxScreen() {
       });
     });
 
-    state.notes.forEach((note) => {
-      if (note.title.toLowerCase().includes('task') || note.content.includes('[ ]')) {
-        items.push({
-          id: `task-${note.uid}`,
-          type: 'task',
-          title: note.title,
-          description: note.content,
-          date: note.createdAt,
-          source: 'Notes',
-        });
-      }
+    state.tasks.forEach((task) => {
+      items.push({
+        id: `task-${task.uid}`,
+        type: 'task',
+        title: task.summary,
+        description: task.description,
+        date: task.due || task.created,
+        source: 'CalDAV Tasks',
+        priority: task.priority >= 1 && task.priority <= 4 ? 'high' : task.priority === 5 ? 'medium' : 'low',
+      });
     });
 
     return items;
-  }, [state.events, state.issues, state.notes, milestones]);
+  }, [state.events, state.issues, state.tasks, milestones]);
 
   const filteredItems = useMemo(() => {
     let items = inboxItems.filter((item) => selectedTypes.includes(item.type));

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
-import { CalendarEvent, Note, GiteaIssue } from '../types';
+import { CalendarEvent, Note, GiteaIssue, CalDavTask } from '../types';
 import { ThemePreference } from '../theme';
 import * as cache from '../services/cache';
 import * as crypto from '../services/crypto';
@@ -8,6 +8,7 @@ interface AppState {
   events: CalendarEvent[];
   notes: Note[];
   issues: GiteaIssue[];
+  tasks: CalDavTask[];
   isLoading: boolean;
   error: string | null;
   caldavConfigured: boolean;
@@ -21,6 +22,7 @@ type AppAction =
   | { type: 'SET_EVENTS'; payload: CalendarEvent[] }
   | { type: 'SET_NOTES'; payload: Note[] }
   | { type: 'SET_ISSUES'; payload: GiteaIssue[] }
+  | { type: 'SET_TASKS'; payload: CalDavTask[] }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_CALDAV_CONFIGURED'; payload: boolean }
@@ -33,6 +35,7 @@ const initialState: AppState = {
   events: [],
   notes: [],
   issues: [],
+  tasks: [],
   isLoading: false,
   error: null,
   caldavConfigured: false,
@@ -50,6 +53,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, notes: action.payload };
     case 'SET_ISSUES':
       return { ...state, issues: action.payload };
+    case 'SET_TASKS':
+      return { ...state, tasks: action.payload };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
@@ -74,6 +79,7 @@ interface AppContextType {
   setEvents: (events: CalendarEvent[]) => void;
   setNotes: (notes: Note[]) => void;
   setIssues: (issues: GiteaIssue[]) => void;
+  setTasks: (tasks: CalDavTask[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setCaldavConfigured: (configured: boolean) => void;
@@ -98,16 +104,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const [events, notes, issues, lastSync] = await Promise.all([
+        const [events, notes, issues, tasks, lastSync] = await Promise.all([
           cache.loadEvents(),
           cache.loadNotes(),
           cache.loadIssues(),
+          cache.loadTasks(),
           cache.getLastSync(),
         ]);
 
         if (events) dispatch({ type: 'SET_EVENTS', payload: events });
         if (notes) dispatch({ type: 'SET_NOTES', payload: notes });
         if (issues) dispatch({ type: 'SET_ISSUES', payload: issues });
+        if (tasks) dispatch({ type: 'SET_TASKS', payload: tasks });
         if (lastSync) dispatch({ type: 'SET_LAST_SYNC', payload: lastSync });
       } catch {
         console.warn('Failed to decrypt cached data, clearing cache');
@@ -127,6 +135,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setIssues = useCallback((issues: GiteaIssue[]) => {
     dispatch({ type: 'SET_ISSUES', payload: issues });
+  }, []);
+
+  const setTasks = useCallback((tasks: CalDavTask[]) => {
+    dispatch({ type: 'SET_TASKS', payload: tasks });
   }, []);
 
   const setLoading = useCallback((loading: boolean) => {
@@ -163,6 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEvents,
     setNotes,
     setIssues,
+    setTasks,
     setLoading,
     setError,
     setCaldavConfigured,

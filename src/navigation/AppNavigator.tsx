@@ -7,6 +7,7 @@ import {
   InboxScreen,
   EventsScreen,
   NotesScreen,
+  TasksScreen,
   IssuesScreen,
   SettingsScreen,
 } from '../screens';
@@ -21,6 +22,7 @@ const tabIcons: Record<string, string> = {
   Inbox: Icons.inbox,
   Events: Icons.calendar,
   Notes: Icons.notes,
+  Tasks: Icons.task,
   Issues: Icons.issues,
   Settings: Icons.settings,
 };
@@ -48,6 +50,7 @@ function MobileNavigator() {
         <Tab.Screen name="Inbox" component={InboxScreen} />
         <Tab.Screen name="Events" component={EventsScreen} />
         <Tab.Screen name="Notes" component={NotesScreen} />
+        <Tab.Screen name="Tasks" component={TasksScreen} />
         <Tab.Screen name="Issues" component={IssuesScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>

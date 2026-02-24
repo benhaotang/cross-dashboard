@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CalendarEvent, Note, GiteaIssue } from '../types';
+import { CalendarEvent, Note, GiteaIssue, CalDavTask } from '../types';
 import { encrypt, decrypt } from './crypto';
 
 const CACHE_EVENTS = '@cache/events';
 const CACHE_NOTES = '@cache/notes';
 const CACHE_ISSUES = '@cache/issues';
+const CACHE_TASKS = '@cache/tasks';
 const CACHE_LAST_SYNC = '@cache/last_sync';
 const CACHE_THEME = '@cache/theme';
 
@@ -20,6 +21,18 @@ function reviveNoteDates(raw: unknown): Note {
     createdAt: new Date(n.createdAt as string),
     updatedAt: new Date(n.updatedAt as string),
   } as Note;
+}
+
+function reviveTaskDates(raw: unknown): CalDavTask {
+  const t = raw as Record<string, unknown>;
+  return {
+    ...t,
+    due: t.due ? new Date(t.due as string) : undefined,
+    dtstart: t.dtstart ? new Date(t.dtstart as string) : undefined,
+    completed: t.completed ? new Date(t.completed as string) : undefined,
+    created: new Date(t.created as string),
+    lastModified: new Date(t.lastModified as string),
+  } as CalDavTask;
 }
 
 function reviveIssueDates(raw: unknown): GiteaIssue {
@@ -65,6 +78,16 @@ export async function loadNotes(): Promise<Note[] | null> {
   return (JSON.parse(data) as unknown[]).map(reviveNoteDates);
 }
 
+export async function saveTasks(tasks: CalDavTask[]): Promise<void> {
+  await encryptedSetItem(CACHE_TASKS, JSON.stringify(tasks));
+}
+
+export async function loadTasks(): Promise<CalDavTask[] | null> {
+  const data = await decryptedGetItem(CACHE_TASKS);
+  if (!data) return null;
+  return (JSON.parse(data) as unknown[]).map(reviveTaskDates);
+}
+
 export async function saveIssues(issues: GiteaIssue[]): Promise<void> {
   await encryptedSetItem(CACHE_ISSUES, JSON.stringify(issues));
 }
@@ -89,5 +112,5 @@ export async function loadThemePreference(): Promise<string | null> {
 }
 
 export async function clearCache(): Promise<void> {
-  await AsyncStorage.multiRemove([CACHE_EVENTS, CACHE_NOTES, CACHE_ISSUES, CACHE_LAST_SYNC]);
+  await AsyncStorage.multiRemove([CACHE_EVENTS, CACHE_NOTES, CACHE_ISSUES, CACHE_TASKS, CACHE_LAST_SYNC]);
 }

@@ -17,7 +17,7 @@ import * as DashboardWidget from '../../modules/dashboard-widget';
 import AppIcon, { Icons } from '../components/Icon';
 
 export default function DashboardScreen() {
-  const { state, setEvents, setIssues, setLoading, setCaldavConfigured, setGiteaConfigured, setLastSync } =
+  const { state, setEvents, setIssues, setTasks, setLoading, setCaldavConfigured, setGiteaConfigured, setLastSync } =
     useApp();
   const theme = useTheme();
 
@@ -41,6 +41,12 @@ export default function DashboardScreen() {
           caldav.fetchEvents().then(async (events) => {
             setEvents(events);
             await cache.saveEvents(events);
+          })
+        );
+        fetches.push(
+          caldav.fetchTasks().then(async (tasks) => {
+            setTasks(tasks);
+            await cache.saveTasks(tasks);
           })
         );
       }
@@ -92,6 +98,15 @@ export default function DashboardScreen() {
     .sort((a, b) => a.start.getTime() - b.start.getTime())
     .slice(0, 5);
 
+  const upcomingTasks = state.tasks
+    .filter((t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+    .sort((a, b) => {
+      const aDate = a.due?.getTime() ?? Infinity;
+      const bDate = b.due?.getTime() ?? Infinity;
+      return aDate - bDate;
+    })
+    .slice(0, 5);
+
   const openIssues = state.issues.filter((i) => i.state === 'open').slice(0, 5);
 
   const c = theme.colors;
@@ -138,6 +153,32 @@ export default function DashboardScreen() {
                 {event.start.toLocaleDateString()} {event.start.toLocaleTimeString()}
               </Text>
               {event.location && <Text style={[styles.cardSubtext, { color: c.textTertiary }]}>{event.location}</Text>}
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>Tasks Due Soon</Text>
+        {!state.caldavConfigured ? (
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>CalDAV not configured</Text>
+        ) : upcomingTasks.length === 0 ? (
+          <Text style={[styles.emptyText, { color: c.textTertiary }]}>No pending tasks</Text>
+        ) : (
+          upcomingTasks.map((task) => (
+            <View key={task.uid} style={[styles.card, { backgroundColor: c.surface }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AppIcon name={Icons.task} size={16} color={task.priority >= 1 && task.priority <= 4 ? '#F44336' : '#FF9800'} />
+                <Text style={[styles.cardTitle, { color: c.text, marginBottom: 0 }]}>{task.summary}</Text>
+              </View>
+              {task.due && (
+                <Text style={[styles.cardText, { color: task.due < new Date() ? '#F44336' : c.textSecondary }]}>
+                  Due: {task.due.toLocaleDateString()}
+                </Text>
+              )}
+              {task.percentComplete > 0 && (
+                <Text style={[styles.cardSubtext, { color: c.textTertiary }]}>{task.percentComplete}% complete</Text>
+              )}
             </View>
           ))
         )}
