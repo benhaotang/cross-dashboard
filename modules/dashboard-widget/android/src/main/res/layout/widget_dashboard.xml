@@ -131,7 +131,7 @@
             android:visibility="gone" />
 
         <!-- Spacer -->
-        <View
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1" />
@@ -164,8 +164,8 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- FAB: add task -->
-    <Button
+    <!-- FAB: add task (TextView avoids MaterialButton inflation via app theme) -->
+    <TextView
         android:id="@+id/widget_fab"
         android:layout_width="38dp"
         android:layout_height="38dp"
@@ -177,7 +177,7 @@
         android:textSize="22sp"
         android:textColor="#FFFFFF"
         android:background="@drawable/fab_background"
-        android:paddingBottom="2dp"
-        android:stateListAnimator="@null" />
+        android:gravity="center"
+        android:paddingBottom="2dp" />
 
 </RelativeLayout>
