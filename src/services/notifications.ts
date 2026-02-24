@@ -17,7 +17,7 @@ Notifications.setNotificationHandler({
 // --- Local notification scheduling for calendar events ---
 
 export async function requestPermissions(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  if (Platform.OS === 'web' || Platform.OS === 'macos') return false;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
 }
@@ -26,6 +26,7 @@ export async function scheduleEventReminders(
   events: CalendarEvent[],
   minutesBefore: number = 15
 ): Promise<void> {
+  if (Platform.OS === 'web' || Platform.OS === 'macos') return;
   // Cancel all existing event reminders first
   await cancelAllEventReminders();
 
@@ -58,6 +59,7 @@ function formatEventBody(event: CalendarEvent, minutesBefore: number): string {
 }
 
 export async function cancelAllEventReminders(): Promise<void> {
+  if (Platform.OS === 'web' || Platform.OS === 'macos') return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 

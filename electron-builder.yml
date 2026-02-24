@@ -24,9 +24,3 @@ linux:
   icon: assets/icon.png
   artifactName: "${productName}-${version}-linux-${arch}.AppImage"
 
-mac:
-  target:
-    - dmg
-  category: public.app-category.productivity
-  icon: assets/icon.png
-  artifactName: "${productName}-${version}-mac-${arch}.dmg"

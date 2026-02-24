@@ -1,0 +1,33 @@
+require 'pathname'
+
+# Expose use_expo_modules! from the expo package
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json', { paths: ['#{File.expand_path('..', __dir__)}'] })"`).strip, "scripts/autolinking.rb")
+
+ws_dir = Pathname.new(__dir__)
+ws_dir = ws_dir.parent until
+  File.exist?("#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb") ||
+  ws_dir.expand_path.to_s == '/'
+require "#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb"
+
+prepare_react_native_project!
+
+target 'CrossDashboard-macOS' do
+  platform :macos, '14.0'
+  # Use a static config instead of @react-native-community/cli (which fails on pnpm + macos-only projects)
+  use_native_modules!(['cat', File.join(__dir__, 'autolink-config.json')])
+  use_expo_modules!
+
+  # Flags change depending on the env values.
+  flags = get_default_flags()
+
+  use_react_native!(
+    :path => '../node_modules/react-native-macos',
+    :fabric_enabled => ENV['RCT_NEW_ARCH_ENABLED'] == '1',
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  post_install do |installer|
+    react_native_post_install(installer)
+  end
+end

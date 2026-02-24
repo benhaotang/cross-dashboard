@@ -1,0 +1,11 @@
+{
+  "root": "/Users/Shared/aisandbox2/cross-dashboard",
+  "reactNativePath": "/Users/Shared/aisandbox2/cross-dashboard/node_modules/react-native-macos",
+  "reactNativeVersion": "0.81",
+  "dependencies": {},
+  "project": {
+    "ios": {
+      "sourceDir": "/Users/Shared/aisandbox2/cross-dashboard/macos"
+    }
+  }
+}
