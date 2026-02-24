@@ -14,7 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { GiteaIssue, GiteaComment } from '../types';
 import * as gitea from '../services/gitea';
 import AppIcon, { Icons } from './Icon';
-import PomodoroTimer from './PomodoroTimer';
+import { usePomodoro } from '../store/PomodoroContext';
 import {
   PropertyPageModal,
   PropertyPageHeader,
@@ -33,8 +33,8 @@ interface Props {
 export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggle, canEdit }: Props) {
   const theme = useTheme();
   const c = theme.colors;
+  const pomodoro = usePomodoro();
   const [editing, setEditing] = useState(false);
-  const [pomodoroOpen, setPomodoroOpen] = useState(false);
 
   // Form state
   const [formTitle, setFormTitle] = useState(issue.title);
@@ -157,7 +157,7 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
               <Text style={[styles.repoName, { color: c.textSecondary }]}>
                 {issue.repository} #{issue.number}
               </Text>
-              <TouchableOpacity onPress={() => setPomodoroOpen(true)} style={styles.pomodoroButton}>
+              <TouchableOpacity onPress={() => pomodoro.start(issue.title)} style={styles.pomodoroButton}>
                 <AppIcon name={Icons.play} size={22} color={c.primary} />
               </TouchableOpacity>
             </View>
@@ -261,11 +261,6 @@ export default function IssuePropertyPage({ issue, onClose, onSave, onStateToggl
           </>
         )}
       </ScrollView>
-      <PomodoroTimer
-        visible={pomodoroOpen}
-        onClose={() => setPomodoroOpen(false)}
-        itemTitle={issue.title}
-      />
     </PropertyPageModal>
   );
 }

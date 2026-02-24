@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,117 +7,28 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
-import { loadPomodoroSettings, DEFAULT_POMODORO, PomodoroSettings } from '../services/cache';
+import { usePomodoro } from '../store/PomodoroContext';
 import AppIcon, { Icons } from './Icon';
 
-interface Props {
-  visible: boolean;
-  onClose: () => void;
-  itemTitle: string;
-  onSessionComplete?: (sessionNumber: number, totalMinutes: number) => void;
-}
-
-type TimerPhase = 'work' | 'shortBreak' | 'longBreak';
-
-export default function PomodoroTimer({ visible, onClose, itemTitle, onSessionComplete }: Props) {
+export default function PomodoroTimer() {
   const theme = useTheme();
   const c = theme.colors;
+  const pomodoro = usePomodoro();
 
-  const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_POMODORO);
-  const [phase, setPhase] = useState<TimerPhase>('work');
-  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_POMODORO.workMinutes * 60);
-  const [running, setRunning] = useState(false);
-  const [currentSession, setCurrentSession] = useState(1);
-  const [completedSessions, setCompletedSessions] = useState(0);
-
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const settingsRef = useRef(settings);
-  const phaseRef = useRef(phase);
-  const currentSessionRef = useRef(currentSession);
-  const completedSessionsRef = useRef(completedSessions);
-  const onSessionCompleteRef = useRef(onSessionComplete);
-
-  settingsRef.current = settings;
-  phaseRef.current = phase;
-  currentSessionRef.current = currentSession;
-  completedSessionsRef.current = completedSessions;
-  onSessionCompleteRef.current = onSessionComplete;
-
-  // Load settings on mount
-  useEffect(() => {
-    if (!visible) return;
-    loadPomodoroSettings().then((saved) => {
-      const s = saved || DEFAULT_POMODORO;
-      setSettings(s);
-      setPhase('work');
-      setSecondsLeft(s.workMinutes * 60);
-      setRunning(false);
-      setCurrentSession(1);
-      setCompletedSessions(0);
-    });
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [visible]);
-
-  const handleTimerEnd = useCallback(() => {
-    const s = settingsRef.current;
-    if (phaseRef.current === 'work') {
-      const newCompleted = completedSessionsRef.current + 1;
-      setCompletedSessions(newCompleted);
-      onSessionCompleteRef.current?.(newCompleted, s.workMinutes);
-
-      // Determine break type
-      const isLongBreak = newCompleted % s.sessionsUntilLongBreak === 0;
-      if (isLongBreak) {
-        setPhase('longBreak');
-        setSecondsLeft(s.longBreakMinutes * 60);
-      } else {
-        setPhase('shortBreak');
-        setSecondsLeft(s.shortBreakMinutes * 60);
-      }
-    } else {
-      // Break ended -> next work session
-      setCurrentSession(currentSessionRef.current + 1);
-      setPhase('work');
-      setSecondsLeft(s.workMinutes * 60);
-    }
-  }, []);
-
-  // Interval tick
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            handleTimerEnd();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [running, handleTimerEnd]);
-
-  function handleReset() {
-    setRunning(false);
-    setPhase('work');
-    setSecondsLeft(settings.workMinutes * 60);
-    setCurrentSession(1);
-    setCompletedSessions(0);
-  }
-
-  function handleClose() {
-    setRunning(false);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    onClose();
-  }
+  const {
+    modalVisible,
+    phase,
+    secondsLeft,
+    running,
+    currentSession,
+    completedSessions,
+    settings,
+    itemTitle,
+    closeModal,
+    stop,
+    pause,
+    resume,
+  } = pomodoro;
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
@@ -126,12 +37,19 @@ export default function PomodoroTimer({ visible, onClose, itemTitle, onSessionCo
   const phaseLabel = phase === 'work' ? 'Work' : phase === 'shortBreak' ? 'Short Break' : 'Long Break';
   const phaseColor = phase === 'work' ? c.primary : phase === 'shortBreak' ? '#4CAF50' : '#FF9800';
 
-  // Session dots
   const totalDots = settings.sessionsUntilLongBreak;
   const dots = Array.from({ length: totalDots }, (_, i) => i < completedSessions);
 
+  function handleClose() {
+    closeModal();
+  }
+
+  function handleReset() {
+    stop();
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={modalVisible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: c.surface }]}>
           {/* Header */}
@@ -180,7 +98,7 @@ export default function PomodoroTimer({ visible, onClose, itemTitle, onSessionCo
 
             {/* Controls */}
             <View style={styles.controlRow}>
-              <TouchableOpacity onPress={() => setRunning(!running)} style={styles.controlButton}>
+              <TouchableOpacity onPress={() => running ? pause() : resume()} style={styles.controlButton}>
                 <AppIcon
                   name={running ? Icons.pause : Icons.play}
                   size={64}

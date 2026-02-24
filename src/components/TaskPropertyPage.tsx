@@ -10,7 +10,7 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { CalDavTask, CalDavCalendar, TaskStatus } from '../types';
 import AppIcon, { Icons } from './Icon';
-import PomodoroTimer from './PomodoroTimer';
+import { usePomodoro } from '../store/PomodoroContext';
 import {
   PropertyPageModal,
   PropertyPageHeader,
@@ -80,8 +80,8 @@ function getStatusLabel(status: TaskStatus): string {
 export default function TaskPropertyPage({ task, allTasks, calendars, onClose, onSave, onDelete, canEdit }: Props) {
   const theme = useTheme();
   const c = theme.colors;
+  const pomodoro = usePomodoro();
   const [editing, setEditing] = useState(false);
-  const [pomodoroOpen, setPomodoroOpen] = useState(false);
 
   // Form state
   const [formSummary, setFormSummary] = useState(task.summary);
@@ -327,7 +327,7 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
                   <Text style={[styles.calName, { color: c.textSecondary }]}>{cal.displayName}</Text>
                 </View>
               )}
-              <TouchableOpacity onPress={() => setPomodoroOpen(true)} style={styles.pomodoroButton}>
+              <TouchableOpacity onPress={() => pomodoro.start(task.summary, handlePomodoroSession)} style={styles.pomodoroButton}>
                 <AppIcon name={Icons.play} size={22} color={c.primary} />
               </TouchableOpacity>
             </View>
@@ -450,12 +450,6 @@ export default function TaskPropertyPage({ task, allTasks, calendars, onClose, o
           </>
         )}
       </ScrollView>
-      <PomodoroTimer
-        visible={pomodoroOpen}
-        onClose={() => setPomodoroOpen(false)}
-        itemTitle={task.summary}
-        onSessionComplete={handlePomodoroSession}
-      />
     </PropertyPageModal>
   );
 }
