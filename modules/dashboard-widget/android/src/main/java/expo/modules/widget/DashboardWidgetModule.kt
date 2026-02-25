@@ -205,8 +205,14 @@ class DashboardWidgetModule : Module() {
     }
 
     private fun triggerRefresh(context: Context) {
+        // Notify compact widget
         val intent = Intent(context, DashboardWidgetProvider::class.java)
         intent.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
         context.sendBroadcast(intent)
+        // Notify 4×4 main widget (separate explicit broadcast — explicit intents are
+        // only delivered to the named component, so we must broadcast to each separately)
+        val intentMain = Intent(context, MainDashboardWidgetProvider::class.java)
+        intentMain.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
+        context.sendBroadcast(intentMain)
     }
 }

@@ -96,7 +96,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
       // ── Android widget update ─────────────────────────────────────────────
       if (Platform.OS === 'android' && DashboardWidget.isAvailable()) {
         const upcoming = freshEvents
-          .filter((e) => e.start >= now)
+          .filter((e) => e.end > now)
           .sort((a, b) => a.start.getTime() - b.start.getTime())
           .slice(0, 3);
 
@@ -134,7 +134,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
         const endOfToday = new Date(now);
         endOfToday.setHours(23, 59, 59, 999);
         const eventsRemainingToday = freshEvents.filter(
-          (e) => e.start >= now && e.start <= endOfToday
+          (e) => e.end > now && e.start <= endOfToday
         ).length;
 
         const overdueTasks = freshTasks

@@ -78,8 +78,24 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
 
         val now = System.currentTimeMillis()
+
+        // Use start-of-today so all-day events (epochMs = midnight 00:00) are included.
+        // Filtering by `epochMs >= now` would exclude them after midnight has passed.
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val endOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
         val upcoming = events
-            .filter { it.epochMs >= now }
+            .filter { it.epochMs >= startOfToday }
             .sortedBy { it.epochMs }
             .take(3)
 
@@ -91,12 +107,7 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             .take(3)
 
         // ── Events remaining today ────────────────────────────────────────────
-        val endOfToday = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 23)
-            set(Calendar.MINUTE, 59)
-            set(Calendar.SECOND, 59)
-        }.timeInMillis
-        val eventsRemainingToday = events.count { it.epochMs in now..endOfToday }
+        val eventsRemainingToday = events.count { it.epochMs in startOfToday..endOfToday }
 
         // ── Pending tasks (for old widget: sorted by due, first 3) ────────────
         val pendingRows = tasks
@@ -164,10 +175,14 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             scheduleEventAlarms(allFutureEvents, notifMinutes)
         }
 
-        // ── Trigger widget refresh (both old and new widgets) ─────────────────
+        // ── Trigger widget refresh ────────────────────────────────────────────
+        // Explicit broadcasts only reach the named component, so broadcast to each widget separately.
         val intent = Intent(applicationContext, DashboardWidgetProvider::class.java)
         intent.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
         applicationContext.sendBroadcast(intent)
+        val intentMain = Intent(applicationContext, MainDashboardWidgetProvider::class.java)
+        intentMain.action = DashboardWidgetProvider.ACTION_UPDATE_WIDGET
+        applicationContext.sendBroadcast(intentMain)
 
         return Result.success()
     }
