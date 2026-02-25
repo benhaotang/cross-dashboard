@@ -24,8 +24,10 @@ data class EventInfo(
 )
 
 data class TaskInfo(
-    val summary: String,
-    val dueMs: Long
+    val formattedRow: String,
+    val dueMs: Long,
+    val uid: String,
+    val summary: String
 )
 
 class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -113,10 +115,7 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val pendingRows = tasks
             .sortedWith(compareBy(nullsLast()) { it.dueMs.takeIf { ms -> ms > 0 } })
             .take(3)
-            .map { t ->
-                val prefix = if (t.dueMs > 0 && t.dueMs < now) "⚠ " else "• "
-                "$prefix${t.summary}"
-            }
+            .map { it.formattedRow }
 
         // ── Gitea ─────────────────────────────────────────────────────────────
         if (hasGiteaConfig) {
@@ -168,11 +167,13 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         editor.apply()
 
-        // ── Schedule event alarms ─────────────────────────────────────────────
+        // ── Schedule event and task alarms ───────────────────────────────────
         val notifEnabled = prefs.getString("notif_enabled", "false") == "true"
         val notifMinutes = prefs.getString("notif_minutes", "15")?.toIntOrNull() ?: 15
         if (notifEnabled) {
             scheduleEventAlarms(allFutureEvents, notifMinutes)
+            val futureTasks = tasks.filter { it.dueMs > 0 && it.dueMs >= now }
+            scheduleTaskAlarms(futureTasks, notifMinutes)
         }
 
         // ── Trigger widget refresh ────────────────────────────────────────────
@@ -368,15 +369,20 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         var inVTodo = false
         var summary = ""
         var due = 0L
+        var uid = ""
+        val now = System.currentTimeMillis()
 
         for (rawLine in unfoldIcal(ical)) {
             val line = rawLine.trim()
             when {
-                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L }
+                line == "BEGIN:VTODO" -> { inVTodo = true; summary = ""; due = 0L; uid = "" }
                 line == "END:VTODO" -> {
                     inVTodo = false
                     if (summary.isNotEmpty()) {
-                        results.add(TaskInfo(summary, due))
+                        val prefix = if (due > 0 && due < now) "⚠ " else "• "
+                        val formattedRow = "$prefix$summary"
+                        val effectiveUid = uid.ifEmpty { "$summary$due" }
+                        results.add(TaskInfo(formattedRow, due, effectiveUid, summary))
                     }
                 }
                 inVTodo && line.startsWith("SUMMARY") -> {
@@ -384,6 +390,9 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 }
                 inVTodo && (line.startsWith("DUE:") || line.startsWith("DUE;")) -> {
                     due = parseICalDate(line.substringAfter(':').trim())
+                }
+                inVTodo && line.startsWith("UID:") -> {
+                    uid = line.substringAfter(':').trim()
                 }
             }
         }
