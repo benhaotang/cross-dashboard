@@ -217,6 +217,36 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
     }
 
+    private fun scheduleTaskAlarms(tasks: List<TaskInfo>, notifMinutes: Int) {
+        EventAlarmReceiver.createChannel(applicationContext)
+
+        val alarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val now = System.currentTimeMillis()
+
+        for (task in tasks) {
+            if (task.dueMs <= 0) continue
+            // Use a notifId range of 100_000–200_000 to avoid collisions with event alarms (0–100_000).
+            val baseId = 100_000 + abs(task.uid.hashCode()) % 50_000
+            val atTimeId = baseId
+            val remindBeforeId = baseId + 50_000
+
+            cancelAlarm(alarmManager, atTimeId)
+            cancelAlarm(alarmManager, remindBeforeId)
+
+            if (task.dueMs > now) {
+                val fakeEvent = EventInfo("", task.dueMs, task.uid, task.summary, null)
+                scheduleAlarm(alarmManager, fakeEvent, "task_due", atTimeId, task.dueMs, notifMinutes)
+
+                if (notifMinutes > 0) {
+                    val remindMs = task.dueMs - notifMinutes * 60_000L
+                    if (remindMs > now) {
+                        scheduleAlarm(alarmManager, fakeEvent, "task_remind", remindBeforeId, remindMs, notifMinutes)
+                    }
+                }
+            }
+        }
+    }
+
     private fun scheduleAlarm(
         alarmManager: AlarmManager,
         event: EventInfo,
