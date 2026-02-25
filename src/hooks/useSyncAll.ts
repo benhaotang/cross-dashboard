@@ -44,25 +44,28 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
 
         fetches.push(
           caldav.fetchEvents(hrefs('VEVENT')).then(async (events) => {
-            if (events.length > 0 || state.events.length > 0) {
+            if (events.length > 0) {
               freshEvents = events;
               setEvents(events);
               await cache.saveEvents(events);
             }
+            // events.length === 0: keep freshEvents = state.events (set above).
+            // Don't clear state or cache — guards against transient empty fetch.
           })
         );
         fetches.push(
           caldav.fetchTasks(hrefs('VTODO')).then(async (tasks) => {
-            if (tasks.length > 0 || state.tasks.length > 0) {
+            if (tasks.length > 0) {
               freshTasks = tasks;
               setTasks(tasks);
               await cache.saveTasks(tasks);
             }
+            // tasks.length === 0: keep freshTasks = state.tasks (set above).
           })
         );
         fetches.push(
           caldav.fetchNotes(hrefs('VJOURNAL')).then(async (notes) => {
-            if (notes.length > 0 || state.notes.length > 0) {
+            if (notes.length > 0) {
               setNotes(notes);
               await cache.saveNotes(notes);
             }
@@ -73,7 +76,7 @@ export function useSyncAll(): { syncAll: () => Promise<void>; syncing: boolean }
       if (state.giteaConfigured && state.giteaRepositories.length > 0) {
         fetches.push(
           gitea.fetchAllIssues(state.giteaRepositories).then(async (issues) => {
-            if (issues.length > 0 || state.issues.length > 0) {
+            if (issues.length > 0) {
               freshIssues = issues;
               setIssues(issues);
               await cache.saveIssues(issues);

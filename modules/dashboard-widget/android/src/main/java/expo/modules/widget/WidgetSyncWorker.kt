@@ -60,14 +60,18 @@ class WidgetSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         // Whether this worker has credentials to actually fetch each data source.
         // If not configured, we must NOT overwrite rows — the JS side (useSyncAll)
         // owns that data and overwrites here would blank the widget every cycle.
-        val hasCaldavConfig = caldavServer != null && caldavUser != null &&
-                caldavPass != null && calendarHrefs.isNotEmpty()
+        // Note: calendarHrefs is NOT required — if empty we fall back to the root
+        // server URL, mirroring what the JS caldav.fetchEvents(undefined) does.
+        val hasCaldavConfig = caldavServer != null && caldavUser != null && caldavPass != null
         val hasGiteaConfig = giteaUrl != null && !giteaToken.isNullOrEmpty() &&
                 giteaRepos.isNotEmpty()
 
         // ── CalDAV ────────────────────────────────────────────────────────────
         if (hasCaldavConfig) {
-            for (href in calendarHrefs) {
+            // Use saved calendar hrefs when available; fall back to root server URL
+            // (same fallback the JS caldav service uses when no calendars are selected).
+            val hrefs = if (calendarHrefs.isNotEmpty()) calendarHrefs else listOf(caldavServer!!)
+            for (href in hrefs) {
                 try {
                     val fetched = fetchCalendarEvents(caldavServer!!, caldavUser!!, caldavPass!!, href)
                     events.addAll(fetched)
