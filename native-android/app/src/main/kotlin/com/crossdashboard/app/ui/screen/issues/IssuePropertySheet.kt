@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Send
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -276,7 +276,7 @@ internal fun IssueReadContent(
                 enabled = newComment.isNotBlank(),
                 modifier = Modifier.semantics { contentDescription = "Post comment" },
             ) {
-                Icon(Icons.Outlined.Send, contentDescription = null)
+                Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null)
             }
         }
     }

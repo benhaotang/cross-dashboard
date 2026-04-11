@@ -50,12 +50,18 @@ fun NotesScreen(
         topBar = {
             if (showSearch) {
                 SearchBar(
-                    query = state.searchQuery,
-                    onQueryChange = viewModel::onSearchChange,
-                    onSearch = {},
-                    active = true,
-                    onActiveChange = { if (!it) showSearch = false },
-                    placeholder = { Text("Search notes…") },
+                    inputField = {
+                        SearchBarDefaults.InputField(
+                            query = state.searchQuery,
+                            onQueryChange = viewModel::onSearchChange,
+                            onSearch = {},
+                            expanded = true,
+                            onExpandedChange = { if (!it) showSearch = false },
+                            placeholder = { Text("Search notes…") },
+                        )
+                    },
+                    expanded = true,
+                    onExpandedChange = { if (!it) showSearch = false },
                     modifier = Modifier.fillMaxWidth(),
                 ) {}
             } else {

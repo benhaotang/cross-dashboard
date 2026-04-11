@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
      * bypasses the launcher and arrives here as REQUEST_AUTH_TOKEN_SSO = 4243.
      */
     @Deprecated("Required for Nextcloud SSO library two-step auth flow")
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == AccountImporter.REQUEST_AUTH_TOKEN_SSO) {

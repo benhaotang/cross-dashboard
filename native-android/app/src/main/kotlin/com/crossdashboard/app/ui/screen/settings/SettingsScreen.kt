@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -572,7 +573,7 @@ private fun NavigationSection(state: SettingsUiState, vm: SettingsViewModel) {
                 "Inbox" -> Icons.Outlined.Inbox
                 "Events" -> Icons.Outlined.CalendarMonth
                 "Tasks" -> Icons.Outlined.CheckBox
-                "Notes" -> Icons.Outlined.Notes
+                "Notes" -> Icons.AutoMirrored.Outlined.Notes
                 "Issues" -> Icons.Outlined.BugReport
                 "Views" -> Icons.Outlined.ViewColumn
                 else -> Icons.Outlined.MoreHoriz

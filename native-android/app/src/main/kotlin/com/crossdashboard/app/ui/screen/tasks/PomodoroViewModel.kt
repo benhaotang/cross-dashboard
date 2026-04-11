@@ -54,7 +54,7 @@ data class PomodoroUiState(
  */
 @HiltViewModel
 class PomodoroViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val statsRepository: StatsRepository,
     private val appPreferences: AppPreferences,
     private val commandBus: PomodoroCommandBus,

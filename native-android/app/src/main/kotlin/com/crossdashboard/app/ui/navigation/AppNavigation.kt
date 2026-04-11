@@ -1,6 +1,8 @@
 package com.crossdashboard.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -35,7 +37,7 @@ val ALL_NAV_ITEMS = listOf(
     NavItem(Destination.Inbox, "Inbox", Icons.Filled.Inbox, Icons.Outlined.Inbox),
     NavItem(Destination.Events, "Events", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
     NavItem(Destination.Tasks, "Tasks", Icons.Filled.CheckBox, Icons.Outlined.CheckBoxOutlineBlank),
-    NavItem(Destination.Notes, "Notes", Icons.Filled.Notes, Icons.Outlined.Notes),
+    NavItem(Destination.Notes, "Notes", Icons.AutoMirrored.Filled.Notes, Icons.AutoMirrored.Outlined.Notes),
     NavItem(Destination.Issues, "Issues", Icons.Filled.BugReport, Icons.Outlined.BugReport),
     NavItem(Destination.Views, "Views", Icons.Filled.ViewColumn, Icons.Outlined.ViewColumn),
     NavItem(Destination.Settings, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
