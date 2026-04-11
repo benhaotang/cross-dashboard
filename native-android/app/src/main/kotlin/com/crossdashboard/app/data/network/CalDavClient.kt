@@ -233,7 +233,8 @@ class CalDavClient @Inject constructor(
         addAuth(builder)
         httpClient.newCall(builder.build()).execute().use { r ->
             if (!r.isSuccessful && r.code != 201 && r.code != 204) {
-                throw IOException("PUT failed: HTTP ${r.code}")
+                val errorBody = runCatching { r.body?.string() }.getOrNull()?.take(500)
+                throw IOException("PUT failed: HTTP ${r.code} — $errorBody")
             }
         }
     }
