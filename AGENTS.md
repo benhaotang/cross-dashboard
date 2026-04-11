@@ -80,7 +80,7 @@ native-android/
 | Category | Library | Version |
 |---|---|---|
 | Language / coroutines | Kotlin 2.1, kotlinx-coroutines | 2.1.x / 1.10.x |
-| UI | Jetpack Compose BOM | 2026.04.00 (Compose 1.10.2) |
+| UI | Jetpack Compose BOM | 2026.03.01 (Compose 1.10.x) |
 | Material | material3 + material3-adaptive | 1.4.0 / 1.2.0 |
 | Navigation | androidx.navigation3 (nav3) | 1.0.x |
 | Architecture | ViewModel + Lifecycle | 2.9.x |
