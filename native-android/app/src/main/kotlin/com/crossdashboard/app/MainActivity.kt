@@ -1,6 +1,7 @@
 package com.crossdashboard.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,7 +35,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        pendingAction = intent.data?.getQueryParameter("action")
+        pendingAction = intent.data?.resolvePendingAction()
 
         setContent {
             // Theme is applied inside CrossDashboardRoot based on user preference.
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        pendingAction = intent.data?.getQueryParameter("action")
+        pendingAction = intent.data?.resolvePendingAction()
     }
 
     /**
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
      * bypasses the launcher and arrives here as REQUEST_AUTH_TOKEN_SSO = 4243.
      */
     @Deprecated("Required for Nextcloud SSO library two-step auth flow")
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == AccountImporter.REQUEST_AUTH_TOKEN_SSO) {
@@ -76,4 +78,19 @@ class MainActivity : ComponentActivity() {
         const val KEY_ACTION = "action"
         const val ACTION_ADD_TASK = "add_task"
     }
+}
+
+/**
+ * Resolves a deep-link URI to a pending action string consumed by [CrossDashboardRoot]
+ * and [AppNavigation]:
+ * - `crossdashboard://pomodoro`           → `"pomodoro"`     (Pomodoro notification tap)
+ * - `crossdashboard://events?uid=<uid>`   → `"events:<uid>"` (event alarm notification tap)
+ * - `crossdashboard://tasks?uid=<uid>`    → `"tasks:<uid>"`  (task reminder notification tap)
+ * - `crossdashboard://tasks?action=add`   → `"add"`          (widget add-task shortcut)
+ */
+private fun Uri.resolvePendingAction(): String? = when (host) {
+    "pomodoro" -> "pomodoro"
+    "events" -> getQueryParameter("uid")?.let { "events:$it" }
+    "tasks" -> getQueryParameter("uid")?.let { "tasks:$it" } ?: getQueryParameter("action")
+    else -> getQueryParameter("action")
 }

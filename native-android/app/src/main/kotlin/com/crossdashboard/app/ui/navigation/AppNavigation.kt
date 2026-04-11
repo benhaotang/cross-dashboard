@@ -1,6 +1,8 @@
 package com.crossdashboard.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -35,7 +37,7 @@ val ALL_NAV_ITEMS = listOf(
     NavItem(Destination.Inbox, "Inbox", Icons.Filled.Inbox, Icons.Outlined.Inbox),
     NavItem(Destination.Events, "Events", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
     NavItem(Destination.Tasks, "Tasks", Icons.Filled.CheckBox, Icons.Outlined.CheckBoxOutlineBlank),
-    NavItem(Destination.Notes, "Notes", Icons.Filled.Notes, Icons.Outlined.Notes),
+    NavItem(Destination.Notes, "Notes", Icons.AutoMirrored.Filled.Notes, Icons.AutoMirrored.Outlined.Notes),
     NavItem(Destination.Issues, "Issues", Icons.Filled.BugReport, Icons.Outlined.BugReport),
     NavItem(Destination.Views, "Views", Icons.Filled.ViewColumn, Icons.Outlined.ViewColumn),
     NavItem(Destination.Settings, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
@@ -53,6 +55,30 @@ fun AppNavigation(
 
     val backStack = rememberNavBackStack(Destination.Dashboard)
     val currentDestination = backStack.lastOrNull() ?: Destination.Dashboard
+
+    // Handle notification-tap deep links that need to navigate to a specific item.
+    LaunchedEffect(pendingAction) {
+        when {
+            pendingAction?.startsWith("events:") == true -> {
+                val uid = pendingAction.removePrefix("events:")
+                while (backStack.count() > 1) backStack.removeLastOrNull()
+                if (backStack.lastOrNull()?.let { it::class } != Destination.Events::class) {
+                    backStack += Destination.Events
+                }
+                backStack += Destination.EventDetail(uid)
+                onActionConsumed()
+            }
+            pendingAction?.startsWith("tasks:") == true -> {
+                val uid = pendingAction.removePrefix("tasks:")
+                while (backStack.count() > 1) backStack.removeLastOrNull()
+                if (backStack.lastOrNull()?.let { it::class } != Destination.Tasks::class) {
+                    backStack += Destination.Tasks
+                }
+                backStack += Destination.TaskDetail(uid)
+                onActionConsumed()
+            }
+        }
+    }
 
     val navItems = ALL_NAV_ITEMS.filter { item ->
         item.destination.screenName() == "Settings" ||
@@ -136,13 +162,14 @@ fun AppNavigation(
                         onNavigate = { backStack += it },
                         pendingAction = null,
                         colorResolver = colorResolver,
+                        initialUid = dest.uid,
                     )
                 }
                 entry<Destination.EventDetail> { dest ->
-                    // Show the events list filtered/highlighted by uid
                     EventsScreen(
                         onNavigate = { backStack += it },
                         colorResolver = colorResolver,
+                        initialUid = dest.uid,
                     )
                 }
                 entry<Destination.IssueDetail> {

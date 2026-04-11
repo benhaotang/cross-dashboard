@@ -19,7 +19,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 
 @Singleton
 class AppPreferences @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     private val ds = context.dataStore
 
@@ -197,6 +197,7 @@ class AppPreferences @Inject constructor(
     }
 }
 
+@Suppress("UNCHECKED_CAST")
 private fun <T> Flow<T>.catchIo(): Flow<T> = catch { e ->
     if (e is IOException) emit(emptyPreferences() as T) else throw e
 }

@@ -20,26 +20,41 @@ object ICalParser {
 
     // ─── Public entry points ─────────────────────────────────────────────────
 
-    fun parseEvents(icalText: String, calendarHref: String? = null): List<CalendarEvent> {
+    fun parseEvents(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<CalendarEvent> {
         val events = mutableListOf<CalendarEvent>()
         forEachComponent(icalText, "VEVENT") { props ->
-            parseEvent(props, calendarHref)?.let { events.add(it) }
+            parseEvent(props, calendarHref, resourceHref, resourceEtag)?.let { events.add(it) }
         }
         return events
     }
 
-    fun parseTasks(icalText: String, calendarHref: String? = null): List<CalDavTask> {
+    fun parseTasks(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<CalDavTask> {
         val tasks = mutableListOf<CalDavTask>()
         forEachComponent(icalText, "VTODO") { props ->
-            parseTask(props, calendarHref)?.let { tasks.add(it) }
+            parseTask(props, calendarHref, resourceHref, resourceEtag)?.let { tasks.add(it) }
         }
         return tasks
     }
 
-    fun parseNotes(icalText: String, calendarHref: String? = null): List<Note> {
+    fun parseNotes(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<Note> {
         val notes = mutableListOf<Note>()
         forEachComponent(icalText, "VJOURNAL") { props ->
-            parseNote(props, calendarHref)?.let { notes.add(it) }
+            parseNote(props, calendarHref, resourceHref, resourceEtag)?.let { notes.add(it) }
         }
         return notes
     }
@@ -96,7 +111,12 @@ object ICalParser {
 
     // ─── Event parser ─────────────────────────────────────────────────────────
 
-    private fun parseEvent(props: Map<String, String>, calendarHref: String?): CalendarEvent? {
+    private fun parseEvent(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): CalendarEvent? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
         val start = parseDateTime(props, "DTSTART") ?: return null
@@ -111,13 +131,19 @@ object ICalParser {
             description = props["DESCRIPTION"]?.let { unescape(it) },
             location = props["LOCATION"]?.let { unescape(it) },
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
     // ─── Task parser ──────────────────────────────────────────────────────────
 
-    private fun parseTask(props: Map<String, String>, calendarHref: String?): CalDavTask? {
+    private fun parseTask(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): CalDavTask? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
 
@@ -146,13 +172,19 @@ object ICalParser {
             location = props["LOCATION"]?.let { unescape(it) },
             parentUid = parentUid,
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
     // ─── Note (VJOURNAL) parser ───────────────────────────────────────────────
 
-    private fun parseNote(props: Map<String, String>, calendarHref: String?): Note? {
+    private fun parseNote(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): Note? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
         return Note(
@@ -163,67 +195,70 @@ object ICalParser {
             created = parseDateTime(props, "DTSTAMP") ?: Instant.now(),
             lastModified = parseDateTime(props, "LAST-MODIFIED") ?: Instant.now(),
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
     // ─── iCal serializers (domain → iCal text) ───────────────────────────────
 
     fun serializeTask(task: CalDavTask): String = buildString {
-        appendLine("BEGIN:VCALENDAR")
-        appendLine("VERSION:2.0")
-        appendLine("PRODID:-//CrossDashboard//Native//EN")
-        appendLine("BEGIN:VTODO")
-        appendLine("UID:${task.uid}")
-        appendLine("SUMMARY:${escape(task.summary)}")
-        task.description?.let { appendLine("DESCRIPTION:${escape(it)}") }
-        appendLine("STATUS:${task.status.icalValue}")
-        appendLine("PRIORITY:${task.priority}")
-        appendLine("PERCENT-COMPLETE:${task.percentComplete}")
-        task.due?.let { appendLine("DUE:${formatInstant(it)}") }
-        task.dtstart?.let { appendLine("DTSTART:${formatInstant(it)}") }
-        task.completed?.let { appendLine("COMPLETED:${formatInstant(it)}") }
-        appendLine("CREATED:${formatInstant(task.created)}")
-        appendLine("LAST-MODIFIED:${formatInstant(Instant.now())}")
-        if (task.categories.isNotEmpty()) {
-            appendLine("CATEGORIES:${task.categories.joinToString(",")}")
-        }
-        task.location?.let { appendLine("LOCATION:${escape(it)}") }
-        task.parentUid?.let { appendLine("RELATED-TO;RELTYPE=PARENT:$it") }
-        appendLine("END:VTODO")
-        appendLine("END:VCALENDAR")
+        fun line(s: String) = append(s).append("\r\n")
+        line("BEGIN:VCALENDAR")
+        line("VERSION:2.0")
+        line("PRODID:-//CrossDashboard//Native//EN")
+        line("BEGIN:VTODO")
+        line("UID:${task.uid}")
+        line("DTSTAMP:${formatInstant(Instant.now())}")
+        line("CREATED:${formatInstant(task.created)}")
+        line("LAST-MODIFIED:${formatInstant(Instant.now())}")
+        line("SUMMARY:${escape(task.summary)}")
+        line("STATUS:${task.status.icalValue}")
+        line("PRIORITY:${task.priority}")
+        line("PERCENT-COMPLETE:${task.percentComplete}")
+        task.description?.let { line("DESCRIPTION:${escape(it)}") }
+        task.due?.let { line("DUE:${formatInstant(it)}") }
+        task.dtstart?.let { line("DTSTART:${formatInstant(it)}") }
+        task.completed?.let { line("COMPLETED:${formatInstant(it)}") }
+        if (task.categories.isNotEmpty()) line("CATEGORIES:${task.categories.joinToString(",")}")
+        task.location?.let { line("LOCATION:${escape(it)}") }
+        task.parentUid?.let { line("RELATED-TO;RELTYPE=PARENT:$it") }
+        line("END:VTODO")
+        line("END:VCALENDAR")
     }
 
     fun serializeNote(note: Note): String = buildString {
-        appendLine("BEGIN:VCALENDAR")
-        appendLine("VERSION:2.0")
-        appendLine("PRODID:-//CrossDashboard//Native//EN")
-        appendLine("BEGIN:VJOURNAL")
-        appendLine("UID:${note.uid}")
-        appendLine("SUMMARY:${escape(note.summary)}")
-        if (note.body.isNotBlank()) appendLine("DESCRIPTION:${escape(note.body)}")
-        if (note.categories.isNotEmpty()) appendLine("CATEGORIES:${note.categories.joinToString(",")}")
-        appendLine("DTSTAMP:${formatInstant(Instant.now())}")
-        appendLine("LAST-MODIFIED:${formatInstant(Instant.now())}")
-        appendLine("END:VJOURNAL")
-        appendLine("END:VCALENDAR")
+        fun line(s: String) = append(s).append("\r\n")
+        line("BEGIN:VCALENDAR")
+        line("VERSION:2.0")
+        line("PRODID:-//CrossDashboard//Native//EN")
+        line("BEGIN:VJOURNAL")
+        line("UID:${note.uid}")
+        line("DTSTAMP:${formatInstant(Instant.now())}")
+        line("LAST-MODIFIED:${formatInstant(Instant.now())}")
+        line("SUMMARY:${escape(note.summary)}")
+        if (note.body.isNotBlank()) line("DESCRIPTION:${escape(note.body)}")
+        if (note.categories.isNotEmpty()) line("CATEGORIES:${note.categories.joinToString(",")}")
+        line("END:VJOURNAL")
+        line("END:VCALENDAR")
     }
 
     fun serializeEvent(event: CalendarEvent): String = buildString {
-        appendLine("BEGIN:VCALENDAR")
-        appendLine("VERSION:2.0")
-        appendLine("PRODID:-//CrossDashboard//Native//EN")
-        appendLine("BEGIN:VEVENT")
-        appendLine("UID:${event.uid}")
-        appendLine("SUMMARY:${escape(event.summary)}")
-        appendLine("DTSTART:${formatInstant(event.start)}")
-        appendLine("DTEND:${formatInstant(event.end)}")
-        event.description?.let { appendLine("DESCRIPTION:${escape(it)}") }
-        event.location?.let { appendLine("LOCATION:${escape(it)}") }
-        appendLine("DTSTAMP:${formatInstant(Instant.now())}")
-        appendLine("LAST-MODIFIED:${formatInstant(Instant.now())}")
-        appendLine("END:VEVENT")
-        appendLine("END:VCALENDAR")
+        fun line(s: String) = append(s).append("\r\n")
+        line("BEGIN:VCALENDAR")
+        line("VERSION:2.0")
+        line("PRODID:-//CrossDashboard//Native//EN")
+        line("BEGIN:VEVENT")
+        line("UID:${event.uid}")
+        line("DTSTAMP:${formatInstant(Instant.now())}")
+        line("DTSTART:${formatInstant(event.start)}")
+        line("DTEND:${formatInstant(event.end)}")
+        line("SUMMARY:${escape(event.summary)}")
+        event.description?.let { line("DESCRIPTION:${escape(it)}") }
+        event.location?.let { line("LOCATION:${escape(it)}") }
+        line("LAST-MODIFIED:${formatInstant(Instant.now())}")
+        line("END:VEVENT")
+        line("END:VCALENDAR")
     }
 
     // ─── Parsing helpers ─────────────────────────────────────────────────────

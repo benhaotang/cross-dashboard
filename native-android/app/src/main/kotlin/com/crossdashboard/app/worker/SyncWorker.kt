@@ -5,6 +5,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.crossdashboard.app.alarm.EventAlarmScheduler
+import com.crossdashboard.app.alarm.TaskAlarmScheduler
 import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
@@ -18,6 +19,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import android.util.Log
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -44,19 +46,33 @@ class SyncWorker @AssistedInject constructor(
     private val secureStore: SecureStore,
     private val prefs: AppPreferences,
     private val alarmScheduler: EventAlarmScheduler,
+    private val taskAlarmScheduler: TaskAlarmScheduler,
 ) : CoroutineWorker(context, workerParams) {
 
-    override suspend fun doWork(): Result = runCatching {
+    override suspend fun doWork(): Result {
         val calendarHrefs = selectedCalendarHrefs()
         val giteaRepos = giteaRepositories()
 
-        // Sync all sources in parallel
+        // Each source is isolated: one failure must not prevent the others from running
+        // or block the widget/alarm update at the end.
         coroutineScope {
-            val events = async { eventRepository.sync(calendarHrefs) }
-            val tasks = async { taskRepository.sync(calendarHrefs) }
-            val notes = async { noteRepository.sync(calendarHrefs) }
+            val events = async {
+                runCatching { eventRepository.sync(calendarHrefs) }
+                    .onFailure { e -> Log.e(TAG, "Event sync failed", e) }
+            }
+            val tasks = async {
+                runCatching { taskRepository.sync(calendarHrefs) }
+                    .onFailure { e -> Log.e(TAG, "Task sync failed", e) }
+            }
+            val notes = async {
+                runCatching { noteRepository.sync(calendarHrefs) }
+                    .onFailure { e -> Log.e(TAG, "Note sync failed", e) }
+            }
             val issues = async {
-                if (giteaRepos.isNotEmpty()) issueRepository.sync(giteaRepos)
+                if (giteaRepos.isNotEmpty()) {
+                    runCatching { issueRepository.sync(giteaRepos) }
+                        .onFailure { e -> Log.e(TAG, "Issue sync failed", e) }
+                }
             }
             events.await()
             tasks.await()
@@ -64,21 +80,29 @@ class SyncWorker @AssistedInject constructor(
             issues.await()
         }
 
-        // Reschedule event alarms
-        val upcomingEvents = eventRepository.getUpcoming(limit = 50)
-        alarmScheduler.rescheduleAll(upcomingEvents)
+        // Always reschedule alarms regardless of whether syncs succeeded
+        runCatching {
+            val upcoming = eventRepository.getUpcoming(limit = 50)
+            alarmScheduler.rescheduleAll(upcoming)
+        }.onFailure { e -> Log.e(TAG, "Event alarm reschedule failed", e) }
 
-        // Update Glance widget state
-        updateWidgetState()
+        runCatching {
+            val (notifEnabled, minutesBefore) = prefs.notificationsFlow.first()
+            if (notifEnabled) {
+                val dueTasks = taskRepository.getDueSoon(Long.MAX_VALUE, 200)
+                taskAlarmScheduler.rescheduleAll(dueTasks, minutesBefore)
+            }
+        }.onFailure { e -> Log.e(TAG, "Task alarm reschedule failed", e) }
 
-        // Persist last sync timestamp
-        prefs.setLastSync(System.currentTimeMillis())
-    }.fold(
-        onSuccess = { Result.success() },
-        onFailure = { e ->
-            if (runAttemptCount < 2) Result.retry() else Result.failure()
-        }
-    )
+        // Always update widget and persist timestamp — this is the only way the user
+        // sees that a sync cycle ran, even if all network calls returned errors.
+        runCatching {
+            updateWidgetState()
+            prefs.setLastSync(System.currentTimeMillis())
+        }.onFailure { e -> Log.e(TAG, "Widget/lastSync update failed", e) }
+
+        return Result.success()
+    }
 
     private fun selectedCalendarHrefs(): List<String> {
         val raw = secureStore.get(CredentialKey.CALDAV_SELECTED_CALENDARS) ?: return emptyList()
@@ -135,6 +159,7 @@ class SyncWorker @AssistedInject constructor(
     }
 
     companion object {
+        private const val TAG = "SyncWorker"
         const val WORK_NAME_PERIODIC = "sync_periodic"
         const val WORK_NAME_ONCE = "sync_once"
 
@@ -146,9 +171,10 @@ class SyncWorker @AssistedInject constructor(
                 .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
                 .build()
 
+        // No network constraint: an explicit "Sync Now" tap should run immediately.
+        // Each repository sync handles its own errors gracefully.
         fun oneTimeRequest(): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<SyncWorker>()
-                .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
                 .build()
     }
 }

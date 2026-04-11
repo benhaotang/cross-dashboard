@@ -9,29 +9,25 @@ import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.crossdashboard.app.CrossDashboardApp.Companion.CHANNEL_EVENTS
+import com.crossdashboard.app.CrossDashboardApp.Companion.CHANNEL_TASKS
 import com.crossdashboard.app.MainActivity
 import com.crossdashboard.app.R
 
 /**
- * Fires an event reminder notification when an exact alarm triggers.
+ * Fires a task due-time reminder notification when an exact alarm triggers.
  *
- * Alarm types:
- * - [TYPE_AT_TIME]: "Starting now [at location]"
- * - [TYPE_REMIND_BEFORE]: "In N minutes [at location]"
- *
- * Tapping the notification deep-links to `crossdashboard://events?uid={uid}`,
- * which [MainActivity] routes to the event detail screen.
+ * The alarm is scheduled by [TaskAlarmScheduler] a configurable number of
+ * minutes before the task's due time. Tapping the notification deep-links to
+ * `crossdashboard://tasks?uid={uid}`, which [MainActivity] routes to the task
+ * detail pane via [Destination.TaskDetail].
  */
-class EventAlarmReceiver : BroadcastReceiver() {
+class TaskAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_ALARM) return
 
         val uid = intent.getStringExtra(EXTRA_UID) ?: ""
         val summary = intent.getStringExtra(EXTRA_SUMMARY) ?: return
-        val location = intent.getStringExtra(EXTRA_LOCATION)
-        val type = intent.getStringExtra(EXTRA_TYPE) ?: TYPE_AT_TIME
         val minutesBefore = intent.getIntExtra(EXTRA_MINUTES_BEFORE, 0)
         val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, System.currentTimeMillis().toInt())
 
@@ -39,21 +35,24 @@ class EventAlarmReceiver : BroadcastReceiver() {
             != PackageManager.PERMISSION_GRANTED
         ) return
 
-        val bodyText = buildBody(type, minutesBefore, location)
+        val bodyText = if (minutesBefore > 0) {
+            context.getString(R.string.task_reminder_due_in, minutesBefore)
+        } else {
+            context.getString(R.string.task_reminder_due_now)
+        }
 
-        // Tap → open the app and navigate directly to this event's detail
         val contentIntent = PendingIntent.getActivity(
             context,
             notifId,
             Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                data = Uri.parse("crossdashboard://events?uid=${Uri.encode(uid)}")
+                data = Uri.parse("crossdashboard://tasks?uid=${Uri.encode(uid)}")
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_EVENTS)
+        val notification = NotificationCompat.Builder(context, CHANNEL_TASKS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(summary)
             .setContentText(bodyText)
@@ -66,23 +65,11 @@ class EventAlarmReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(context).notify(notifId, notification)
     }
 
-    private fun buildBody(type: String, minutesBefore: Int, location: String?): String {
-        val locationSuffix = if (!location.isNullOrBlank()) " at $location" else ""
-        return when (type) {
-            TYPE_REMIND_BEFORE -> "In $minutesBefore minutes$locationSuffix"
-            else -> "Starting now$locationSuffix"
-        }
-    }
-
     companion object {
-        const val ACTION_ALARM = "com.crossdashboard.app.EVENT_ALARM"
+        const val ACTION_ALARM = "com.crossdashboard.app.TASK_ALARM"
         const val EXTRA_UID = "uid"
         const val EXTRA_SUMMARY = "summary"
-        const val EXTRA_LOCATION = "location"
-        const val EXTRA_TYPE = "type"
         const val EXTRA_MINUTES_BEFORE = "minutes_before"
         const val EXTRA_NOTIF_ID = "notif_id"
-        const val TYPE_AT_TIME = "at_time"
-        const val TYPE_REMIND_BEFORE = "remind_before"
     }
 }

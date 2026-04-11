@@ -35,11 +35,27 @@ import java.time.temporal.ChronoUnit
 fun EventsScreen(
     onNavigate: (Destination) -> Unit = {},
     colorResolver: CalendarColorResolver? = null,
+    initialUid: String? = null,
     viewModel: EventsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val navigator = rememberListDetailPaneScaffoldNavigator<CalendarEvent>()
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    var selectedEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     val scope = rememberCoroutineScope()
+
+    // When opened via a notification tap, auto-navigate the detail pane to the target event.
+    // Runs whenever events load or the uid changes; the flag prevents double-navigation.
+    var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
+    LaunchedEffect(initialUid, state.events) {
+        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.events.isNotEmpty()) {
+            val target = state.events.find { it.uid == initialUid }
+            if (target != null) {
+                selectedEvent = target
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
+                initialNavigationDone = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -109,9 +125,10 @@ fun EventsScreen(
                                     EventListRow(
                                         event = event,
                                         colorResolver = colorResolver,
-                        isSelected = navigator.currentDestination?.contentKey?.uid == event.uid,
+                        isSelected = navigator.currentDestination?.contentKey == event.uid,
                                     onClick = {
-                                        scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, event) }
+                                        selectedEvent = event
+                                        scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, event.uid) }
                                     },
                                     )
                                 }
@@ -122,11 +139,11 @@ fun EventsScreen(
             },
             detailPane = {
                 AnimatedPane {
-                    val selectedEvent = navigator.currentDestination?.contentKey
-                    if (selectedEvent != null) {
+                    val event = selectedEvent
+                    if (event != null) {
                         // Inline detail pane for tablet/Expanded — no bottom sheet
                         EventDetailContent(
-                            event = selectedEvent,
+                            event = event,
                             colorResolver = colorResolver,
                         )
                     } else {
@@ -146,7 +163,7 @@ fun EventsScreen(
     // Phone: show bottom sheet when detail pane is active but scaffold is single-pane
     val selectedEventForSheet = if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] ==
         androidx.compose.material3.adaptive.layout.PaneAdaptedValue.Hidden
-    ) navigator.currentDestination?.contentKey else null
+    ) selectedEvent else null
 
     selectedEventForSheet?.let { event ->
         EventPropertySheet(

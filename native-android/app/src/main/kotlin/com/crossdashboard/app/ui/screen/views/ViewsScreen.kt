@@ -59,8 +59,8 @@ fun ViewsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* open assign modal with no pre-selected item */ },
-                modifier = Modifier.semantics { contentDescription = "Assign item to column" },
+                onClick = vm::openBulkAssign,
+                modifier = Modifier.semantics { contentDescription = "Assign items to column" },
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
             }
@@ -102,8 +102,18 @@ fun ViewsScreen(
 
             // ── Board content ─────────────────────────────────────────────────
             when (state.viewMode) {
-                ViewMode.KANBAN -> KanbanBoard(state = state, onAssign = vm::openAssign, onRemove = vm::removeTag)
-                ViewMode.COVEY -> CoveyBoard(state = state, onAssign = vm::openAssign, onRemove = vm::removeTag)
+                ViewMode.KANBAN -> KanbanBoard(
+                    state = state,
+                    onAssign = vm::openAssign,
+                    onRemove = vm::removeTag,
+                    onBulkAssign = vm::openBulkAssign,
+                )
+                ViewMode.COVEY -> CoveyBoard(
+                    state = state,
+                    onAssign = vm::openAssign,
+                    onRemove = vm::removeTag,
+                    onBulkAssign = vm::openBulkAssign,
+                )
             }
         }
     }
@@ -121,6 +131,22 @@ fun ViewsScreen(
                 ViewMode.COVEY -> CoveyTag.ALL
             }) },
             onDismiss = vm::closeAssign,
+        )
+    }
+
+    // ── Bulk assign modal (FAB / per-column + button) ─────────────────────────
+    state.bulkAssignTarget?.let { target ->
+        val allTargets = when (state.viewMode) {
+            ViewMode.KANBAN -> state.kanbanColumns
+            ViewMode.COVEY -> CoveyTag.ALL
+        }
+        BulkAssignModal(
+            target = target,
+            availableTargets = allTargets,
+            items = state.items,
+            onTargetChange = vm::setBulkAssignTarget,
+            onAssignItem = { item -> vm.assignTagFromBulk(item, target) },
+            onDismiss = vm::closeBulkAssign,
         )
     }
 
@@ -151,6 +177,7 @@ private fun KanbanBoard(
     state: ViewsUiState,
     onAssign: (ViewItem) -> Unit,
     onRemove: (ViewItem, String) -> Unit,
+    onBulkAssign: (String) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -172,6 +199,7 @@ private fun KanbanBoard(
                 columnTag = null,
                 onAssign = onAssign,
                 onRemove = onRemove,
+                onBulkAssign = null,
             )
         }
 
@@ -184,6 +212,7 @@ private fun KanbanBoard(
                 columnTag = col,
                 onAssign = onAssign,
                 onRemove = onRemove,
+                onBulkAssign = { onBulkAssign(col) },
             )
         }
     }
@@ -196,6 +225,7 @@ private fun KanbanColumn(
     columnTag: String?,
     onAssign: (ViewItem) -> Unit,
     onRemove: (ViewItem, String) -> Unit,
+    onBulkAssign: (() -> Unit)?,
 ) {
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
     val itemWord = if (items.size == 1) "item" else "items"
@@ -214,20 +244,41 @@ private fun KanbanColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(headerColor, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "${items.size}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${items.size}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (onBulkAssign != null) {
+                IconButton(
+                    onClick = onBulkAssign,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .semantics { contentDescription = "Add items to $title" },
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
 
         LazyColumn(
@@ -266,6 +317,7 @@ private fun CoveyBoard(
     state: ViewsUiState,
     onAssign: (ViewItem) -> Unit,
     onRemove: (ViewItem, String) -> Unit,
+    onBulkAssign: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -282,6 +334,7 @@ private fun CoveyBoard(
                 items = state.items.filter { CoveyTag.DO in it.labels },
                 onAssign = onAssign,
                 onRemove = { item -> onRemove(item, CoveyTag.DO) },
+                onBulkAssign = { onBulkAssign(CoveyTag.DO) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
             )
@@ -290,6 +343,7 @@ private fun CoveyBoard(
                 items = state.items.filter { CoveyTag.DELAY in it.labels },
                 onAssign = onAssign,
                 onRemove = { item -> onRemove(item, CoveyTag.DELAY) },
+                onBulkAssign = { onBulkAssign(CoveyTag.DELAY) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
             )
@@ -303,6 +357,7 @@ private fun CoveyBoard(
                 items = state.items.filter { CoveyTag.DELEGATE in it.labels },
                 onAssign = onAssign,
                 onRemove = { item -> onRemove(item, CoveyTag.DELEGATE) },
+                onBulkAssign = { onBulkAssign(CoveyTag.DELEGATE) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f),
             )
@@ -311,6 +366,7 @@ private fun CoveyBoard(
                 items = state.items.filter { CoveyTag.ELIMINATE in it.labels },
                 onAssign = onAssign,
                 onRemove = { item -> onRemove(item, CoveyTag.ELIMINATE) },
+                onBulkAssign = { onBulkAssign(CoveyTag.ELIMINATE) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             )
@@ -324,6 +380,7 @@ private fun CoveyQuadrantCell(
     items: List<ViewItem>,
     onAssign: (ViewItem) -> Unit,
     onRemove: (ViewItem) -> Unit,
+    onBulkAssign: () -> Unit,
     modifier: Modifier = Modifier,
     containerColor: androidx.compose.ui.graphics.Color,
 ) {
@@ -333,13 +390,35 @@ private fun CoveyQuadrantCell(
             .clip(RoundedCornerShape(12.dp))
             .background(containerColor)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            .padding(8.dp)
+            .padding(horizontal = 8.dp)
+            .padding(bottom = 8.dp)
             .semantics {
                 contentDescription = "${quadrant.label} quadrant: ${quadrant.description}, ${items.size} $itemWord"
             },
     ) {
-        Text(quadrant.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text(quadrant.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+                Text(quadrant.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(quadrant.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(
+                onClick = onBulkAssign,
+                modifier = Modifier
+                    .size(32.dp)
+                    .semantics { contentDescription = "Add items to ${quadrant.label}" },
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Spacer(Modifier.height(4.dp))
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
@@ -464,6 +543,150 @@ private fun AssignModal(
                     )
                     if (isSelected) {
                         Icon(Icons.Outlined.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Bulk assign modal ────────────────────────────────────────────────────────
+
+/**
+ * RN-style "Assign Items" bottom sheet: choose destination at the top, then tap
+ * any item from the list of items not already in that destination to assign it.
+ * The sheet stays open after each assignment so you can batch-assign.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BulkAssignModal(
+    target: String,
+    availableTargets: List<String>,
+    items: List<ViewItem>,
+    onTargetChange: (String) -> Unit,
+    onAssignItem: (ViewItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Items not yet assigned to the currently selected destination
+    val assignableItems = remember(items, target) {
+        items.filter { target !in it.labels }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.semantics { contentDescription = "Assign items" },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Assign Items", style = MaterialTheme.typography.titleMedium)
+
+            // ── Destination selector ──────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Move to:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    availableTargets.forEach { tag ->
+                        val displayName = tag.replaceFirstChar { it.uppercaseChar() }
+                        FilterChip(
+                            selected = tag == target,
+                            onClick = { onTargetChange(tag) },
+                            label = { Text(displayName) },
+                            modifier = Modifier.semantics {
+                                contentDescription = displayName
+                                stateDescription = if (tag == target) "selected" else "not selected"
+                            },
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // ── Item list ─────────────────────────────────────────────────────
+            if (assignableItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "All items are already in ${target.replaceFirstChar { it.uppercaseChar() }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Text(
+                    "${assignableItems.size} item${if (assignableItems.size == 1) "" else "s"} not in ${target.replaceFirstChar { it.uppercaseChar() }}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(assignableItems, key = { it.key }) { item ->
+                        val zone = ZoneId.systemDefault()
+                        val typeDesc = if (item.isTask) "Task" else "Issue"
+                        val dueDesc = item.due?.let { ", due ${it.atZone(zone).format(DATE_FMT)}" } ?: ""
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAssignItem(item) }
+                                .semantics {
+                                    contentDescription = "$typeDesc: ${item.title}$dueDesc. Tap to assign to ${target.replaceFirstChar { it.uppercaseChar() }}"
+                                },
+                            shape = RoundedCornerShape(8.dp),
+                            tonalElevation = 1.dp,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    if (item.isTask) Icons.Outlined.CheckBoxOutlineBlank else Icons.Outlined.BugReport,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                                    item.due?.let { due ->
+                                        Text(
+                                            due.atZone(zone).format(DATE_FMT),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (item.priority in 1..4) {
+                                        Text("⚑ High", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                     }
                 }
             }

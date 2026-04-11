@@ -28,7 +28,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class NextcloudSsoHelper @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     fun isNextcloudAppInstalled(): Boolean {
         return try {
@@ -75,6 +75,7 @@ class NextcloudSsoHelper @Inject constructor(
                     .let { it.javaClass.getMethod("getAccountTypes").invoke(it) as Array<String> }
             }.getOrElse { arrayOf("nextcloud") }
 
+            @Suppress("DEPRECATION")
             AccountManager.newChooseAccountIntent(
                 null, null, accountTypes,
                 true, null, "SSO", null, null,

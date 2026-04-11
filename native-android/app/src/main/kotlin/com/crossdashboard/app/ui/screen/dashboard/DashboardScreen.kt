@@ -30,9 +30,7 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            DashboardTopBar(onRefresh = {
-                // Will be injected properly; WorkManager ref obtained from context
-            })
+            DashboardTopBar(onRefresh = viewModel::syncNow)
         },
     ) { paddingValues ->
         LazyColumn(

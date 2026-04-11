@@ -33,7 +33,8 @@ fun IssuesScreen(
     viewModel: IssuesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val navigator = rememberListDetailPaneScaffoldNavigator<GiteaIssue>()
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    var selectedIssue by remember { mutableStateOf<GiteaIssue?>(null) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -104,11 +105,12 @@ fun IssuesScreen(
                                 items(state.issues, key = { it.id }) { issue ->
                                     IssueListRow(
                                         issue = issue,
-                        isSelected = navigator.currentDestination?.contentKey?.id == issue.id,
+                        isSelected = navigator.currentDestination?.contentKey == issue.id.toString(),
                                     onClick = {
+                                        selectedIssue = issue
                                         viewModel.loadComments(issue)
                                         scope.launch {
-                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue)
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue.id.toString())
                                         }
                                     },
                                     )
@@ -120,24 +122,24 @@ fun IssuesScreen(
             },
             detailPane = {
                 AnimatedPane {
-                    val selectedIssue = navigator.currentDestination?.contentKey
-                    if (selectedIssue != null) {
-                        val comments = state.comments[selectedIssue.id] ?: emptyList()
-                        val commentLoading = selectedIssue.id in state.commentLoading
+                    val issue = selectedIssue
+                    if (issue != null) {
+                        val comments = state.comments[issue.id] ?: emptyList()
+                        val commentLoading = issue.id in state.commentLoading
                         IssueDetailContent(
-                            issue = selectedIssue,
+                            issue = issue,
                             comments = comments,
                             commentLoading = commentLoading,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
                             onSave = { title, body ->
-                                viewModel.saveIssue(selectedIssue, title, body)
+                                viewModel.saveIssue(issue, title, body)
                                 scope.launch { navigator.navigateBack() }
                             },
                             onToggleState = {
-                                viewModel.toggleState(selectedIssue)
+                                viewModel.toggleState(issue)
                                 scope.launch { navigator.navigateBack() }
                             },
-                            onAddComment = { body -> viewModel.addComment(selectedIssue, body) },
+                            onAddComment = { body -> viewModel.addComment(issue, body) },
                         )
                     } else {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -156,7 +158,7 @@ fun IssuesScreen(
     // Phone: show bottom sheet when detail pane is hidden (single-pane)
     val selectedIssueForSheet =
         if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] == PaneAdaptedValue.Hidden)
-            navigator.currentDestination?.contentKey
+            selectedIssue
         else null
 
     selectedIssueForSheet?.let { issue ->

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -70,6 +71,11 @@
             android:name=".alarm.EventAlarmReceiver"
             android:exported="false" />
 
+        <!-- Task due-time reminder receiver -->
+        <receiver
+            android:name=".alarm.TaskAlarmReceiver"
+            android:exported="false" />
+
         <!-- Boot + package replace → reschedule alarms -->
         <receiver
             android:name=".receiver.BootReceiver"
@@ -100,8 +106,7 @@
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"
-                tools:node="remove"
-                xmlns:tools="http://schemas.android.com/tools" />
+                tools:node="remove" />
         </provider>
 
     </application>

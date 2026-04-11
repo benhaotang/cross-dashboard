@@ -2,6 +2,8 @@ package com.crossdashboard.app.ui.screen.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.repository.EventRepository
 import com.crossdashboard.app.data.repository.IssueRepository
@@ -10,6 +12,7 @@ import com.crossdashboard.app.data.repository.TaskRepository
 import com.crossdashboard.app.domain.model.CalendarEvent
 import com.crossdashboard.app.domain.model.CalDavTask
 import com.crossdashboard.app.domain.model.DailyStats
+import com.crossdashboard.app.worker.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -46,6 +49,7 @@ class DashboardViewModel @Inject constructor(
     private val issueRepo: IssueRepository,
     private val statsRepo: StatsRepository,
     private val prefs: AppPreferences,
+    private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardUiState())
@@ -87,6 +91,14 @@ class DashboardViewModel @Inject constructor(
                 refreshStats()
             }
         }
+    }
+
+    fun syncNow() {
+        workManager.enqueueUniqueWork(
+            SyncWorker.WORK_NAME_ONCE,
+            ExistingWorkPolicy.REPLACE,
+            SyncWorker.oneTimeRequest(),
+        )
     }
 
     private suspend fun refreshStats() {

@@ -42,8 +42,13 @@ data class ViewsUiState(
     val items: List<ViewItem> = emptyList(),
     val kanbanColumns: List<String> = DEFAULT_KANBAN_COLUMNS,
     val viewMode: ViewMode = ViewMode.KANBAN,
-    /** When non-null, the assign modal is shown for this item */
+    /** When non-null, the assign modal is shown for this item (tap-card flow) */
     val assigningItem: ViewItem? = null,
+    /**
+     * When non-null, the bulk assign modal is open; value is the currently selected
+     * destination column/quadrant tag. The modal lists all items not yet in that destination.
+     */
+    val bulkAssignTarget: String? = null,
     /** Editable column name list shown in the config modal */
     val editingColumns: List<String>? = null,
     val isLoading: Boolean = false,
@@ -153,6 +158,49 @@ class ViewsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }
+        }
+    }
+
+    // ─── Bulk assign modal (FAB / per-column + button flow) ───────────────────
+
+    /**
+     * Open the bulk assign modal pre-targeted at [targetTag]. If null, defaults to the
+     * first kanban column (or first Covey quadrant when in Covey mode).
+     */
+    fun openBulkAssign(targetTag: String? = null) {
+        val s = _state.value
+        val target = targetTag ?: when (s.viewMode) {
+            ViewMode.KANBAN -> s.kanbanColumns.firstOrNull()
+            ViewMode.COVEY -> CoveyTag.ALL.first()
+        } ?: return
+        _state.update { it.copy(bulkAssignTarget = target) }
+    }
+
+    fun closeBulkAssign() = _state.update { it.copy(bulkAssignTarget = null) }
+
+    fun setBulkAssignTarget(tag: String) = _state.update { it.copy(bulkAssignTarget = tag) }
+
+    /**
+     * Assign [tag] to [item] without closing the bulk assign modal, so the user can
+     * keep assigning additional items in the same session.
+     */
+    fun assignTagFromBulk(item: ViewItem, tag: String) {
+        viewModelScope.launch {
+            val exclusiveSet = when (_state.value.viewMode) {
+                ViewMode.KANBAN -> _state.value.kanbanColumns
+                ViewMode.COVEY -> CoveyTag.ALL
+            }
+            val newLabels = item.labels.filterNot { it in exclusiveSet }.plus(tag)
+            try {
+                if (item.isTask && item.taskRef != null) {
+                    taskRepo.update(item.taskRef.copy(categories = newLabels))
+                } else if (!item.isTask && item.issueRef != null) {
+                    issueRepo.replaceLabels(item.issueRef.repository, item.issueRef.number, newLabels)
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+            // Modal intentionally stays open for batch assignment
         }
     }
 
