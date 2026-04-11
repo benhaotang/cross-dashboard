@@ -146,7 +146,9 @@ class CalDavClient @Inject constructor(
             ?: throw IOException("No href for task ${task.uid}")
 
         val ical = ICalParser.serializeTask(task)
-        put(url, ical, task.etag)
+        // Unconditional PUT — no If-Match — matching the RN behaviour and avoiding
+        // 412 Precondition Failed when the cached ETag is stale.
+        put(url, ical, etag = null)
     }
 
     suspend fun deleteTask(task: CalDavTask): Unit = withContext(Dispatchers.IO) {
@@ -174,7 +176,7 @@ class CalDavClient @Inject constructor(
 
     suspend fun updateNote(note: Note): Unit = withContext(Dispatchers.IO) {
         val url = resolveHref(note.href, note.uid, note.calendarHref)
-        put(url, ICalParser.serializeNote(note), note.etag)
+        put(url, ICalParser.serializeNote(note), etag = null)
     }
 
     suspend fun deleteNote(note: Note): Unit = withContext(Dispatchers.IO) {
