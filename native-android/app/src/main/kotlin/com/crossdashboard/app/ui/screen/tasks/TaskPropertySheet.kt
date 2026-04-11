@@ -1,13 +1,20 @@
 package com.crossdashboard.app.ui.screen.tasks
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -15,7 +22,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.CalDavTask
 import com.crossdashboard.app.domain.model.TaskStatus
 import com.crossdashboard.app.ui.component.*
+import com.crossdashboard.app.ui.screen.views.CoveyTag
+import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -206,6 +217,31 @@ private fun TaskReadView(
         }
     }
 
+    // Covey quadrant quick-tags
+    SheetSectionHeader(title = "Quadrant")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(
+            CoveyTag.DO to "Do",
+            CoveyTag.DELAY to "Delay",
+            CoveyTag.DELEGATE to "Delegate",
+            CoveyTag.ELIMINATE to "Eliminate",
+        ).forEach { (tag, label) ->
+            TagChip(
+                label = label,
+                selected = tag in task.categories,
+                onClick = {}, // read-only; edit mode handles mutation
+            )
+        }
+    }
+
     // Subtasks
     if (subtasks.isNotEmpty()) {
         SheetSectionHeader(title = "Subtasks")
@@ -254,6 +290,7 @@ private fun TaskReadView(
 
 // ─── Edit form ────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskEditForm(
     task: CalDavTask,
@@ -262,7 +299,10 @@ private fun TaskEditForm(
     onSave: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val zone = ZoneId.systemDefault()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.padding(horizontal = 20.dp),
@@ -284,7 +324,61 @@ private fun TaskEditForm(
             maxLines = 6,
         )
 
-        // Priority selector
+        // ── Due date / time ───────────────────────────────────────────────────
+        Text(
+            text = "Due",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val dueZoned = task.due?.atZone(zone)
+            // Date button
+            OutlinedButton(
+                onClick = { showDatePicker = true },
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics {
+                        contentDescription = if (dueZoned != null)
+                            "Due date: ${dueZoned.format(DateTimeFormatter.ofPattern("d MMM yyyy"))}, tap to change"
+                        else "No due date, tap to set"
+                    },
+            ) {
+                Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = dueZoned?.format(DateTimeFormatter.ofPattern("d MMM yyyy")) ?: "Set date",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            // Time button — only shown once a date is chosen
+            if (dueZoned != null) {
+                OutlinedButton(
+                    onClick = { showTimePicker = true },
+                    modifier = Modifier.semantics {
+                        contentDescription = "Due time: ${dueZoned.format(DateTimeFormatter.ofPattern("HH:mm"))}, tap to change"
+                    },
+                ) {
+                    Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = dueZoned.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+                // Clear due date
+                IconButton(
+                    onClick = { onTaskChange(task.copy(due = null)) },
+                    modifier = Modifier.semantics { contentDescription = "Clear due date" },
+                ) {
+                    Icon(Icons.Outlined.Clear, contentDescription = null)
+                }
+            }
+        }
+
+        // ── Priority selector ─────────────────────────────────────────────────
         Text(
             text = "Priority",
             style = MaterialTheme.typography.labelMedium,
@@ -306,7 +400,7 @@ private fun TaskEditForm(
             }
         }
 
-        // Kanban quick-tags
+        // ── Kanban quick-tags ─────────────────────────────────────────────────
         val effectiveColumns = kanbanColumns.ifEmpty {
             listOf("backlog", "planned", "inprogress", "done")
         }
@@ -317,7 +411,9 @@ private fun TaskEditForm(
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
         ) {
             effectiveColumns.forEach { col ->
                 val isSelected = col in task.categories
@@ -333,6 +429,41 @@ private fun TaskEditForm(
                         onTaskChange(task.copy(categories = updated))
                     },
                     label = { Text(col, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+        }
+
+        // ── Covey quadrant tags ───────────────────────────────────────────────
+        Text(
+            text = "Quadrant",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            listOf(
+                CoveyTag.DO to "Do",
+                CoveyTag.DELAY to "Delay",
+                CoveyTag.DELEGATE to "Delegate",
+                CoveyTag.ELIMINATE to "Eliminate",
+            ).forEach { (tag, label) ->
+                val isSelected = tag in task.categories
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        val updated = if (isSelected) {
+                            task.categories - tag
+                        } else {
+                            // Mutual exclusivity within quadrant tags
+                            (task.categories - CoveyTag.ALL.toSet()) + tag
+                        }
+                        onTaskChange(task.copy(categories = updated))
+                    },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }
@@ -361,6 +492,75 @@ private fun TaskEditForm(
         }
     }
 
+    // ── Date picker dialog ────────────────────────────────────────────────────
+    if (showDatePicker) {
+        // Convert existing due Instant → UTC-midnight millis for the date picker
+        val initialMillis = task.due
+            ?.atZone(zone)?.toLocalDate()
+            ?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+            ?: System.currentTimeMillis()
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        // Interpret the picker's UTC-date millis as a local date
+                        val pickedDate = LocalDate.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
+                        // Preserve the existing time-of-day if available, else default to 09:00
+                        val existingZoned = task.due?.atZone(zone)
+                        val hour = existingZoned?.hour ?: 9
+                        val minute = existingZoned?.minute ?: 0
+                        val newInstant = pickedDate.atTime(hour, minute)
+                            .atZone(zone).toInstant()
+                        onTaskChange(task.copy(due = newInstant))
+                        showTimePicker = true
+                    }
+                }) { Text("Next") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // ── Time picker dialog ────────────────────────────────────────────────────
+    if (showTimePicker) {
+        val dueZoned = task.due?.atZone(zone)
+        val timePickerState = rememberTimePickerState(
+            initialHour = dueZoned?.hour ?: 9,
+            initialMinute = dueZoned?.minute ?: 0,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Set time") },
+            text = {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTimePicker = false
+                    val baseDate = task.due?.atZone(zone)?.toLocalDate()
+                        ?: LocalDate.now(zone)
+                    val newInstant = baseDate
+                        .atTime(timePickerState.hour, timePickerState.minute)
+                        .atZone(zone).toInstant()
+                    onTaskChange(task.copy(due = newInstant))
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    // ── Delete confirmation dialog ────────────────────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
