@@ -52,6 +52,7 @@ class EventAlarmScheduler @Inject constructor(
             setAlarm(
                 alarmId = baseId,
                 triggerMs = startMs,
+                uid = event.uid,
                 summary = event.summary,
                 location = event.location,
                 type = TYPE_AT_TIME,
@@ -64,6 +65,7 @@ class EventAlarmScheduler @Inject constructor(
             setAlarm(
                 alarmId = baseId + 100_000,
                 triggerMs = remindMs,
+                uid = event.uid,
                 summary = event.summary,
                 location = event.location,
                 type = TYPE_REMIND_BEFORE,
@@ -75,12 +77,13 @@ class EventAlarmScheduler @Inject constructor(
     private fun setAlarm(
         alarmId: Int,
         triggerMs: Long,
+        uid: String,
         summary: String,
         location: String?,
         type: String,
         minutesBefore: Int,
     ) {
-        val pi = buildPendingIntent(alarmId, summary, location, type, minutesBefore)
+        val pi = buildPendingIntent(alarmId, uid, summary, location, type, minutesBefore)
         runCatching {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
         }
@@ -89,13 +92,15 @@ class EventAlarmScheduler @Inject constructor(
     fun cancel(uid: String) {
         val baseId = Math.abs(uid.hashCode()) % 100_000
         listOf(baseId, baseId + 100_000).forEach { alarmId ->
-            val pi = buildPendingIntent(alarmId, "", null, TYPE_AT_TIME, 0)
+            // Extras are not used for PendingIntent matching — empty values are safe here
+            val pi = buildPendingIntent(alarmId, uid, "", null, TYPE_AT_TIME, 0)
             alarmManager.cancel(pi)
         }
     }
 
     private fun buildPendingIntent(
         alarmId: Int,
+        uid: String,
         summary: String,
         location: String?,
         type: String,
@@ -103,6 +108,7 @@ class EventAlarmScheduler @Inject constructor(
     ): PendingIntent {
         val intent = Intent(context, EventAlarmReceiver::class.java).apply {
             action = EventAlarmReceiver.ACTION_ALARM
+            putExtra(EventAlarmReceiver.EXTRA_UID, uid)
             putExtra(EventAlarmReceiver.EXTRA_SUMMARY, summary)
             putExtra(EventAlarmReceiver.EXTRA_LOCATION, location)
             putExtra(EventAlarmReceiver.EXTRA_TYPE, type)

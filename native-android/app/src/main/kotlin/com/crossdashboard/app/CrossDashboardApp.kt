@@ -62,6 +62,13 @@ class CrossDashboardApp : Application(), Configuration.Provider {
                     description = getString(R.string.channel_events_desc)
                 },
                 NotificationChannel(
+                    CHANNEL_TASKS,
+                    getString(R.string.channel_tasks_name),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = getString(R.string.channel_tasks_desc)
+                },
+                NotificationChannel(
                     CHANNEL_SYNC,
                     getString(R.string.channel_sync_name),
                     NotificationManager.IMPORTANCE_LOW,
@@ -76,6 +83,7 @@ class CrossDashboardApp : Application(), Configuration.Provider {
     companion object {
         const val CHANNEL_POMODORO = "pomodoro"
         const val CHANNEL_EVENTS = "event_reminders"
+        const val CHANNEL_TASKS = "task_reminders"
         const val CHANNEL_SYNC = "sync_status"
     }
 }

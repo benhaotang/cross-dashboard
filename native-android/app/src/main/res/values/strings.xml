@@ -29,6 +29,11 @@
     <string name="widget_add_task">Add task</string>
     <string name="widget_last_sync">Synced %1$s</string>
 
+    <string name="channel_tasks_name">Task Reminders</string>
+    <string name="channel_tasks_desc">Notifications for upcoming task due times</string>
+    <string name="task_reminder_due_in">Due in %1$d minutes</string>
+    <string name="task_reminder_due_now">Due now</string>
+
     <!-- Pomodoro -->
     <string name="pomodoro_work">Focus</string>
     <string name="pomodoro_short_break">Short break</string>

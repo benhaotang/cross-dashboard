@@ -69,6 +69,7 @@ fun TasksScreenContent(
     onNavigate: (Destination) -> Unit = {},
     pendingAction: String? = null,
     colorResolver: CalendarColorResolver? = null,
+    initialUid: String? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -76,12 +77,24 @@ fun TasksScreenContent(
     val navigator = rememberListDetailPaneScaffoldNavigator<CalDavTask>()
     val scope = rememberCoroutineScope()
 
-    // Handle deep link auto-focus
+    // Handle deep link auto-focus (widget add-task shortcut)
     LaunchedEffect(pendingAction) {
         if (pendingAction == "add_task") {
             viewModel.setAutoFocus(true)
             delay(300)
             runCatching { focusRequester.requestFocus() }
+        }
+    }
+
+    // Handle task-reminder notification tap: auto-open the detail pane for the target task
+    var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
+    LaunchedEffect(initialUid, state.rootTasks) {
+        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.rootTasks.isNotEmpty()) {
+            val target = state.rootTasks.find { it.uid == initialUid }
+            if (target != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target)
+                initialNavigationDone = true
+            }
         }
     }
 

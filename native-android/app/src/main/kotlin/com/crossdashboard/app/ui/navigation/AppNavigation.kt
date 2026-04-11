@@ -54,6 +54,30 @@ fun AppNavigation(
     val backStack = rememberNavBackStack(Destination.Dashboard)
     val currentDestination = backStack.lastOrNull() ?: Destination.Dashboard
 
+    // Handle notification-tap deep links that need to navigate to a specific item.
+    LaunchedEffect(pendingAction) {
+        when {
+            pendingAction?.startsWith("events:") == true -> {
+                val uid = pendingAction.removePrefix("events:")
+                while (backStack.count() > 1) backStack.removeLastOrNull()
+                if (backStack.lastOrNull()?.let { it::class } != Destination.Events::class) {
+                    backStack += Destination.Events
+                }
+                backStack += Destination.EventDetail(uid)
+                onActionConsumed()
+            }
+            pendingAction?.startsWith("tasks:") == true -> {
+                val uid = pendingAction.removePrefix("tasks:")
+                while (backStack.count() > 1) backStack.removeLastOrNull()
+                if (backStack.lastOrNull()?.let { it::class } != Destination.Tasks::class) {
+                    backStack += Destination.Tasks
+                }
+                backStack += Destination.TaskDetail(uid)
+                onActionConsumed()
+            }
+        }
+    }
+
     val navItems = ALL_NAV_ITEMS.filter { item ->
         item.destination.screenName() == "Settings" ||
             visibleScreens.contains(item.destination.screenName())
@@ -136,13 +160,14 @@ fun AppNavigation(
                         onNavigate = { backStack += it },
                         pendingAction = null,
                         colorResolver = colorResolver,
+                        initialUid = dest.uid,
                     )
                 }
                 entry<Destination.EventDetail> { dest ->
-                    // Show the events list filtered/highlighted by uid
                     EventsScreen(
                         onNavigate = { backStack += it },
                         colorResolver = colorResolver,
+                        initialUid = dest.uid,
                     )
                 }
                 entry<Destination.IssueDetail> {

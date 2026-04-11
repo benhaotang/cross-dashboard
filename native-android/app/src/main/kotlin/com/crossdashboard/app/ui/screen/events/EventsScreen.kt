@@ -35,11 +35,25 @@ import java.time.temporal.ChronoUnit
 fun EventsScreen(
     onNavigate: (Destination) -> Unit = {},
     colorResolver: CalendarColorResolver? = null,
+    initialUid: String? = null,
     viewModel: EventsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val navigator = rememberListDetailPaneScaffoldNavigator<CalendarEvent>()
     val scope = rememberCoroutineScope()
+
+    // When opened via a notification tap, auto-navigate the detail pane to the target event.
+    // Runs whenever events load or the uid changes; the flag prevents double-navigation.
+    var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
+    LaunchedEffect(initialUid, state.events) {
+        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.events.isNotEmpty()) {
+            val target = state.events.find { it.uid == initialUid }
+            if (target != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target)
+                initialNavigationDone = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {

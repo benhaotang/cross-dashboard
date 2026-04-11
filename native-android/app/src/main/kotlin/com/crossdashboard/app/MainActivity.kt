@@ -80,9 +80,16 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Resolves a deep-link URI to a pending action string.
- * - `crossdashboard://pomodoro` → "pomodoro"  (notification tap)
- * - `crossdashboard://tasks?action=add` → "add"  (widget shortcut)
+ * Resolves a deep-link URI to a pending action string consumed by [CrossDashboardRoot]
+ * and [AppNavigation]:
+ * - `crossdashboard://pomodoro`           → `"pomodoro"`     (Pomodoro notification tap)
+ * - `crossdashboard://events?uid=<uid>`   → `"events:<uid>"` (event alarm notification tap)
+ * - `crossdashboard://tasks?uid=<uid>`    → `"tasks:<uid>"`  (task reminder notification tap)
+ * - `crossdashboard://tasks?action=add`   → `"add"`          (widget add-task shortcut)
  */
-private fun Uri.resolvePendingAction(): String? =
-    if (host == "pomodoro") "pomodoro" else getQueryParameter("action")
+private fun Uri.resolvePendingAction(): String? = when (host) {
+    "pomodoro" -> "pomodoro"
+    "events" -> getQueryParameter("uid")?.let { "events:$it" }
+    "tasks" -> getQueryParameter("uid")?.let { "tasks:$it" } ?: getQueryParameter("action")
+    else -> getQueryParameter("action")
+}

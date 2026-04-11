@@ -5,6 +5,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.crossdashboard.app.alarm.EventAlarmScheduler
+import com.crossdashboard.app.alarm.TaskAlarmScheduler
 import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
@@ -45,6 +46,7 @@ class SyncWorker @AssistedInject constructor(
     private val secureStore: SecureStore,
     private val prefs: AppPreferences,
     private val alarmScheduler: EventAlarmScheduler,
+    private val taskAlarmScheduler: TaskAlarmScheduler,
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -82,7 +84,15 @@ class SyncWorker @AssistedInject constructor(
         runCatching {
             val upcoming = eventRepository.getUpcoming(limit = 50)
             alarmScheduler.rescheduleAll(upcoming)
-        }.onFailure { e -> Log.e(TAG, "Alarm reschedule failed", e) }
+        }.onFailure { e -> Log.e(TAG, "Event alarm reschedule failed", e) }
+
+        runCatching {
+            val (notifEnabled, minutesBefore) = prefs.notificationsFlow.first()
+            if (notifEnabled) {
+                val dueTasks = taskRepository.getDueSoon(Long.MAX_VALUE, 200)
+                taskAlarmScheduler.rescheduleAll(dueTasks, minutesBefore)
+            }
+        }.onFailure { e -> Log.e(TAG, "Task alarm reschedule failed", e) }
 
         // Always update widget and persist timestamp — this is the only way the user
         // sees that a sync cycle ran, even if all network calls returned errors.
