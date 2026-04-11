@@ -20,26 +20,41 @@ object ICalParser {
 
     // ─── Public entry points ─────────────────────────────────────────────────
 
-    fun parseEvents(icalText: String, calendarHref: String? = null): List<CalendarEvent> {
+    fun parseEvents(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<CalendarEvent> {
         val events = mutableListOf<CalendarEvent>()
         forEachComponent(icalText, "VEVENT") { props ->
-            parseEvent(props, calendarHref)?.let { events.add(it) }
+            parseEvent(props, calendarHref, resourceHref, resourceEtag)?.let { events.add(it) }
         }
         return events
     }
 
-    fun parseTasks(icalText: String, calendarHref: String? = null): List<CalDavTask> {
+    fun parseTasks(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<CalDavTask> {
         val tasks = mutableListOf<CalDavTask>()
         forEachComponent(icalText, "VTODO") { props ->
-            parseTask(props, calendarHref)?.let { tasks.add(it) }
+            parseTask(props, calendarHref, resourceHref, resourceEtag)?.let { tasks.add(it) }
         }
         return tasks
     }
 
-    fun parseNotes(icalText: String, calendarHref: String? = null): List<Note> {
+    fun parseNotes(
+        icalText: String,
+        calendarHref: String? = null,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): List<Note> {
         val notes = mutableListOf<Note>()
         forEachComponent(icalText, "VJOURNAL") { props ->
-            parseNote(props, calendarHref)?.let { notes.add(it) }
+            parseNote(props, calendarHref, resourceHref, resourceEtag)?.let { notes.add(it) }
         }
         return notes
     }
@@ -96,7 +111,12 @@ object ICalParser {
 
     // ─── Event parser ─────────────────────────────────────────────────────────
 
-    private fun parseEvent(props: Map<String, String>, calendarHref: String?): CalendarEvent? {
+    private fun parseEvent(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): CalendarEvent? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
         val start = parseDateTime(props, "DTSTART") ?: return null
@@ -111,13 +131,19 @@ object ICalParser {
             description = props["DESCRIPTION"]?.let { unescape(it) },
             location = props["LOCATION"]?.let { unescape(it) },
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
     // ─── Task parser ──────────────────────────────────────────────────────────
 
-    private fun parseTask(props: Map<String, String>, calendarHref: String?): CalDavTask? {
+    private fun parseTask(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): CalDavTask? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
 
@@ -146,13 +172,19 @@ object ICalParser {
             location = props["LOCATION"]?.let { unescape(it) },
             parentUid = parentUid,
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
     // ─── Note (VJOURNAL) parser ───────────────────────────────────────────────
 
-    private fun parseNote(props: Map<String, String>, calendarHref: String?): Note? {
+    private fun parseNote(
+        props: Map<String, String>,
+        calendarHref: String?,
+        resourceHref: String? = null,
+        resourceEtag: String? = null,
+    ): Note? {
         val uid = props["UID"] ?: return null
         val summary = unescape(props["SUMMARY"] ?: return null)
         return Note(
@@ -163,7 +195,8 @@ object ICalParser {
             created = parseDateTime(props, "DTSTAMP") ?: Instant.now(),
             lastModified = parseDateTime(props, "LAST-MODIFIED") ?: Instant.now(),
             calendarHref = calendarHref,
-            etag = props["ETAG"],
+            etag = resourceEtag,
+            href = resourceHref,
         )
     }
 
@@ -175,6 +208,7 @@ object ICalParser {
         appendLine("PRODID:-//CrossDashboard//Native//EN")
         appendLine("BEGIN:VTODO")
         appendLine("UID:${task.uid}")
+        appendLine("DTSTAMP:${formatInstant(Instant.now())}")
         appendLine("SUMMARY:${escape(task.summary)}")
         task.description?.let { appendLine("DESCRIPTION:${escape(it)}") }
         appendLine("STATUS:${task.status.icalValue}")

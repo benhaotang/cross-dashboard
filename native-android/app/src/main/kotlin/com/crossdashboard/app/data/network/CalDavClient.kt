@@ -77,8 +77,9 @@ class CalDavClient @Inject constructor(
             val report = calendarQueryReport(from, to, "VEVENT")
             val response = execute("REPORT", url, report, mapOf("Depth" to "1", "Content-Type" to "application/xml"))
                 ?: continue
-            extractIcalData(response).forEach { ical ->
-                results.addAll(ICalParser.parseEvents(ical, href))
+            extractCalendarResources(response).forEach { resource ->
+                val absHref = resource.href?.let { if (it.startsWith("http")) it else "$server$it" }
+                results.addAll(ICalParser.parseEvents(resource.icalData, href, absHref, resource.etag))
             }
         }
         results
@@ -95,8 +96,9 @@ class CalDavClient @Inject constructor(
             val report = todoQueryReport()
             val response = execute("REPORT", url, report, mapOf("Depth" to "1", "Content-Type" to "application/xml"))
                 ?: continue
-            extractIcalData(response).forEach { ical ->
-                results.addAll(ICalParser.parseTasks(ical, href))
+            extractCalendarResources(response).forEach { resource ->
+                val absHref = resource.href?.let { if (it.startsWith("http")) it else "$server$it" }
+                results.addAll(ICalParser.parseTasks(resource.icalData, href, absHref, resource.etag))
             }
         }
         results
@@ -113,8 +115,9 @@ class CalDavClient @Inject constructor(
             val report = calendarQueryReport(componentType = "VJOURNAL")
             val response = execute("REPORT", url, report, mapOf("Depth" to "1", "Content-Type" to "application/xml"))
                 ?: continue
-            extractIcalData(response).forEach { ical ->
-                results.addAll(ICalParser.parseNotes(ical, href))
+            extractCalendarResources(response).forEach { resource ->
+                val absHref = resource.href?.let { if (it.startsWith("http")) it else "$server$it" }
+                results.addAll(ICalParser.parseNotes(resource.icalData, href, absHref, resource.etag))
             }
         }
         results
@@ -347,12 +350,29 @@ class CalDavClient @Inject constructor(
         return calendars
     }
 
-    private fun extractIcalData(multiStatusXml: String): List<String> {
-        return Regex("""<[^:]*:?calendar-data[^>]*>(.*?)</[^:]*:?calendar-data>""", RegexOption.DOT_MATCHES_ALL)
+    private data class CalendarResource(
+        val href: String?,
+        val etag: String?,
+        val icalData: String,
+    )
+
+    private fun extractCalendarResources(multiStatusXml: String): List<CalendarResource> {
+        val resources = mutableListOf<CalendarResource>()
+        Regex("""<[^:]*:?response\b[^>]*>(.*?)</[^:]*:?response>""", RegexOption.DOT_MATCHES_ALL)
             .findAll(multiStatusXml)
-            .map { it.groupValues[1].trim() }
-            .filter { it.isNotEmpty() }
-            .toList()
+            .forEach { block ->
+                val content = block.groupValues[1]
+                val icalData = Regex(
+                    """<[^:]*:?calendar-data[^>]*>(.*?)</[^:]*:?calendar-data>""",
+                    RegexOption.DOT_MATCHES_ALL,
+                ).find(content)?.groupValues?.get(1)?.trim() ?: return@forEach
+                if (icalData.isEmpty()) return@forEach
+                val href = extractXmlValue(content, "href")
+                // Strip surrounding quotes that some servers include in ETag values
+                val etag = extractXmlValue(content, "getetag")?.trim('"')
+                resources.add(CalendarResource(href, etag, icalData))
+            }
+        return resources
     }
 
     private fun extractXmlValue(xml: String, tag: String): String? {
