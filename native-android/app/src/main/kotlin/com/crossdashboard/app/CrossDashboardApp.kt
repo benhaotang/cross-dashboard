@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import androidx.core.content.getSystemService
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.WorkManager
+import com.crossdashboard.app.worker.SyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -22,6 +25,20 @@ class CrossDashboardApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        ensurePeriodicSyncScheduled()
+    }
+
+    /**
+     * Enqueues the periodic sync worker on every app start with [ExistingPeriodicWorkPolicy.KEEP]
+     * so it is registered on first launch (or after a data clear) without overriding an interval
+     * the user has already configured via Settings (which uses [ExistingPeriodicWorkPolicy.UPDATE]).
+     */
+    private fun ensurePeriodicSyncScheduled() {
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            SyncWorker.WORK_NAME_PERIODIC,
+            ExistingPeriodicWorkPolicy.KEEP,
+            SyncWorker.periodicRequest(60),
+        )
     }
 
     private fun createNotificationChannels() {

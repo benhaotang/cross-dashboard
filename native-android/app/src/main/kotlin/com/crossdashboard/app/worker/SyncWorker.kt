@@ -18,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import android.util.Log
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -76,6 +77,7 @@ class SyncWorker @AssistedInject constructor(
     }.fold(
         onSuccess = { Result.success() },
         onFailure = { e ->
+            Log.e(TAG, "Sync failed (attempt ${runAttemptCount + 1})", e)
             if (runAttemptCount < 2) Result.retry() else Result.failure()
         }
     )
@@ -135,6 +137,7 @@ class SyncWorker @AssistedInject constructor(
     }
 
     companion object {
+        private const val TAG = "SyncWorker"
         const val WORK_NAME_PERIODIC = "sync_periodic"
         const val WORK_NAME_ONCE = "sync_once"
 
