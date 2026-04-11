@@ -142,6 +142,36 @@ fun ReadField(
     }
 }
 
+/**
+ * Like [ReadField] but renders [value] as GitHub-Flavoured Markdown.
+ * Use for description/body fields; keep [ReadField] for short plain-text metadata.
+ */
+@Composable
+fun ReadMarkdownField(
+    label: String,
+    value: String?,
+    modifier: Modifier = Modifier,
+) {
+    if (value.isNullOrBlank()) return
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(4.dp))
+        MarkdownText(
+            content = value,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
 // ─── Section header ───────────────────────────────────────────────────────────
 
 @Composable

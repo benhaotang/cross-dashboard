@@ -52,7 +52,7 @@ native-android/
 │           │   ├── navigation/               # AppNavigation.kt, Destination.kt
 │           │   ├── adaptive/                 # FoldableUtils.kt
 │           │   ├── screen/                   # dashboard/, events/, tasks/, notes/, issues/, inbox/, views/, settings/
-│           │   ├── component/                # PropertySheet.kt, PomodoroBar.kt, PomodoroModal.kt, BiometricLockScreen.kt, CalendarColorResolver.kt, ...
+│           │   ├── component/                # PropertySheet.kt, MarkdownText.kt, PomodoroBar.kt, PomodoroModal.kt, BiometricLockScreen.kt, CalendarColorResolver.kt, ...
 │           │   ├── viewmodel/                # AppViewModel.kt, NavigationViewModel.kt
 │           │   └── CrossDashboardRoot.kt
 │           ├── service/
@@ -80,8 +80,8 @@ native-android/
 | Category | Library | Version |
 |---|---|---|
 | Language / coroutines | Kotlin 2.1, kotlinx-coroutines | 2.1.x / 1.10.x |
-| UI | Jetpack Compose BOM | 2026.04.x |
-| Material | material3 + material3-adaptive | 1.3.x / 1.2.x |
+| UI | Jetpack Compose BOM | 2026.03.01 (Compose 1.10.x) |
+| Material | material3 + material3-adaptive | 1.4.0 / 1.2.0 |
 | Navigation | androidx.navigation3 (nav3) | 1.0.x |
 | Architecture | ViewModel + Lifecycle | 2.9.x |
 | DI | Hilt | 2.56.x |
@@ -94,6 +94,7 @@ native-android/
 | Biometric | androidx.biometric | 1.4.x |
 | DataStore | Preferences DataStore | 1.1.x |
 | Nextcloud SSO | Android-SingleSignOn (JitPack) | 1.3.4 |
+| Markdown (GFM) | multiplatform-markdown-renderer (mikepenz) | 0.39.2 |
 
 ### Adaptive UI Tiers
 
@@ -144,6 +145,23 @@ Uses Android 16 **Live Update** (promoted ongoing notification) API:
 
 ### Exact Alarms
 `USE_EXACT_ALARM` permission declared (auto-granted, non-revocable — appropriate for a calendar app). Stable alarm IDs from `abs(uid.hashCode()) % 100_000`. `EventAlarmScheduler.rescheduleAll()` called after every sync and on boot.
+
+### Markdown Rendering (GFM)
+Read-only detail views render descriptions and note bodies as GitHub-Flavoured Markdown via `multiplatform-markdown-renderer` (Mike Penz, v0.39.2). The library is pure Compose — no `AndroidView` wrapper.
+
+**Key components in `ui/component/`:**
+- `MarkdownText(content, modifier)` — low-level composable. Colors are mapped to `MaterialTheme.colorScheme` tokens; typography to the M3 type scale. Images load via the app's existing Coil 3 instance (`Coil3ImageTransformerImpl`).
+- `ReadMarkdownField(label, value, modifier)` — drop-in replacement for `ReadField` when the value may contain markdown. Shows the same small-caps label but renders the body through `MarkdownText`.
+
+**Where markdown is rendered (read-only paths only):**
+
+| Surface | Field | Component used |
+|---|---|---|
+| Task detail (`TaskReadView`) | Description | `ReadMarkdownField` |
+| Event detail (`EventPropertySheet` + `EventDetailContent`) | Description | `ReadMarkdownField` |
+| Note detail (`NoteReadView`) | Body | `MarkdownText` directly |
+
+**Rule:** Use `ReadMarkdownField` / `MarkdownText` only in read-only branches. Edit forms (`TaskEditForm`, `NoteEditForm`, etc.) always use plain `OutlinedTextField` — never pass markdown-rendered content into an editor.
 
 ---
 
@@ -311,6 +329,7 @@ The RN `package.json` / `app.json` version fields are legacy and no longer need 
 - Use `NavigationSuiteScaffold` + `NavigableListDetailPaneScaffold` patterns for adaptive layouts.
 - Every interactive composable must have a `contentDescription` for TalkBack.
 - Wrap bottom sheets in `ModalBottomSheet` with `WindowInsets.ime` padding for keyboard avoidance.
+- For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled fields) or `MarkdownText` (unlabelled) — never plain `Text`. Edit forms always use `OutlinedTextField`.
 
 ### Background Work
 - Use `WorkManager` for all deferrable background tasks. Inject with `@HiltWorker`.

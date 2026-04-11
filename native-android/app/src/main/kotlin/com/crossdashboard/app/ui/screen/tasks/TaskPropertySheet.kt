@@ -184,7 +184,7 @@ private fun TaskReadView(
 
     ReadField(label = "Due", value = task.due?.let { dtFmt.format(it) })
     ReadField(label = "Start", value = task.dtstart?.let { dateFmt.format(it) })
-    ReadField(label = "Description", value = task.description)
+    ReadMarkdownField(label = "Description", value = task.description)
     ReadField(label = "Location", value = task.location)
 
     // Calendar

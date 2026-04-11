@@ -150,4 +150,9 @@ dependencies {
 
     // Core library desugaring (required by Nextcloud SSO)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // Markdown rendering (GFM)
+    implementation(libs.markdown.renderer.android)
+    implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.coil3)
 }

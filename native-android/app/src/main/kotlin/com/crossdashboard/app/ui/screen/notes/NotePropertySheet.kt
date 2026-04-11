@@ -97,12 +97,12 @@ internal fun NoteReadView(
     }
 
     if (note.body.isNotBlank()) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text(
-                text = note.body,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+        MarkdownText(
+            content = note.body,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+        )
     }
 
     ReadField(label = "Created", value = dtFmt.format(note.created))
