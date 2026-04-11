@@ -160,6 +160,8 @@ Read-only detail views render descriptions and note bodies as GitHub-Flavoured M
 | Task detail (`TaskReadView`) | Description | `ReadMarkdownField` |
 | Event detail (`EventPropertySheet` + `EventDetailContent`) | Description | `ReadMarkdownField` |
 | Note detail (`NoteReadView`) | Body | `MarkdownText` directly |
+| Issue detail (`IssueReadContent`) | Description (body) | `MarkdownText` directly |
+| Issue detail (`CommentItem`) | Comment body | `MarkdownText` directly |
 
 **Rule:** Use `ReadMarkdownField` / `MarkdownText` only in read-only branches. Edit forms (`TaskEditForm`, `NoteEditForm`, etc.) always use plain `OutlinedTextField` — never pass markdown-rendered content into an editor.
 

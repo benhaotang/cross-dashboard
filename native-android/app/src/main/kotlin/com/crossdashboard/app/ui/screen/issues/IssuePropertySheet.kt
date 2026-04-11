@@ -187,9 +187,8 @@ internal fun IssueReadContent(
             if (issue.body.isNotBlank()) {
                 item {
                     SheetSectionHeader(title = "Description")
-                    Text(
-                        text = issue.body,
-                        style = MaterialTheme.typography.bodyMedium,
+                    MarkdownText(
+                        content = issue.body,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                 }
@@ -347,9 +346,9 @@ private fun CommentItem(comment: GiteaComment) {
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = comment.body,
-                style = MaterialTheme.typography.bodySmall,
+            MarkdownText(
+                content = comment.body,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

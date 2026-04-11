@@ -295,9 +295,23 @@ private fun LoginFlowSection(
             TextButton(onClick = vm::cancelLoginFlow) { Text("Cancel") }
         }
         NextcloudFlowStatus.SUCCESS -> {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Logged in as ${state.caldavUsername}", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Column {
+                        Text("Logged in", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        Text(state.caldavUsername, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                OutlinedButton(onClick = vm::clearLoginFlowCredentials) { Text("Sign out") }
             }
         }
     }
