@@ -134,11 +134,11 @@ class PomodoroViewModel @Inject constructor(
         timer = null
         persistClear()
         _state.update { PomodoroUiState() }
-        context.startService(
-            Intent(context, PomodoroForegroundService::class.java).apply {
-                action = PomodoroForegroundService.ACTION_STOP
-            }
-        )
+        // Use stopService() rather than startService(ACTION_STOP) so that this call
+        // works even if the foreground service was already killed (e.g. by a prior
+        // notification-Stop tap). stopService() is a no-op when the service isn't
+        // running, and never triggers the foreground-service-start restrictions.
+        context.stopService(Intent(context, PomodoroForegroundService::class.java))
     }
 
     fun showModal() = _state.update { it.copy(modalVisible = true) }

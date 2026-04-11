@@ -23,7 +23,8 @@ import javax.inject.Inject
  * timer logic; this service only owns the notification lifecycle.
  *
  * Notification action buttons (Pause/Resume, Stop) post commands through
- * [PomodoroCommandBus], which PomodoroViewModel collects to update timer state.
+ * [PomodoroCommandBus] so PomodoroViewModel can update its state without
+ * being in the foreground.
  */
 @AndroidEntryPoint
 class PomodoroForegroundService : Service() {
@@ -51,20 +52,25 @@ class PomodoroForegroundService : Service() {
             }
             ACTION_PAUSE -> {
                 currentlyRunning = false
-                commandBus.send(ACTION_PAUSE)
                 notify(buildNotification())
+                // Notify ViewModel after the notification is updated so the UI
+                // and notification state stay in sync.
+                commandBus.send(ACTION_PAUSE)
             }
             ACTION_RESUME -> {
                 currentlyRunning = true
-                commandBus.send(ACTION_RESUME)
                 notify(buildNotification())
+                commandBus.send(ACTION_RESUME)
             }
             ACTION_STOP -> {
+                // Tell the ViewModel to reset its state BEFORE the service dies so
+                // the in-app bar/modal is removed and the CountDownTimer is cancelled.
+                commandBus.send(ACTION_STOP)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun updateCurrentState(intent: Intent) {
@@ -89,7 +95,15 @@ class PomodoroForegroundService : Service() {
         }
         val progress = ((phaseTotal - currentSecondsLeft).toFloat() / phaseTotal * 100)
             .toInt().coerceIn(0, 100)
+
+        // Chronometer counts down to this epoch — only meaningful when running.
         val endTimeMs = System.currentTimeMillis() + currentSecondsLeft * 1000L
+
+        // When paused, include the frozen remaining time in the content text so
+        // the user can still see how much time is left without a live countdown.
+        val timeLabel = "%d:%02d".format(currentSecondsLeft / 60, currentSecondsLeft % 60)
+        val contentText = if (currentlyRunning) phaseLabel
+                          else "$phaseLabel · $timeLabel ${getString(R.string.pomodoro_paused_suffix)}"
 
         // Tap → re-open app and surface the Pomodoro bar/modal
         val contentIntent = PendingIntent.getActivity(
@@ -128,13 +142,16 @@ class PomodoroForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_POMODORO)
             .setSmallIcon(R.drawable.ic_timer)
             .setContentTitle(currentTitle)
-            .setContentText(phaseLabel)
+            .setContentText(contentText)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setShowWhen(true)
-            .setWhen(endTimeMs)
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
+            // Chronometer and its countdown chip are only active while the timer is running.
+            // Setting setUsesChronometer(false) when paused removes the live chip from the
+            // status bar so it no longer ticks while the session is paused.
+            .setShowWhen(currentlyRunning)
+            .setWhen(if (currentlyRunning) endTimeMs else 0L)
+            .setUsesChronometer(currentlyRunning)
+            .setChronometerCountDown(currentlyRunning)
             // Live Update / promoted ongoing (Android 16 API 36)
             .setRequestPromotedOngoing(true)
             .setProgress(100, progress, false)

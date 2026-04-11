@@ -41,6 +41,7 @@
     <string name="pomodoro_pause">Pause</string>
     <string name="pomodoro_resume">Resume</string>
     <string name="pomodoro_stop">Stop</string>
+    <string name="pomodoro_paused_suffix">paused</string>
 
     <!-- Alarms -->
     <string name="alarm_starting_now">Starting now</string>
