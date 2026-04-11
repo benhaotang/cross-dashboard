@@ -1,6 +1,7 @@
 package com.crossdashboard.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,7 +35,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        pendingAction = intent.data?.getQueryParameter("action")
+        pendingAction = intent.data?.resolvePendingAction()
 
         setContent {
             // Theme is applied inside CrossDashboardRoot based on user preference.
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        pendingAction = intent.data?.getQueryParameter("action")
+        pendingAction = intent.data?.resolvePendingAction()
     }
 
     /**
@@ -77,3 +78,11 @@ class MainActivity : ComponentActivity() {
         const val ACTION_ADD_TASK = "add_task"
     }
 }
+
+/**
+ * Resolves a deep-link URI to a pending action string.
+ * - `crossdashboard://pomodoro` → "pomodoro"  (notification tap)
+ * - `crossdashboard://tasks?action=add` → "add"  (widget shortcut)
+ */
+private fun Uri.resolvePendingAction(): String? =
+    if (host == "pomodoro") "pomodoro" else getQueryParameter("action")

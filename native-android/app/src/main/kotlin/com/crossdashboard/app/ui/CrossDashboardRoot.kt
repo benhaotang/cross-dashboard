@@ -31,6 +31,14 @@ fun CrossDashboardRoot(
     val systemCredentialEnabled by appVm.systemCredential.collectAsStateWithLifecycle()
     val pomodoroState by pomodoroVm.state.collectAsStateWithLifecycle()
 
+    // Handle notification tap: crossdashboard://pomodoro → show the running timer
+    LaunchedEffect(pendingAction) {
+        if (pendingAction == "pomodoro") {
+            pomodoroVm.showModal()
+            onActionConsumed()
+        }
+    }
+
     val isDark = when (theme) {
         ThemePreference.DARK -> true
         ThemePreference.LIGHT -> false
