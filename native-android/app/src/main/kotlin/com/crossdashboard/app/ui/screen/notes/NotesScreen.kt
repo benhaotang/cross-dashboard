@@ -40,7 +40,8 @@ fun NotesScreen(
     viewModel: NotesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val navigator = rememberListDetailPaneScaffoldNavigator<Note>()
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    var selectedNote by remember { mutableStateOf<Note?>(null) }
     val scope = rememberCoroutineScope()
     var showCreateSheet by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -128,10 +129,11 @@ fun NotesScreen(
                                 NoteCard(
                                     note = note,
                                     colorResolver = colorResolver,
-                                    isSelected = navigator.currentDestination?.contentKey?.uid == note.uid,
+                                    isSelected = navigator.currentDestination?.contentKey == note.uid,
                                     onClick = {
+                                        selectedNote = note
                                         scope.launch {
-                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, note)
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, note.uid)
                                         }
                                     },
                                 )
@@ -142,10 +144,10 @@ fun NotesScreen(
             },
             detailPane = {
                 AnimatedPane {
-                    val selectedNote = navigator.currentDestination?.contentKey
-                    if (selectedNote != null) {
+                    val note = selectedNote
+                    if (note != null) {
                         NoteDetailContent(
-                            note = selectedNote,
+                            note = note,
                             colorResolver = colorResolver,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
                             onSave = { updated ->
@@ -153,7 +155,7 @@ fun NotesScreen(
                                 scope.launch { navigator.navigateBack() }
                             },
                             onDelete = {
-                                viewModel.deleteNote(selectedNote)
+                                viewModel.deleteNote(note)
                                 scope.launch { navigator.navigateBack() }
                             },
                         )
@@ -174,7 +176,7 @@ fun NotesScreen(
     // Phone: show bottom sheet when detail pane is hidden (single-pane)
     val selectedNoteForSheet =
         if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] == PaneAdaptedValue.Hidden)
-            navigator.currentDestination?.contentKey
+            selectedNote
         else null
 
     selectedNoteForSheet?.let { note ->

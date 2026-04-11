@@ -74,7 +74,8 @@ fun TasksScreenContent(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
-    val navigator = rememberListDetailPaneScaffoldNavigator<CalDavTask>()
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    var selectedTask by remember { mutableStateOf<CalDavTask?>(null) }
     val scope = rememberCoroutineScope()
 
     // Handle deep link auto-focus (widget add-task shortcut)
@@ -92,7 +93,8 @@ fun TasksScreenContent(
         if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.rootTasks.isNotEmpty()) {
             val target = state.rootTasks.find { it.uid == initialUid }
             if (target != null) {
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target)
+                selectedTask = target
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
                 initialNavigationDone = true
             }
         }
@@ -150,7 +152,7 @@ fun TasksScreenContent(
                                 }
 
                                 // ── Task list ────────────────────────────────
-                                val selectedUid = navigator.currentDestination?.contentKey?.uid
+                                val selectedUid = navigator.currentDestination?.contentKey
                                 if (state.rootTasks.isEmpty()) {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                         Text(
@@ -175,14 +177,16 @@ fun TasksScreenContent(
                                                 expanded = task.uid in state.expandedUids,
                                                 onExpandToggle = { viewModel.toggleExpand(task.uid) },
                                 onTaskClick = {
-                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, task) }
+                                    selectedTask = task
+                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, task.uid) }
                                 },
                                                 onToggleComplete = { viewModel.toggleComplete(task) },
                                                 colorResolver = colorResolver,
                                                 subtasksFlow = viewModel.subtasksOf(task.uid),
                                                 expandedUids = state.expandedUids,
                                 onSubtaskClick = {
-                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, it) }
+                                    selectedTask = it
+                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, it.uid) }
                                 },
                                                 onSubtaskToggle = { viewModel.toggleComplete(it) },
                                                 onSubtaskExpand = { viewModel.toggleExpand(it.uid) },
@@ -201,7 +205,7 @@ fun TasksScreenContent(
                             LocalSharedTransitionScope provides this@SharedTransitionLayout,
                             LocalAnimVisibilityScope provides this,
                         ) {
-                        val task = navigator.currentDestination?.contentKey
+                        val task = selectedTask
                         if (task != null) {
                             TaskPropertySheet(
                                 task = task,
@@ -232,7 +236,7 @@ fun TasksScreenContent(
     // Phone: bottom sheet when detail pane is hidden (single-pane mode)
     val taskForSheet = if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] ==
         PaneAdaptedValue.Hidden
-    ) navigator.currentDestination?.contentKey else null
+    ) selectedTask else null
 
     taskForSheet?.let { task ->
         TaskPropertySheet(
