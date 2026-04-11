@@ -50,7 +50,7 @@ fun EventPropertySheet(
             }
             ReadField(label = "Duration", value = durationLabel)
             ReadField(label = "Location", value = event.location)
-            ReadField(label = "Description", value = event.description)
+            ReadMarkdownField(label = "Description", value = event.description)
             ReadField(label = "UID", value = event.uid)
 
             colorResolver?.displayName(event.calendarHref)?.let { name ->
@@ -92,7 +92,7 @@ fun EventDetailContent(
         }
         ReadField(label = "Duration", value = durationLabel)
         ReadField(label = "Location", value = event.location)
-        ReadField(label = "Description", value = event.description)
+        ReadMarkdownField(label = "Description", value = event.description)
         ReadField(label = "UID", value = event.uid)
         colorResolver?.displayName(event.calendarHref)?.let { name ->
             ReadField(label = "Calendar", value = name)

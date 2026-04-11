@@ -1,0 +1,52 @@
+package com.crossdashboard.app.ui.component
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
+
+/**
+ * Renders [content] as GitHub-Flavoured Markdown using Material 3 colour tokens.
+ *
+ * Only use this in **read-only** contexts. Edit forms should use plain [TextField].
+ * Images embedded in markdown are loaded via Coil 3 (the same instance used elsewhere
+ * in the app) so network/disk caching behaves consistently.
+ */
+@Composable
+fun MarkdownText(
+    content: String,
+    modifier: Modifier = Modifier,
+) {
+    Markdown(
+        content = content,
+        colors = markdownColor(
+            text = MaterialTheme.colorScheme.onSurface,
+            codeText = MaterialTheme.colorScheme.onSurfaceVariant,
+            codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+            inlineCodeText = MaterialTheme.colorScheme.onSurfaceVariant,
+            inlineCodeBackground = MaterialTheme.colorScheme.surfaceVariant,
+            linkText = MaterialTheme.colorScheme.primary,
+            dividerColor = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        typography = markdownTypography(
+            h1 = MaterialTheme.typography.headlineLarge,
+            h2 = MaterialTheme.typography.headlineMedium,
+            h3 = MaterialTheme.typography.headlineSmall,
+            h4 = MaterialTheme.typography.titleLarge,
+            h5 = MaterialTheme.typography.titleMedium,
+            h6 = MaterialTheme.typography.titleSmall,
+            text = MaterialTheme.typography.bodyMedium,
+            paragraph = MaterialTheme.typography.bodyMedium,
+            ordered = MaterialTheme.typography.bodyMedium,
+            bullet = MaterialTheme.typography.bodyMedium,
+            list = MaterialTheme.typography.bodyMedium,
+            quote = MaterialTheme.typography.bodyMedium,
+            code = MaterialTheme.typography.labelMedium,
+        ),
+        imageTransformer = Coil3ImageTransformerImpl,
+        modifier = modifier,
+    )
+}
