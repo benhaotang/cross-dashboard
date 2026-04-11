@@ -142,12 +142,34 @@ class SettingsViewModel @Inject constructor(
                 runCatching { json.decodeFromString<List<CalDavCalendar>>(it) }.getOrNull()
             } ?: emptyList()
 
+            val server = secureStore.get(CredentialKey.CALDAV_SERVER) ?: ""
+            val username = secureStore.get(CredentialKey.CALDAV_USERNAME) ?: ""
+            val password = secureStore.get(CredentialKey.CALDAV_PASSWORD) ?: ""
+            val credentialsPresent = server.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+
+            // Restore LOGIN_FLOW_V2 success state when credentials already exist in keystore
+            val restoredLoginFlowStatus = if (
+                authMethod == CalDavAuthMethod.LOGIN_FLOW_V2 && credentialsPresent
+            ) NextcloudFlowStatus.SUCCESS else NextcloudFlowStatus.IDLE
+
+            // Restore Manual connection status so the "credentials saved" indicator shows after restart
+            val restoredConnectionStatus = if (
+                authMethod == CalDavAuthMethod.MANUAL && credentialsPresent
+            ) CalDavConnectionStatus.SUCCESS else CalDavConnectionStatus.IDLE
+
+            val restoredConnectionMessage = if (
+                authMethod == CalDavAuthMethod.MANUAL && credentialsPresent
+            ) "Credentials saved" else ""
+
             _state.update { s ->
                 s.copy(
                     authMethod = authMethod,
-                    caldavServer = secureStore.get(CredentialKey.CALDAV_SERVER) ?: "",
-                    caldavUsername = secureStore.get(CredentialKey.CALDAV_USERNAME) ?: "",
-                    caldavPassword = secureStore.get(CredentialKey.CALDAV_PASSWORD) ?: "",
+                    caldavServer = server,
+                    caldavUsername = username,
+                    caldavPassword = password,
+                    loginFlowStatus = restoredLoginFlowStatus,
+                    caldavConnectionStatus = restoredConnectionStatus,
+                    caldavConnectionMessage = restoredConnectionMessage,
                     ssoAccountName = ssoAccount?.name,
                     isNextcloudAppInstalled = ssoHelper.isNextcloudAppInstalled(),
                     availableCalendars = selected,
@@ -325,6 +347,25 @@ class SettingsViewModel @Inject constructor(
 
     fun cancelLoginFlow() {
         _state.update { it.copy(loginFlowStatus = NextcloudFlowStatus.IDLE, loginFlowUrl = null, loginFlowError = null) }
+    }
+
+    fun clearLoginFlowCredentials() {
+        secureStore.delete(CredentialKey.CALDAV_SERVER)
+        secureStore.delete(CredentialKey.CALDAV_USERNAME)
+        secureStore.delete(CredentialKey.CALDAV_PASSWORD)
+        secureStore.delete(CredentialKey.CALDAV_AUTH_METHOD)
+        _state.update {
+            it.copy(
+                loginFlowStatus = NextcloudFlowStatus.IDLE,
+                loginFlowUrl = null,
+                loginFlowError = null,
+                caldavServer = "",
+                caldavUsername = "",
+                caldavPassword = "",
+                availableCalendars = emptyList(),
+                selectedCalendarHrefs = emptySet(),
+            )
+        }
     }
 
     // ─── Calendar picker ──────────────────────────────────────────────────────
