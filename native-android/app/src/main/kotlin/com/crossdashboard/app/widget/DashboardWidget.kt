@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.*
@@ -26,51 +25,74 @@ import androidx.glance.text.TextStyle
  * Content is driven by [DashboardWidgetState] stored in [DashboardWidgetStateDefinition].
  * The state is updated by [SyncWorker] after each background sync.
  *
- * Uses [SizeMode.Responsive] with three explicit size tiers so Android calls
- * [provideContent] with the exact allocated size — correct at every resize step
- * without needing to infer row counts from a single height value.
+ * Uses [SizeMode.Exact] so [LocalSize.current] always reflects the actual allocated widget
+ * dimensions. Row counts for events and tasks are computed dynamically from the available
+ * height, filling all free space rather than capping at a fixed tier.
  *
- * Tiers:
- *   - SMALL  (≥250×110dp): 1 event row + 1 task row + footer
- *   - MEDIUM (≥250×180dp): 2 event rows + 2 task rows + footer
- *   - LARGE  (≥250×250dp): 3 event rows + 3 task rows + footer
+ * Fixed overhead (dp): outer padding 16 + events header 14 + tasks header 14 + spacer 6 +
+ * footer 36 = 86dp. Each content row is ~14dp (12sp text + 2dp vertical padding).
+ * Total per-section rows = floor((height − 86) / 14 / 2), clamped to [1, data.size].
+ *
+ * Tapping anywhere on the widget body opens [MainActivity]. The FAB deep-links to the
+ * Tasks quick-add screen instead.
  */
 class DashboardWidget : GlanceAppWidget() {
 
     override val stateDefinition = DashboardWidgetStateDefinition
 
-    override val sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(SMALL, MEDIUM, LARGE)
-    )
+    // Exact mode gives the real allocated dp size at every resize step.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val state = currentState<DashboardWidgetState>()
             val size = LocalSize.current
-            val visibleRows = when {
-                size.height >= LARGE.height -> 3
-                size.height >= MEDIUM.height -> 2
-                else -> 1
-            }
-            DashboardWidgetContent(state = state, visibleRows = visibleRows)
-        }
-    }
 
-    companion object {
-        val SMALL = DpSize(250.dp, 110.dp)
-        val MEDIUM = DpSize(250.dp, 180.dp)
-        val LARGE = DpSize(250.dp, 250.dp)
+            // Compute how many rows we can fit, split evenly between the two sections.
+            val fixedOverheadDp = 86f   // padding + 2 headers + spacer + footer
+            val rowHeightDp = 14f
+            val totalRows = ((size.height.value - fixedOverheadDp) / rowHeightDp)
+                .toInt()
+                .coerceAtLeast(2)
+            // Give each section its fair share; if odd, events gets the extra row.
+            val eventRows = (totalRows + 1) / 2
+            val taskRows = totalRows / 2
+
+            DashboardWidgetContent(
+                state = state,
+                maxEventRows = eventRows,
+                maxTaskRows = taskRows,
+            )
+        }
     }
 }
 
 @Composable
-private fun DashboardWidgetContent(state: DashboardWidgetState, visibleRows: Int) {
+private fun DashboardWidgetContent(
+    state: DashboardWidgetState,
+    maxEventRows: Int,
+    maxTaskRows: Int,
+) {
     GlanceTheme {
+        // Outer box: tapping anywhere opens MainActivity.
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.surface)
-                .padding(8.dp),
+                .padding(8.dp)
+                .clickable(
+                    actionStartActivity(
+                        Intent(Intent.ACTION_MAIN).apply {
+                            addCategory(Intent.CATEGORY_LAUNCHER)
+                            setClassName(
+                                "com.crossdashboard.app",
+                                "com.crossdashboard.app.MainActivity",
+                            )
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                        }
+                    )
+                ),
         ) {
             Column(modifier = GlanceModifier.fillMaxSize()) {
                 // ── Events section ───────────────────────────────────────────
@@ -78,7 +100,7 @@ private fun DashboardWidgetContent(state: DashboardWidgetState, visibleRows: Int
                 if (state.eventRows.isEmpty()) {
                     RowText(text = "No upcoming events", muted = true)
                 } else {
-                    state.eventRows.take(visibleRows).forEach { row ->
+                    state.eventRows.take(maxEventRows).forEach { row ->
                         RowText(text = row)
                     }
                 }
@@ -90,7 +112,7 @@ private fun DashboardWidgetContent(state: DashboardWidgetState, visibleRows: Int
                 if (state.taskRows.isEmpty()) {
                     RowText(text = "No tasks due", muted = true)
                 } else {
-                    state.taskRows.take(visibleRows).forEach { row ->
+                    state.taskRows.take(maxTaskRows).forEach { row ->
                         RowText(text = row)
                     }
                 }
@@ -115,7 +137,8 @@ private fun DashboardWidgetContent(state: DashboardWidgetState, visibleRows: Int
                         maxLines = 1,
                     )
 
-                    // FAB: deep-link to Tasks screen with quick-add
+                    // FAB: deep-link to Tasks screen with quick-add.
+                    // Its own clickable overrides the outer body tap for this area.
                     Box(
                         modifier = GlanceModifier
                             .size(32.dp)
