@@ -4,66 +4,130 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name override (e.g. 1.8.0). Defaults to short commit SHA.'
+        required: false
+        default: ''
+
+# Disable Gradle daemon in CI; cap JVM heap to stay within the 7 GB runner limit.
+env:
+  GRADLE_OPTS: >-
+    -Dorg.gradle.daemon=false
+    -Dorg.gradle.parallel=true
+    -Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m
+    -Dkotlin.incremental=false
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Native Android APK
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write   # needed to upload release assets
 
     steps:
-      - name: Checkout repository
+      # ── Source ──────────────────────────────────────────────────────────────
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup JDK 17
+      # ── Java toolchain ───────────────────────────────────────────────────────
+      # jvmTarget = "17" in build.gradle.kts; JDK 17 is the minimum for AGP 9.x.
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --no-install
+      # ── Gradle + dependency cache ────────────────────────────────────────────
+      # gradle/actions/setup-gradle auto-detects native-android/gradlew (committed
+      # to the repo) and handles ~/.gradle/caches + wrapper JAR caching.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Only write the cache on release/dispatch runs to avoid cache thrash on PRs.
+          cache-read-only: ${{ github.event_name != 'release' && github.event_name != 'workflow_dispatch' }}
 
+      # ── Android SDK ──────────────────────────────────────────────────────────
+      # GitHub's ubuntu-latest runners ship Android SDK but may not include API 36
+      # (Android 16). Install it explicitly; silence verbose sdkmanager output.
+      - name: Install Android SDK platform 36
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            --sdk_root="$ANDROID_HOME" 2>/dev/null
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --licenses --sdk_root="$ANDROID_HOME" 2>/dev/null || true
+
+      # ── Version resolution ───────────────────────────────────────────────────
+      # Release trigger  → tag name (leading 'v' stripped, e.g. v1.8.0 → 1.8.0)
+      # workflow_dispatch → manual input or short commit SHA
+      # versionCode       → github.run_number (strictly increasing; fine for sideloading)
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VER="${{ github.event.release.tag_name }}"
+            VER="${VER#v}"
+          elif [ -n "${{ inputs.version_name }}" ]; then
+            VER="${{ inputs.version_name }}"
+          else
+            VER="dev-$(git rev-parse --short HEAD)"
+          fi
+          echo "name=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # ── Signing keystore ─────────────────────────────────────────────────────
+      # Required secrets:
+      #   KEYSTORE_FILE   – base64-encoded .jks keystore
+      #   STORE_PASSWORD  – keystore password
+      #   KEY_ALIAS       – signing key alias
+      #   KEY_PASSWORD    – signing key password
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > android/keystore.jks
+        run: echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > native-android/keystore.jks
 
+      # ── Build ────────────────────────────────────────────────────────────────
       - name: Build release APK
-        working-directory: android
+        working-directory: native-android
         run: |
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$(pwd)/keystore.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.STORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+            -PversionName="${{ steps.ver.outputs.name }}" \
+            -PversionCode="${{ steps.ver.outputs.code }}" \
+            -Pandroid.injected.signing.store.file="${{ github.workspace }}/native-android/keystore.jks" \
+            -Pandroid.injected.signing.store.password="${{ secrets.STORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
+            --stacktrace
 
+      # ── Artefact staging ─────────────────────────────────────────────────────
       - name: Rename APK
+        id: apk
         run: |
-          VERSION=${{ github.event.release.tag_name || 'manual' }}
-          mv android/app/build/outputs/apk/release/app-release.apk \
-             android/app/build/outputs/apk/release/cross-dashboard-${VERSION}.apk
+          VER="${{ steps.ver.outputs.name }}"
+          SRC="native-android/app/build/outputs/apk/release/app-release.apk"
+          DST="native-android/app/build/outputs/apk/release/cross-dashboard-${VER}.apk"
+          mv "$SRC" "$DST"
+          echo "path=$DST" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK as artifact
+      # ── Upload ───────────────────────────────────────────────────────────────
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cross-dashboard-apk
-          path: android/app/build/outputs/apk/release/cross-dashboard-*.apk
+          name: cross-dashboard-${{ steps.ver.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
 
-      - name: Attach APK to release
+      - name: Attach APK to GitHub release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/cross-dashboard-*.apk
+          files: ${{ steps.apk.outputs.path }}
+
+      # ── Cleanup ──────────────────────────────────────────────────────────────
+      # Delete the keystore unconditionally so it is never captured by artifact upload.
+      - name: Remove keystore
+        if: always()
+        run: rm -f native-android/keystore.jks

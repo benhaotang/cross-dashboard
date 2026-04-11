@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cross Dashboard</string>
+    <string name="widget_description">Shows upcoming events, tasks, and issues</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_events">Events</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_notes">Notes</string>
+    <string name="nav_issues">Issues</string>
+    <string name="nav_views">Views</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Notification channels -->
+    <string name="channel_pomodoro_name">Pomodoro Timer</string>
+    <string name="channel_pomodoro_desc">Live countdown for active Pomodoro sessions</string>
+    <string name="channel_events_name">Event Reminders</string>
+    <string name="channel_events_desc">Notifications for upcoming calendar events</string>
+    <string name="channel_sync_name">Background Sync</string>
+    <string name="channel_sync_desc">Status updates for data synchronization</string>
+
+    <!-- Widget -->
+    <string name="widget_events_section">Events</string>
+    <string name="widget_tasks_section">Tasks</string>
+    <string name="widget_no_events">No upcoming events</string>
+    <string name="widget_no_tasks">No pending tasks</string>
+    <string name="widget_add_task">Add task</string>
+    <string name="widget_last_sync">Synced %1$s</string>
+
+    <!-- Pomodoro -->
+    <string name="pomodoro_work">Focus</string>
+    <string name="pomodoro_short_break">Short break</string>
+    <string name="pomodoro_long_break">Long break</string>
+    <string name="pomodoro_pause">Pause</string>
+    <string name="pomodoro_resume">Resume</string>
+    <string name="pomodoro_stop">Stop</string>
+
+    <!-- Alarms -->
+    <string name="alarm_starting_now">Starting now</string>
+    <string name="alarm_in_minutes">In %1$d minutes</string>
+    <string name="alarm_at_location">at %1$s</string>
+
+    <!-- Auth -->
+    <string name="auth_nextcloud_sso">Sign in with Nextcloud</string>
+    <string name="auth_login_flow">Nextcloud Login Flow v2</string>
+    <string name="auth_manual">Manual CalDAV</string>
+</resources>
