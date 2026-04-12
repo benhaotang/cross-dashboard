@@ -81,7 +81,7 @@ final class GiteaClient: Sendable {
 
     func createRepoLabel(repo: String, name: String, color: String = "0075ca") async throws -> GiteaLabel {
         guard let base = instanceUrl() else { throw GiteaError.noInstance }
-        let payload = #"{"name":"\#(name)","color":"#\#(color)"}"#
+        let payload = "{\"name\":\"\(name)\",\"color\":\"#\(color)\"}"
         guard let data = await post("\(base)/api/v1/repos/\(repo)/labels", body: payload)
         else { throw GiteaError.requestFailed }
         let dto = try decoder.decode(GiteaLabelDto.self, from: data)
@@ -150,10 +150,9 @@ final class GiteaClient: Sendable {
         guard let reqUrl = URL(string: url) else { return nil }
         var request = URLRequest(url: reqUrl)
         addToken(&request)
-        return try? await session.data(for: request).0
-            .let { data, response in
-                (response as? HTTPURLResponse)?.statusCode == 200 ? data : nil
-            }
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return data
     }
 
     private func post(_ url: String, body: String) async -> Data? {
@@ -163,10 +162,10 @@ final class GiteaClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body.data(using: .utf8)
         addToken(&request)
-        return try? await session.data(for: request)
-            .let { data, response in
-                (response as? HTTPURLResponse).map { $0.statusCode >= 200 && $0.statusCode < 300 ? data : nil } ?? nil
-            }
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode >= 200 && http.statusCode < 300 else { return nil }
+        return data
     }
 
     private func patch(_ url: String, body: String) async -> Data? {
@@ -176,10 +175,10 @@ final class GiteaClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body.data(using: .utf8)
         addToken(&request)
-        return try? await session.data(for: request)
-            .let { data, response in
-                (response as? HTTPURLResponse).map { $0.statusCode >= 200 && $0.statusCode < 300 ? data : nil } ?? nil
-            }
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode >= 200 && http.statusCode < 300 else { return nil }
+        return data
     }
 
     @discardableResult
@@ -190,10 +189,10 @@ final class GiteaClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body.data(using: .utf8)
         addToken(&request)
-        return try? await session.data(for: request)
-            .let { data, response in
-                (response as? HTTPURLResponse).map { $0.statusCode >= 200 && $0.statusCode < 300 ? data : nil } ?? nil
-            }
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode >= 200 && http.statusCode < 300 else { return nil }
+        return data
     }
 
     private func uploadMultipart(url: String, fileName: String, bytes: Data, mimeType: String) async throws -> Data {
@@ -321,8 +320,3 @@ enum GiteaError: LocalizedError {
     }
 }
 
-// ─── Tuple helper ─────────────────────────────────────────────────────────────
-
-private extension (Data, URLResponse) {
-    func `let`<T>(_ transform: (Data, URLResponse) -> T) -> T { transform(self.0, self.1) }
-}

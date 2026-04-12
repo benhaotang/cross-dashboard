@@ -5,14 +5,14 @@ import Security
 ///
 /// All values are stored as `kSecClassGenericPassword` items under the service name
 /// "com.crossdashboard.app". Mirrors the API of `SecureStore.kt` on Android.
-final class KeychainStore: Sendable {
-    static let shared = KeychainStore()
+public final class KeychainStore: Sendable {
+    public static let shared = KeychainStore()
 
     private let service = "com.crossdashboard.app"
 
     private init() {}
 
-    func set(_ key: String, value: String) {
+    public func set(_ key: String, value: String) {
         guard let data = value.data(using: .utf8) else { return }
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
@@ -34,7 +34,7 @@ final class KeychainStore: Sendable {
         }
     }
 
-    func get(_ key: String) -> String? {
+    public func get(_ key: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass:            kSecClassGenericPassword,
             kSecAttrService:      service,
@@ -51,7 +51,7 @@ final class KeychainStore: Sendable {
         return value
     }
 
-    func delete(_ key: String) {
+    public func delete(_ key: String) {
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
@@ -60,7 +60,7 @@ final class KeychainStore: Sendable {
         SecItemDelete(query as CFDictionary)
     }
 
-    func has(_ key: String) -> Bool {
+    public func has(_ key: String) -> Bool {
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
@@ -70,7 +70,7 @@ final class KeychainStore: Sendable {
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
-    func clearAll() {
+    public func clearAll() {
         let query: [CFString: Any] = [
             kSecClass:       kSecClassGenericPassword,
             kSecAttrService: service,
@@ -81,16 +81,16 @@ final class KeychainStore: Sendable {
 
 // ─── Credential key constants — mirrors CredentialKey in SecureStore.kt ───────
 
-enum CredentialKey {
-    static let caldavServer                = "caldav_server"
-    static let caldavUsername              = "caldav_username"
-    static let caldavPassword              = "caldav_password"
-    static let caldavAuthMethod            = "caldav_auth_method"
-    static let caldavSelectedCalendars     = "caldav_selected_calendars"
-    static let caldavDefaultEventCalendar  = "caldav_default_event_calendar"
-    static let caldavDefaultTaskCalendar   = "caldav_default_task_calendar"
-    static let giteaToken                  = "gitea_token"
-    static let giteaInstance               = "gitea_instance"
-    static let giteaRepos                  = "gitea_repos"
-    static let pinHash                     = "biometric_pin_hash"
+public enum CredentialKey {
+    public static let caldavServer                = "caldav_server"
+    public static let caldavUsername              = "caldav_username"
+    public static let caldavPassword              = "caldav_password"
+    public static let caldavAuthMethod            = "caldav_auth_method"
+    public static let caldavSelectedCalendars     = "caldav_selected_calendars"
+    public static let caldavDefaultEventCalendar  = "caldav_default_event_calendar"
+    public static let caldavDefaultTaskCalendar   = "caldav_default_task_calendar"
+    public static let giteaToken                  = "gitea_token"
+    public static let giteaInstance               = "gitea_instance"
+    public static let giteaRepos                  = "gitea_repos"
+    public static let pinHash                     = "biometric_pin_hash"
 }

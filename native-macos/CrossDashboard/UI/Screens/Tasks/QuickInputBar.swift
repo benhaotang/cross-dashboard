@@ -19,7 +19,7 @@ struct QuickInputBar: View {
             Divider()
             HStack(spacing: 10) {
                 Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accentColor)
                     .font(.title3)
 
                 TextField("Add a task… (!! priority, #tag, tomorrow)", text: $text)
@@ -76,7 +76,7 @@ struct QuickInputBar: View {
             Image(systemName: "return")
                 .font(.caption)
                 .padding(6)
-                .background(.accent.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Submit task")

@@ -7,24 +7,6 @@ struct CrossDashboardApp: App {
     @State private var appViewModel = AppViewModel()
     @State private var pomodoroViewModel = PomodoroViewModel.shared
 
-    init() {
-        // Schedule background sync (mirrors BootReceiver on Android)
-        SyncScheduler.shared.scheduleIfNeeded()
-
-        // Request notification permission and perform initial sync
-        Task { @MainActor in
-            await NotificationScheduler.shared.requestAuthorization()
-            await AppContainer.shared.syncAll()
-            let events = AppContainer.shared.eventRepository.events
-            await NotificationScheduler.shared.rescheduleAll(events: events)
-        }
-
-        // Lock on launch if biometric lock is enabled
-        if AppPreferences.shared.biometricLockEnabled {
-            appViewModel.lock()
-        }
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -32,6 +14,19 @@ struct CrossDashboardApp: App {
                 .environment(pomodoroViewModel)
                 .environment(\.appContainer, .shared)
                 .preferredColorScheme(appViewModel.colorScheme)
+                .task {
+                    // Lock on launch if biometric lock is enabled
+                    if AppPreferences.shared.biometricLockEnabled {
+                        appViewModel.lock()
+                    }
+                    // Schedule background sync (mirrors BootReceiver on Android)
+                    SyncScheduler.shared.scheduleIfNeeded()
+                    // Request notification permission and perform initial sync
+                    await NotificationScheduler.shared.requestAuthorization()
+                    await AppContainer.shared.syncAll()
+                    let events = AppContainer.shared.eventRepository.events
+                    await NotificationScheduler.shared.rescheduleAll(events: events)
+                }
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }

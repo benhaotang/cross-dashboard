@@ -5,18 +5,18 @@ import SwiftData
 // Each @Model mirrors an Android Room entity and provides toDomain() / init(from:) mappers.
 
 @Model
-final class EventModel {
-    @Attribute(.unique) var uid: String
-    var summary: String
-    var startEpoch: Double        // Date.timeIntervalSince1970
-    var endEpoch: Double
-    var descriptionText: String?
-    var location: String?
-    var calendarHref: String?
-    var etag: String?
-    var href: String?
+public final class EventModel {
+    @Attribute(.unique) public var uid: String
+    public var summary: String
+    public var startEpoch: Double        // Date.timeIntervalSince1970
+    public var endEpoch: Double
+    public var descriptionText: String?
+    public var location: String?
+    public var calendarHref: String?
+    public var etag: String?
+    public var href: String?
 
-    init(from event: CalendarEvent) {
+    public init(from event: CalendarEvent) {
         uid = event.uid
         summary = event.summary
         startEpoch = event.start.timeIntervalSince1970
@@ -28,7 +28,7 @@ final class EventModel {
         href = event.href
     }
 
-    func toDomain() -> CalendarEvent {
+    public func toDomain() -> CalendarEvent {
         CalendarEvent(
             uid: uid,
             summary: summary,
@@ -44,26 +44,26 @@ final class EventModel {
 }
 
 @Model
-final class TaskModel {
-    @Attribute(.unique) var uid: String
-    var summary: String
-    var descriptionText: String?
-    var statusRaw: String
-    var priority: Int
-    var percentComplete: Int
-    var dueEpoch: Double?
-    var dtstartEpoch: Double?
-    var completedEpoch: Double?
-    var createdEpoch: Double
-    var lastModifiedEpoch: Double
-    var categoriesJSON: String    // JSON array string
-    var location: String?
-    var parentUid: String?
-    var calendarHref: String?
-    var etag: String?
-    var href: String?
+public final class TaskModel {
+    @Attribute(.unique) public var uid: String
+    public var summary: String
+    public var descriptionText: String?
+    public var statusRaw: String
+    public var priority: Int
+    public var percentComplete: Int
+    public var dueEpoch: Double?
+    public var dtstartEpoch: Double?
+    public var completedEpoch: Double?
+    public var createdEpoch: Double
+    public var lastModifiedEpoch: Double
+    public var categoriesJSON: String    // JSON array string
+    public var location: String?
+    public var parentUid: String?
+    public var calendarHref: String?
+    public var etag: String?
+    public var href: String?
 
-    init(from task: CalDavTask) {
+    public init(from task: CalDavTask) {
         uid = task.uid
         summary = task.summary
         descriptionText = task.description
@@ -83,7 +83,7 @@ final class TaskModel {
         href = task.href
     }
 
-    func toDomain() -> CalDavTask {
+    public func toDomain() -> CalDavTask {
         let cats = (try? JSONDecoder().decode([String].self, from: Data(categoriesJSON.utf8))) ?? []
         return CalDavTask(
             uid: uid,
@@ -108,18 +108,18 @@ final class TaskModel {
 }
 
 @Model
-final class NoteModel {
-    @Attribute(.unique) var uid: String
-    var summary: String
-    var body: String
-    var categoriesJSON: String
-    var createdEpoch: Double
-    var lastModifiedEpoch: Double
-    var calendarHref: String?
-    var etag: String?
-    var href: String?
+public final class NoteModel {
+    @Attribute(.unique) public var uid: String
+    public var summary: String
+    public var body: String
+    public var categoriesJSON: String
+    public var createdEpoch: Double
+    public var lastModifiedEpoch: Double
+    public var calendarHref: String?
+    public var etag: String?
+    public var href: String?
 
-    init(from note: Note) {
+    public init(from note: Note) {
         uid = note.uid
         summary = note.summary
         body = note.body
@@ -131,7 +131,7 @@ final class NoteModel {
         href = note.href
     }
 
-    func toDomain() -> Note {
+    public func toDomain() -> Note {
         let cats = (try? JSONDecoder().decode([String].self, from: Data(categoriesJSON.utf8))) ?? []
         return Note(
             uid: uid,
@@ -148,20 +148,20 @@ final class NoteModel {
 }
 
 @Model
-final class IssueModel {
-    @Attribute(.unique) var issueId: Int64
-    var number: Int
-    var title: String
-    var body: String
-    var state: String
-    var labelsJSON: String      // JSON string[]
-    var assigneesJSON: String
-    var createdAtEpoch: Double
-    var updatedAtEpoch: Double
-    var repository: String
-    var htmlUrl: String
+public final class IssueModel {
+    @Attribute(.unique) public var issueId: Int64
+    public var number: Int
+    public var title: String
+    public var body: String
+    public var state: String
+    public var labelsJSON: String      // JSON string[]
+    public var assigneesJSON: String
+    public var createdAtEpoch: Double
+    public var updatedAtEpoch: Double
+    public var repository: String
+    public var htmlUrl: String
 
-    init(from issue: GiteaIssue) {
+    public init(from issue: GiteaIssue) {
         issueId = issue.id
         number = issue.number
         title = issue.title
@@ -175,7 +175,7 @@ final class IssueModel {
         htmlUrl = issue.htmlUrl
     }
 
-    func toDomain() -> GiteaIssue {
+    public func toDomain() -> GiteaIssue {
         let labels = (try? JSONDecoder().decode([String].self, from: Data(labelsJSON.utf8))) ?? []
         let assignees = (try? JSONDecoder().decode([String].self, from: Data(assigneesJSON.utf8))) ?? []
         return GiteaIssue(
@@ -195,27 +195,27 @@ final class IssueModel {
 }
 
 @Model
-final class StatsModel {
-    @Attribute(.unique) var date: String   // "yyyy-MM-dd"
-    var tasksCompleted: Int
-    var pomodoroSessions: Int
-    var issuesClosed: Int
+public final class StatsModel {
+    @Attribute(.unique) public var date: String   // "yyyy-MM-dd"
+    public var tasksCompleted: Int
+    public var pomodoroSessions: Int
+    public var issuesClosed: Int
 
-    init(date: String) {
+    public init(date: String) {
         self.date = date
         tasksCompleted = 0
         pomodoroSessions = 0
         issuesClosed = 0
     }
 
-    convenience init(from stats: DailyStats) {
+    public convenience init(from stats: DailyStats) {
         self.init(date: stats.date)
         tasksCompleted = stats.tasksCompleted
         pomodoroSessions = stats.pomodoroSessions
         issuesClosed = stats.issuesClosed
     }
 
-    func toDomain() -> DailyStats {
+    public func toDomain() -> DailyStats {
         DailyStats(
             date: date,
             tasksCompleted: tasksCompleted,
@@ -228,13 +228,13 @@ final class StatsModel {
 // ─── PersistenceController ────────────────────────────────────────────────────
 
 @MainActor
-final class PersistenceController {
-    static let shared = PersistenceController()
+public final class PersistenceController {
+    public static let shared = PersistenceController()
 
-    let container: ModelContainer
+    public let container: ModelContainer
 
     /// All SwiftData model types registered in the schema.
-    static let schema = Schema([
+    public static let schema = Schema([
         EventModel.self,
         TaskModel.self,
         NoteModel.self,
@@ -245,7 +245,7 @@ final class PersistenceController {
     /// Returns the SwiftData store URL inside the shared App Group container so
     /// the widget extension can read the same database as the main app.
     /// Falls back to the default location if the group container is unavailable.
-    static func groupContainerURL(appGroupID: String = "group.com.crossdashboard") -> URL? {
+    public static func groupContainerURL(appGroupID: String = "group.com.crossdashboard") -> URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?
             .appendingPathComponent("CrossDashboard.sqlite")
@@ -269,7 +269,7 @@ final class PersistenceController {
     }
 
     /// Creates a ModelContainer stored entirely in memory. Used in tests and SwiftUI Previews.
-    static func preview() -> PersistenceController {
+    public static func preview() -> PersistenceController {
         let instance = PersistenceController(inMemory: true)
         return instance
     }

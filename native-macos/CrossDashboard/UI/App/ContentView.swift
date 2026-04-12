@@ -10,14 +10,15 @@ struct ContentView: View {
     @Environment(PomodoroViewModel.self) private var pomodoroVM
     @Environment(\.appContainer) private var container
 
-    var body: some View {
-        @Bindable var vm = appViewModel
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var selectedScreen: Screen? = .dashboard
 
+    var body: some View {
         Group {
             if appViewModel.isLocked {
                 BiometricLockView()
             } else {
-                NavigationSplitView(columnVisibility: .constant(.all)) {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
                     sidebar
                 } content: {
                     contentColumn
@@ -28,9 +29,15 @@ struct ContentView: View {
                 .overlay(alignment: .bottomTrailing) {
                     PomodoroFloatingBar()
                 }
+                .onChange(of: selectedScreen) { _, newScreen in
+                    appViewModel.selectedScreen = newScreen
+                }
+                .onChange(of: appViewModel.selectedScreen) { _, newScreen in
+                    selectedScreen = newScreen
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .crossDashboardOpenEvent)) { note in
                     if let uid = note.userInfo?["eventUID"] as? String {
-                        appViewModel.selectedScreen = .events
+                        selectedScreen = .events
                         appViewModel.selectedEventID = uid
                     }
                 }
@@ -41,10 +48,21 @@ struct ContentView: View {
     // ─── Sidebar ──────────────────────────────────────────────────────────────
 
     private var sidebar: some View {
-        @Bindable var vm = appViewModel
-        return List(appViewModel.visibleScreens, selection: $vm.selectedScreen) { screen in
-            Label(screen.label, systemImage: screen.systemImage)
-                .accessibilityLabel(screen.label)
+        List {
+            ForEach(appViewModel.visibleScreens) { screen in
+                Label(screen.label, systemImage: screen.systemImage)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .listRowBackground(
+                        selectedScreen == screen
+                            ? Color.accentColor.opacity(0.15)
+                            : Color.clear
+                    )
+                    .foregroundStyle(selectedScreen == screen ? Color.accentColor : Color.primary)
+                    .onTapGesture { selectedScreen = screen }
+                    .accessibilityLabel(screen.label)
+                    .accessibilityAddTraits(selectedScreen == screen ? .isSelected : [])
+            }
         }
         .listStyle(.sidebar)
         .navigationTitle("CrossDashboard")
@@ -65,7 +83,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var contentColumn: some View {
-        switch appViewModel.selectedScreen {
+        switch selectedScreen {
         case .dashboard:
             DashboardView()
         case .inbox:
@@ -93,7 +111,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailColumn: some View {
-        switch appViewModel.selectedScreen {
+        switch selectedScreen {
         case .tasks:
             TaskDetailView(taskID: appViewModel.selectedTaskID)
         case .events:

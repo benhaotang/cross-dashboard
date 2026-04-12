@@ -5,6 +5,7 @@ import CrossDashboardKit
 /// Room is the source of truth; UI observes via ModelContext fetch.
 /// Mirrors EventRepository.kt.
 @Observable
+@MainActor
 final class EventRepository {
 
     private let context: ModelContext

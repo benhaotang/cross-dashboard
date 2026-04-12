@@ -2,60 +2,82 @@ import Foundation
 
 // ─── CalDAV ───────────────────────────────────────────────────────────────────
 
-struct CalDavCalendar: Codable, Identifiable, Hashable {
-    var id: String { href }
-    let href: String
-    let displayName: String
-    let color: String?        // normalized #RRGGBB
-    let ctag: String?
-    let components: [String]  // VEVENT, VTODO, VJOURNAL
+public struct CalDavCalendar: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { href }
+    public let href: String
+    public let displayName: String
+    public let color: String?        // normalized #RRGGBB
+    public let ctag: String?
+    public let components: [String]  // VEVENT, VTODO, VJOURNAL
+
+    public init(href: String, displayName: String, color: String? = nil, ctag: String? = nil, components: [String] = []) {
+        self.href = href
+        self.displayName = displayName
+        self.color = color
+        self.ctag = ctag
+        self.components = components
+    }
 }
 
-struct CalendarEvent: Codable, Identifiable, Hashable {
-    var id: String { uid }
-    let uid: String
-    let summary: String
-    let start: Date
-    let end: Date
-    let description: String?
-    let location: String?
-    let calendarHref: String?
-    let etag: String?
-    let href: String?
+public struct CalendarEvent: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { uid }
+    public let uid: String
+    public let summary: String
+    public let start: Date
+    public let end: Date
+    public let description: String?
+    public let location: String?
+    public let calendarHref: String?
+    public let etag: String?
+    public let href: String?
+
+    public init(uid: String, summary: String, start: Date, end: Date,
+                description: String? = nil, location: String? = nil,
+                calendarHref: String? = nil, etag: String? = nil, href: String? = nil) {
+        self.uid = uid
+        self.summary = summary
+        self.start = start
+        self.end = end
+        self.description = description
+        self.location = location
+        self.calendarHref = calendarHref
+        self.etag = etag
+        self.href = href
+    }
 }
 
-enum TaskStatus: String, Codable, CaseIterable {
+public enum TaskStatus: String, Codable, CaseIterable, Sendable {
     case needsAction = "NEEDS-ACTION"
     case inProcess   = "IN-PROCESS"
     case completed   = "COMPLETED"
     case cancelled   = "CANCELLED"
 
-    static func fromIcal(_ value: String) -> TaskStatus {
+    public static func fromIcal(_ value: String) -> TaskStatus {
         allCases.first { $0.rawValue.lowercased() == value.lowercased() } ?? .needsAction
     }
 }
 
-struct CalDavTask: Codable, Identifiable, Hashable {
-    var id: String { uid }
-    let uid: String
-    let summary: String
-    let description: String?
-    let status: TaskStatus
-    let priority: Int           // 0=none, 1-4=high, 5=med, 6-9=low
-    let percentComplete: Int
-    let due: Date?
-    let dtstart: Date?
-    let completed: Date?
-    let created: Date
-    let lastModified: Date
-    let categories: [String]
-    let location: String?
-    let parentUid: String?
-    let calendarHref: String?
-    let etag: String?
-    let href: String?
+public struct CalDavTask: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { uid }
+    public let uid: String
+    public let summary: String
+    public let description: String?
+    public let status: TaskStatus
+    public let priority: Int           // 0=none, 1-4=high, 5=med, 6-9=low
+    public let percentComplete: Int
+    public let due: Date?
+    public let dtstart: Date?
+    public let completed: Date?
+    public let created: Date
+    public let lastModified: Date
+    public let categories: [String]
+    public let location: String?
+    public let parentUid: String?
+    public let calendarHref: String?
+    public let etag: String?
+    public let href: String?
 
-    init(
+    public init(
         uid: String = UUID().uuidString,
         summary: String,
         description: String? = nil,
@@ -94,19 +116,19 @@ struct CalDavTask: Codable, Identifiable, Hashable {
     }
 }
 
-struct Note: Codable, Identifiable, Hashable {
-    var id: String { uid }
-    let uid: String
-    let summary: String
-    let body: String
-    let categories: [String]
-    let created: Date
-    let lastModified: Date
-    let calendarHref: String?
-    let etag: String?
-    let href: String?
+public struct Note: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { uid }
+    public let uid: String
+    public let summary: String
+    public let body: String
+    public let categories: [String]
+    public let created: Date
+    public let lastModified: Date
+    public let calendarHref: String?
+    public let etag: String?
+    public let href: String?
 
-    init(
+    public init(
         uid: String = UUID().uuidString,
         summary: String,
         body: String = "",
@@ -131,59 +153,104 @@ struct Note: Codable, Identifiable, Hashable {
 
 // ─── Gitea ────────────────────────────────────────────────────────────────────
 
-struct GiteaIssue: Codable, Identifiable, Hashable {
-    let id: Int64
-    let number: Int
-    let title: String
-    let body: String
-    let state: String           // "open" | "closed"
-    let labels: [String]
-    let assignees: [String]
-    let createdAt: Date
-    let updatedAt: Date
-    let repository: String      // "owner/repo"
-    let htmlUrl: String
+public struct GiteaIssue: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let number: Int
+    public let title: String
+    public let body: String
+    public let state: String           // "open" | "closed"
+    public let labels: [String]
+    public let assignees: [String]
+    public let createdAt: Date
+    public let updatedAt: Date
+    public let repository: String      // "owner/repo"
+    public let htmlUrl: String
+
+    public init(id: Int64, number: Int, title: String, body: String, state: String,
+                labels: [String] = [], assignees: [String] = [],
+                createdAt: Date, updatedAt: Date, repository: String, htmlUrl: String) {
+        self.id = id
+        self.number = number
+        self.title = title
+        self.body = body
+        self.state = state
+        self.labels = labels
+        self.assignees = assignees
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.repository = repository
+        self.htmlUrl = htmlUrl
+    }
 }
 
-struct GiteaComment: Codable, Identifiable, Hashable {
-    let id: Int64
-    let body: String
-    let user: String
-    let createdAt: Date
+public struct GiteaComment: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let body: String
+    public let user: String
+    public let createdAt: Date
+
+    public init(id: Int64, body: String, user: String, createdAt: Date) {
+        self.id = id
+        self.body = body
+        self.user = user
+        self.createdAt = createdAt
+    }
 }
 
-struct GiteaLabel: Codable, Identifiable, Hashable {
-    let id: Int64
-    let name: String
-    let color: String           // hex without #
+public struct GiteaLabel: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let name: String
+    public let color: String           // hex without #
+
+    public init(id: Int64, name: String, color: String) {
+        self.id = id
+        self.name = name
+        self.color = color
+    }
 }
 
-struct GiteaMilestone: Codable, Identifiable, Hashable {
-    let id: Int64
-    let title: String
-    let dueOn: Date?
-    let openIssues: Int
-    let closedIssues: Int
+public struct GiteaMilestone: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let title: String
+    public let dueOn: Date?
+    public let openIssues: Int
+    public let closedIssues: Int
+
+    public init(id: Int64, title: String, dueOn: Date? = nil, openIssues: Int = 0, closedIssues: Int = 0) {
+        self.id = id
+        self.title = title
+        self.dueOn = dueOn
+        self.openIssues = openIssues
+        self.closedIssues = closedIssues
+    }
 }
 
-struct GiteaAttachment: Codable, Identifiable, Hashable {
-    let id: Int64
-    let name: String
-    let downloadUrl: String
-    let size: Int64
-    let uuid: String
+public struct GiteaAttachment: Codable, Identifiable, Hashable, Sendable {
+    public let id: Int64
+    public let name: String
+    public let downloadUrl: String
+    public let size: Int64
+    public let uuid: String
+
+    public init(id: Int64, name: String, downloadUrl: String, size: Int64, uuid: String) {
+        self.id = id
+        self.name = name
+        self.downloadUrl = downloadUrl
+        self.size = size
+        self.uuid = uuid
+    }
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
-struct DailyStats: Codable, Identifiable, Hashable {
-    var id: String { date }
-    let date: String            // ISO-8601 "yyyy-MM-dd"
-    let tasksCompleted: Int
-    let pomodoroSessions: Int
-    let issuesClosed: Int
+public struct DailyStats: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { date }
+    public let date: String            // ISO-8601 "yyyy-MM-dd"
+    public let tasksCompleted: Int
+    public let pomodoroSessions: Int
+    public let issuesClosed: Int
 
-    init(date: String, tasksCompleted: Int = 0, pomodoroSessions: Int = 0, issuesClosed: Int = 0) {
+    public init(date: String, tasksCompleted: Int = 0, pomodoroSessions: Int = 0, issuesClosed: Int = 0) {
         self.date = date
         self.tasksCompleted = tasksCompleted
         self.pomodoroSessions = pomodoroSessions
@@ -193,27 +260,34 @@ struct DailyStats: Codable, Identifiable, Hashable {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-enum CalDavAuthMethod: String, Codable, CaseIterable {
+public enum CalDavAuthMethod: String, Codable, CaseIterable, Sendable {
     case loginFlowV2 = "LOGIN_FLOW_V2"
     case manual      = "MANUAL"
 }
 
-struct CalDavCredentials: Codable {
-    let authMethod: CalDavAuthMethod
-    let serverUrl: String
-    let username: String
-    let password: String?
+public struct CalDavCredentials: Codable, Sendable {
+    public let authMethod: CalDavAuthMethod
+    public let serverUrl: String
+    public let username: String
+    public let password: String?
+
+    public init(authMethod: CalDavAuthMethod, serverUrl: String, username: String, password: String? = nil) {
+        self.authMethod = authMethod
+        self.serverUrl = serverUrl
+        self.username = username
+        self.password = password
+    }
 }
 
 // ─── Inbox aggregation ────────────────────────────────────────────────────────
 
-enum InboxItem: Identifiable {
+public enum InboxItem: Identifiable, Sendable {
     case event(CalendarEvent, durationMinutes: Int)
     case task(CalDavTask, estimatedMinutes: Int?)
     case issue(GiteaIssue, estimatedMinutes: Int?)
     case milestone(GiteaMilestone)
 
-    var id: String {
+    public var id: String {
         switch self {
         case .event(let e, _):     return "event-\(e.uid)"
         case .task(let t, _):      return "task-\(t.uid)"
@@ -225,19 +299,27 @@ enum InboxItem: Identifiable {
 
 // ─── Pomodoro ─────────────────────────────────────────────────────────────────
 
-struct PomodoroSettings: Codable, Equatable {
-    var workMinutes: Int = 25
-    var shortBreakMinutes: Int = 5
-    var longBreakMinutes: Int = 15
-    var sessionsUntilLongBreak: Int = 4
+public struct PomodoroSettings: Codable, Equatable, Sendable {
+    public var workMinutes: Int = 25
+    public var shortBreakMinutes: Int = 5
+    public var longBreakMinutes: Int = 15
+    public var sessionsUntilLongBreak: Int = 4
+
+    public init(workMinutes: Int = 25, shortBreakMinutes: Int = 5,
+                longBreakMinutes: Int = 15, sessionsUntilLongBreak: Int = 4) {
+        self.workMinutes = workMinutes
+        self.shortBreakMinutes = shortBreakMinutes
+        self.longBreakMinutes = longBreakMinutes
+        self.sessionsUntilLongBreak = sessionsUntilLongBreak
+    }
 }
 
-enum PomodoroPhase: String, Codable, CaseIterable {
+public enum PomodoroPhase: String, Codable, CaseIterable, Sendable {
     case work        = "WORK"
     case shortBreak  = "SHORT_BREAK"
     case longBreak   = "LONG_BREAK"
 
-    var label: String {
+    public var label: String {
         switch self {
         case .work:       return "Focus"
         case .shortBreak: return "Short break"
@@ -246,52 +328,83 @@ enum PomodoroPhase: String, Codable, CaseIterable {
     }
 }
 
-struct PomodoroState: Codable, Equatable {
-    var phase: PomodoroPhase = .work
-    var secondsLeft: Int = 25 * 60
-    var running: Bool = false
-    var currentSession: Int = 1
-    var completedSessions: Int = 0
-    var itemTitle: String = ""
-    var active: Bool = false
-    var settings: PomodoroSettings = PomodoroSettings()
+public struct PomodoroState: Codable, Equatable, Sendable {
+    public var phase: PomodoroPhase = .work
+    public var secondsLeft: Int = 25 * 60
+    public var running: Bool = false
+    public var currentSession: Int = 1
+    public var completedSessions: Int = 0
+    public var itemTitle: String = ""
+    public var active: Bool = false
+    public var settings: PomodoroSettings = PomodoroSettings()
+
+    public init(phase: PomodoroPhase = .work, secondsLeft: Int = 25 * 60,
+                running: Bool = false, currentSession: Int = 1,
+                completedSessions: Int = 0, itemTitle: String = "",
+                active: Bool = false, settings: PomodoroSettings = PomodoroSettings()) {
+        self.phase = phase
+        self.secondsLeft = secondsLeft
+        self.running = running
+        self.currentSession = currentSession
+        self.completedSessions = completedSessions
+        self.itemTitle = itemTitle
+        self.active = active
+        self.settings = settings
+    }
 }
 
 // ─── Task input parsing ───────────────────────────────────────────────────────
 
-struct TaskDefaults: Codable, Equatable {
-    var morningHour: Int = 8
-    var afternoonHour: Int = 13
-    var nightHour: Int = 21
-    var defaultHour: Int = 10
+public struct TaskDefaults: Codable, Equatable, Sendable {
+    public var morningHour: Int = 8
+    public var afternoonHour: Int = 13
+    public var nightHour: Int = 21
+    public var defaultHour: Int = 10
+
+    public init(morningHour: Int = 8, afternoonHour: Int = 13,
+                nightHour: Int = 21, defaultHour: Int = 10) {
+        self.morningHour = morningHour
+        self.afternoonHour = afternoonHour
+        self.nightHour = nightHour
+        self.defaultHour = defaultHour
+    }
 }
 
-struct ParsedTask {
-    let summary: String
-    let priority: Int           // 0, 1 (high), 5 (med), 9 (low)
-    let categories: [String]
-    let due: Date?
+public struct ParsedTask: Sendable {
+    public let summary: String
+    public let priority: Int           // 0, 1 (high), 5 (med), 9 (low)
+    public let categories: [String]
+    public let due: Date?
+
+    public init(summary: String, priority: Int = 0, categories: [String] = [], due: Date? = nil) {
+        self.summary = summary
+        self.priority = priority
+        self.categories = categories
+        self.due = due
+    }
 }
 
 // ─── App preferences ─────────────────────────────────────────────────────────
 
-enum ThemePreference: String, Codable, CaseIterable {
+public enum ThemePreference: String, Codable, CaseIterable, Sendable {
     case system = "SYSTEM"
     case light  = "LIGHT"
     case dark   = "DARK"
 }
 
-let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views"]
-let defaultKanbanColumns: [String] = ["backlog", "planned", "inprogress", "done"]
+public let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views"]
+public let defaultKanbanColumns: [String] = ["backlog", "planned", "inprogress", "done"]
 
-struct AppSettings: Codable, Equatable {
-    var theme: ThemePreference = .system
-    var visibleScreens: [String] = allScreens
-    var kanbanColumns: [String] = defaultKanbanColumns
-    var pomodoroSettings: PomodoroSettings = PomodoroSettings()
-    var taskDefaults: TaskDefaults = TaskDefaults()
-    var notificationsEnabled: Bool = true
-    var notificationMinutesBefore: Int = 15
-    var biometricLockEnabled: Bool = false
-    var showPomodoroInMenuBar: Bool = true
+public struct AppSettings: Codable, Equatable, Sendable {
+    public var theme: ThemePreference = .system
+    public var visibleScreens: [String] = allScreens
+    public var kanbanColumns: [String] = defaultKanbanColumns
+    public var pomodoroSettings: PomodoroSettings = PomodoroSettings()
+    public var taskDefaults: TaskDefaults = TaskDefaults()
+    public var notificationsEnabled: Bool = true
+    public var notificationMinutesBefore: Int = 15
+    public var biometricLockEnabled: Bool = false
+    public var showPomodoroInMenuBar: Bool = true
+
+    public init() {}
 }

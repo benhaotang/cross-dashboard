@@ -5,32 +5,32 @@ import Observation
 /// Mirrors AppPreferences.kt (DataStore) on Android.
 @Observable
 @MainActor
-final class AppPreferences {
-    static let shared = AppPreferences()
+public final class AppPreferences {
+    public static let shared = AppPreferences()
 
     private let defaults: UserDefaults
 
     // ─── Theme ───────────────────────────────────────────────────────────────
 
-    var theme: ThemePreference {
+    public var theme: ThemePreference {
         didSet { defaults.set(theme.rawValue, forKey: Keys.theme) }
     }
 
     // ─── Visible screens ─────────────────────────────────────────────────────
 
-    var visibleScreens: [String] {
+    public var visibleScreens: [String] {
         didSet { defaults.set(visibleScreens.joined(separator: ","), forKey: Keys.visibleScreens) }
     }
 
     // ─── Kanban columns ──────────────────────────────────────────────────────
 
-    var kanbanColumns: [String] {
+    public var kanbanColumns: [String] {
         didSet { defaults.set(kanbanColumns.joined(separator: ","), forKey: Keys.kanbanColumns) }
     }
 
     // ─── Pomodoro ────────────────────────────────────────────────────────────
 
-    var pomodoroSettings: PomodoroSettings {
+    public var pomodoroSettings: PomodoroSettings {
         didSet {
             defaults.set(pomodoroSettings.workMinutes,            forKey: Keys.pomodoroWork)
             defaults.set(pomodoroSettings.shortBreakMinutes,      forKey: Keys.pomodoroShort)
@@ -41,7 +41,7 @@ final class AppPreferences {
 
     // ─── Task input defaults ─────────────────────────────────────────────────
 
-    var taskDefaults: TaskDefaults {
+    public var taskDefaults: TaskDefaults {
         didSet {
             defaults.set(taskDefaults.morningHour,   forKey: Keys.taskMorningHour)
             defaults.set(taskDefaults.afternoonHour, forKey: Keys.taskAfternoonHour)
@@ -52,36 +52,36 @@ final class AppPreferences {
 
     // ─── Notifications ───────────────────────────────────────────────────────
 
-    var notificationsEnabled: Bool {
+    public var notificationsEnabled: Bool {
         didSet { defaults.set(notificationsEnabled, forKey: Keys.notifEnabled) }
     }
 
-    var notificationMinutesBefore: Int {
+    public var notificationMinutesBefore: Int {
         didSet { defaults.set(notificationMinutesBefore, forKey: Keys.notifMinutes) }
     }
 
     // ─── Sync interval ───────────────────────────────────────────────────────
 
     /// Background sync interval in minutes. Default is 60.
-    var syncIntervalMinutes: Int {
+    public var syncIntervalMinutes: Int {
         didSet { defaults.set(syncIntervalMinutes, forKey: Keys.syncInterval) }
     }
 
     // ─── Biometric lock ──────────────────────────────────────────────────────
 
-    var biometricLockEnabled: Bool {
+    public var biometricLockEnabled: Bool {
         didSet { defaults.set(biometricLockEnabled, forKey: Keys.biometricLock) }
     }
 
     // ─── Pomodoro menu bar ───────────────────────────────────────────────────
 
-    var showPomodoroInMenuBar: Bool {
+    public var showPomodoroInMenuBar: Bool {
         didSet { defaults.set(showPomodoroInMenuBar, forKey: Keys.pomodoroMenuBar) }
     }
 
     // ─── Last sync ───────────────────────────────────────────────────────────
 
-    var lastSyncDate: Date? {
+    public var lastSyncDate: Date? {
         didSet {
             if let d = lastSyncDate {
                 defaults.set(d.timeIntervalSince1970, forKey: Keys.lastSync)

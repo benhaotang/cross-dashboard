@@ -35,7 +35,7 @@ final class InboxViewModel {
         let horizon = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
 
         // Upcoming events (next 7 days)
-        let events = container.eventRepository.allEvents
+        let events = container.eventRepository.events
             .filter { $0.start >= now && $0.start <= horizon }
             .sorted { $0.start < $1.start }
         for event in events {

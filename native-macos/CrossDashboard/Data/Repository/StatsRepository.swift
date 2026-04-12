@@ -3,6 +3,7 @@ import SwiftData
 import CrossDashboardKit
 
 /// Mirrors StatsRepository.kt.
+@MainActor
 final class StatsRepository {
 
     private let context: ModelContext
@@ -24,28 +25,38 @@ final class StatsRepository {
         return models.map { $0.toDomain() }
     }
 
-    func incrementTasksCompleted() async {
-        await MainActor.run { increment(field: \.tasksCompleted) }
+    func incrementTasksCompleted() {
+        increment(.tasks)
     }
 
-    func incrementPomodoro() async {
-        await MainActor.run { increment(field: \.pomodoroSessions) }
+    func incrementPomodoro() {
+        increment(.pomodoro)
     }
 
-    func incrementIssuesClosed() async {
-        await MainActor.run { increment(field: \.issuesClosed) }
+    func incrementIssuesClosed() {
+        increment(.issues)
     }
 
-    private func increment(field: WritableKeyPath<StatsModel, Int>) {
+    private enum StatField { case tasks, pomodoro, issues }
+
+    private func increment(_ field: StatField) {
         let today = isoDate(Date())
         let descriptor = FetchDescriptor<StatsModel>(
             predicate: #Predicate { $0.date == today }
         )
         if let existing = (try? context.fetch(descriptor))?.first {
-            existing[keyPath: field] += 1
+            switch field {
+            case .tasks:    existing.tasksCompleted    += 1
+            case .pomodoro: existing.pomodoroSessions  += 1
+            case .issues:   existing.issuesClosed      += 1
+            }
         } else {
             let model = StatsModel(date: today)
-            model[keyPath: field] = 1
+            switch field {
+            case .tasks:    model.tasksCompleted    = 1
+            case .pomodoro: model.pomodoroSessions  = 1
+            case .issues:   model.issuesClosed      = 1
+            }
             context.insert(model)
         }
         try? context.save()

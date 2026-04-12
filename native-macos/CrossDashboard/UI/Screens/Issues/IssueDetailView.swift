@@ -309,7 +309,7 @@ private struct AddCommentBar: View {
                     Button(action: onSubmit) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title3)
-                            .foregroundStyle(draft.trimmingCharacters(in: .whitespaces).isEmpty ? .tertiary : .accentColor)
+                            .foregroundStyle(draft.trimmingCharacters(in: .whitespaces).isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
                     }
                     .buttonStyle(.plain)
                     .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)

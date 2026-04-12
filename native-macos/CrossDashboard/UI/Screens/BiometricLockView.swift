@@ -156,11 +156,11 @@ struct BiometricLockView: View {
     private func submitPin() {
         let enteredPin = pinDigits.map(String.init).joined()
         let enteredHash = sha256(enteredPin)
-        let storedHash = KeychainStore.shared.get(key: pinHashKey) ?? ""
+        let storedHash = KeychainStore.shared.get(pinHashKey) ?? ""
 
         if storedHash.isEmpty {
             // No PIN stored yet — this is first-time setup; set the PIN and unlock
-            KeychainStore.shared.set(key: pinHashKey, value: enteredHash)
+            KeychainStore.shared.set(pinHashKey, value: enteredHash)
             appViewModel.unlock()
         } else if enteredHash == storedHash {
             appViewModel.unlock()

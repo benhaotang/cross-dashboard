@@ -80,7 +80,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .tasks:     return "checklist"
         case .notes:     return "note.text"
         case .issues:    return "exclamationmark.bubble"
-        case .views:     return "kanban"
+        case .views:     return "rectangle.3.group"
         }
     }
 

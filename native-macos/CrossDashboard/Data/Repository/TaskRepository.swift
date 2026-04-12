@@ -4,6 +4,7 @@ import CrossDashboardKit
 
 /// Mirrors TaskRepository.kt.
 @Observable
+@MainActor
 final class TaskRepository {
 
     private let context: ModelContext

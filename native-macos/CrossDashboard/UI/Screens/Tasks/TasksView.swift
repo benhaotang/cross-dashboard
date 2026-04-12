@@ -68,15 +68,28 @@ struct TasksView: View {
                 set: { viewModel.selectedTaskID = $0 }
             )) {
                 OutlineGroup(
-                    viewModel.filteredRootTasks,
-                    id: \.uid,
-                    children: \.nonEmptySubtasks(in: viewModel)
-                ) { task in
-                    TaskRow(task: task, viewModel: viewModel)
-                        .tag(task.uid)
+                    taskTree,
+                    id: \.id,
+                    children: \.children
+                ) { node in
+                    TaskRow(task: node.task, viewModel: viewModel)
+                        .tag(node.task.uid)
                 }
             }
             .listStyle(.sidebar)
+        }
+    }
+
+    // ─── Task tree ────────────────────────────────────────────────────────────
+
+    private var taskTree: [TaskNode] {
+        buildNodes(viewModel.filteredRootTasks)
+    }
+
+    private func buildNodes(_ tasks: [CalDavTask]) -> [TaskNode] {
+        tasks.map { task in
+            let subs = viewModel.subtasks(of: task.uid)
+            return TaskNode(task: task, children: subs.isEmpty ? nil : buildNodes(subs))
         }
     }
 
@@ -193,11 +206,10 @@ private struct TaskRow: View {
     }
 }
 
-// ─── CalDavTask subtask helper for OutlineGroup ───────────────────────────────
+// ─── TaskNode: wraps CalDavTask with pre-computed children for OutlineGroup ───
 
-private extension CalDavTask {
-    func nonEmptySubtasks(in viewModel: TasksViewModel) -> [CalDavTask]? {
-        let children = viewModel.subtasks(of: uid)
-        return children.isEmpty ? nil : children
-    }
+private struct TaskNode: Identifiable {
+    let task: CalDavTask
+    let children: [TaskNode]?
+    var id: String { task.uid }
 }

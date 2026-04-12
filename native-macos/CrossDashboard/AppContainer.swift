@@ -11,7 +11,7 @@ final class AppContainer {
 
     // ─── Shared instance ──────────────────────────────────────────────────────
 
-    static let shared: AppContainer = AppContainer()
+    nonisolated(unsafe) static let shared: AppContainer = MainActor.assumeIsolated { AppContainer() }
 
     // ─── Data layer ───────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ final class AppContainer {
 import SwiftUI
 
 private struct AppContainerKey: EnvironmentKey {
-    @MainActor static let defaultValue: AppContainer = .shared
+    static let defaultValue: AppContainer = .shared
 }
 
 extension EnvironmentValues {

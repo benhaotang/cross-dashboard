@@ -13,6 +13,24 @@ packages:
     url: https://github.com/gonzalezreal/swift-markdown-ui
     from: "2.3.0"
 
+schemes:
+  CrossDashboard:
+    build:
+      targets:
+        CrossDashboard: all
+        CrossDashboardKit: [build]
+        DashboardWidgetExtension: [build]
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
 targets:
 
   CrossDashboardKit:
@@ -30,7 +48,10 @@ targets:
         PRODUCT_NAME: CrossDashboardKit
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
-        CODE_SIGN_STYLE: Automatic
+        MACH_O_TYPE: staticlib
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: ""
 
   CrossDashboard:
     type: application
@@ -80,6 +101,7 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
     dependencies:
       - target: CrossDashboardKit
+        embed: false
       - package: swift-markdown-ui
         product: MarkdownUI
 
@@ -111,3 +133,4 @@ targets:
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - target: CrossDashboardKit
+        embed: false
