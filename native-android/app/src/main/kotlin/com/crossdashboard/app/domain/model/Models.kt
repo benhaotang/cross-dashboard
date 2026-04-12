@@ -109,6 +109,14 @@ data class GiteaMilestone(
     val closedIssues: Int,
 )
 
+data class GiteaAttachment(
+    val id: Long,
+    val name: String,
+    val downloadUrl: String,
+    val size: Long,
+    val uuid: String,
+)
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 data class DailyStats(

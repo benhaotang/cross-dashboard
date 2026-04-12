@@ -209,6 +209,28 @@ class IssueRepository @Inject constructor(
         val updated = fresh.firstOrNull { it.number == number }
         if (updated != null) dao.upsertAll(listOf(updated.toEntity()))
     }
+
+    suspend fun createIssue(repo: String, title: String, body: String): GiteaIssue {
+        val issue = client.createIssue(repo, title, body)
+        dao.upsertAll(listOf(issue.toEntity()))
+        return issue
+    }
+
+    suspend fun attachToIssue(
+        repo: String, issueNumber: Int,
+        fileName: String, bytes: ByteArray, mimeType: String,
+    ): String = client.uploadIssueAttachment(repo, issueNumber, fileName, bytes, mimeType)
+
+    suspend fun attachToComment(
+        repo: String, commentId: Long,
+        fileName: String, bytes: ByteArray, mimeType: String,
+    ): String = client.uploadCommentAttachment(repo, commentId, fileName, bytes, mimeType)
+
+    suspend fun fetchIssueAttachments(repo: String, issueNumber: Int) =
+        client.fetchIssueAttachments(repo, issueNumber)
+
+    suspend fun fetchCommentAttachments(repo: String, commentId: Long) =
+        client.fetchCommentAttachments(repo, commentId)
 }
 
 // ─── Stats Repository ─────────────────────────────────────────────────────────

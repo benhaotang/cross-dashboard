@@ -110,6 +110,94 @@ class GiteaClient @Inject constructor(
             put("$base/api/v1/repos/$repo/issues/$number/labels", payload)
         }
 
+    suspend fun fetchIssueAttachments(repo: String, issueNumber: Int): List<GiteaAttachment> =
+        withContext(Dispatchers.IO) {
+            val base = instanceUrl() ?: return@withContext emptyList()
+            val response = get("$base/api/v1/repos/$repo/issues/$issueNumber/assets")
+                ?: return@withContext emptyList()
+            runCatching { json.decodeFromString<List<GiteaAttachmentDto>>(response) }
+                .getOrNull()
+                ?.map { it.toDomain() }
+                ?: emptyList()
+        }
+
+    suspend fun fetchCommentAttachments(repo: String, commentId: Long): List<GiteaAttachment> =
+        withContext(Dispatchers.IO) {
+            val base = instanceUrl() ?: return@withContext emptyList()
+            val response = get("$base/api/v1/repos/$repo/issues/comments/$commentId/assets")
+                ?: return@withContext emptyList()
+            runCatching { json.decodeFromString<List<GiteaAttachmentDto>>(response) }
+                .getOrNull()
+                ?.map { it.toDomain() }
+                ?: emptyList()
+        }
+
+    suspend fun createIssue(repo: String, title: String, body: String): GiteaIssue =
+        withContext(Dispatchers.IO) {
+            val base = instanceUrl() ?: throw IOException("No Gitea instance configured")
+            val payload = buildString {
+                append("{")
+                append(""""title":${json.encodeToString(title)}""")
+                if (body.isNotBlank()) append(""","body":${json.encodeToString(body)}""")
+                append("}")
+            }
+            val response = post("$base/api/v1/repos/$repo/issues", payload)
+                ?: throw IOException("Create issue failed")
+            json.decodeFromString<GiteaIssueDto>(response).toDomain(repo)
+        }
+
+    suspend fun uploadIssueAttachment(
+        repo: String,
+        issueNumber: Int,
+        fileName: String,
+        bytes: ByteArray,
+        mimeType: String,
+    ): String = withContext(Dispatchers.IO) {
+        val base = instanceUrl() ?: throw IOException("No Gitea instance configured")
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("attachment", fileName, bytes.toRequestBody(mimeType.toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url("$base/api/v1/repos/$repo/issues/$issueNumber/assets")
+            .addToken()
+            .post(body)
+            .build()
+        httpClient.newCall(request).execute().use { r ->
+            if (!r.isSuccessful) throw IOException("Attachment upload failed: ${r.code}")
+            val dto = json.decodeFromString<GiteaAttachmentDto>(
+                r.body?.string() ?: throw IOException("Empty response")
+            )
+            dto.browser_download_url
+        }
+    }
+
+    suspend fun uploadCommentAttachment(
+        repo: String,
+        commentId: Long,
+        fileName: String,
+        bytes: ByteArray,
+        mimeType: String,
+    ): String = withContext(Dispatchers.IO) {
+        val base = instanceUrl() ?: throw IOException("No Gitea instance configured")
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("attachment", fileName, bytes.toRequestBody(mimeType.toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url("$base/api/v1/repos/$repo/issues/comments/$commentId/assets")
+            .addToken()
+            .post(body)
+            .build()
+        httpClient.newCall(request).execute().use { r ->
+            if (!r.isSuccessful) throw IOException("Attachment upload failed: ${r.code}")
+            val dto = json.decodeFromString<GiteaAttachmentDto>(
+                r.body?.string() ?: throw IOException("Empty response")
+            )
+            dto.browser_download_url
+        }
+    }
+
     // ─── HTTP helpers ─────────────────────────────────────────────────────────
 
     private fun get(url: String): String? {
@@ -205,4 +293,21 @@ class GiteaClient @Inject constructor(
 
     @Serializable
     private data class GiteaUserDto(val login: String)
+
+    @Serializable
+    private data class GiteaAttachmentDto(
+        val id: Long = 0,
+        val name: String = "",
+        val browser_download_url: String = "",
+        val size: Long = 0,
+        val uuid: String = "",
+    ) {
+        fun toDomain() = GiteaAttachment(
+            id = id,
+            name = name,
+            downloadUrl = browser_download_url,
+            size = size,
+            uuid = uuid,
+        )
+    }
 }
