@@ -169,7 +169,7 @@ fun EventsScreen(
         EventPropertySheet(
             event = event,
             colorResolver = colorResolver,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedEvent = null },
         )
     }
 }

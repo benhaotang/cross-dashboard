@@ -189,14 +189,14 @@ fun NotesScreen(
         NotePropertySheet(
             note = note,
             colorResolver = colorResolver,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedNote = null },
             onSave = { updated ->
                 viewModel.updateNote(updated)
-                scope.launch { navigator.navigateBack() }
+                selectedNote = null
             },
             onDelete = {
                 viewModel.deleteNote(note)
-                scope.launch { navigator.navigateBack() }
+                selectedNote = null
             },
         )
     }

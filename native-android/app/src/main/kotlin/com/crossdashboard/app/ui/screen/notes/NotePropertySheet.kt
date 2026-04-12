@@ -43,7 +43,7 @@ fun NotePropertySheet(
                     if (editing) editedNote = note  // cancel: reset
                     editing = !editing
                 },
-                onClose = onDismiss,
+                onClose = null,
             )
 
             if (editing) {

@@ -244,18 +244,18 @@ fun TasksScreenContent(
             kanbanColumns = state.kanbanColumns,
             colorResolver = colorResolver,
             inlineMode = false,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedTask = null },
             onSave = { updated ->
                 viewModel.saveTask(updated)
-                scope.launch { navigator.navigateBack() }
+                selectedTask = null
             },
             onDelete = {
                 viewModel.deleteTask(task)
-                scope.launch { navigator.navigateBack() }
+                selectedTask = null
             },
             onToggleComplete = {
                 viewModel.toggleComplete(task)
-                scope.launch { navigator.navigateBack() }
+                selectedTask = null
             },
         )
     }

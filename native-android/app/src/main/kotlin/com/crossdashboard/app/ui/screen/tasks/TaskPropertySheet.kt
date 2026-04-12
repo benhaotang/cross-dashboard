@@ -81,7 +81,7 @@ fun TaskPropertySheet(
                     }
                     editing = !editing
                 },
-                onClose = onDismiss,
+                onClose = null,
             )
 
             if (editing) {

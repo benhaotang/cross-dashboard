@@ -74,7 +74,7 @@ fun PropertySheetHeader(
     title: String,
     editing: Boolean,
     onEditToggle: (() -> Unit)?,
-    onClose: () -> Unit,
+    onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -104,11 +104,13 @@ fun PropertySheetHeader(
                 }
             }
         }
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier.semantics { contentDescription = "Close" },
-        ) {
-            Icon(Icons.Outlined.Close, contentDescription = null)
+        if (onClose != null) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.semantics { contentDescription = "Close" },
+            ) {
+                Icon(Icons.Outlined.Close, contentDescription = null)
+            }
         }
     }
 }

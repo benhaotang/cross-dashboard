@@ -181,14 +181,14 @@ fun IssuesScreen(
             commentLoading = commentLoading,
             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
             commentAttachments = state.commentAttachments,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedIssue = null },
             onSave = { title, body ->
                 viewModel.saveIssue(issue, title, body)
-                scope.launch { navigator.navigateBack() }
+                selectedIssue = null
             },
             onToggleState = {
                 viewModel.toggleState(issue)
-                scope.launch { navigator.navigateBack() }
+                selectedIssue = null
             },
             onAddComment = { body, attachments -> viewModel.addComment(issue, body, attachments) },
         )
