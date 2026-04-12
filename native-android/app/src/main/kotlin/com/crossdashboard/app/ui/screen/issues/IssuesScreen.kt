@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
@@ -57,6 +58,14 @@ fun IssuesScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.showCreateSheet() },
+                modifier = Modifier.semantics { contentDescription = "Create new issue" },
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null)
+            }
         },
     ) { paddingValues ->
         NavigableListDetailPaneScaffold(
@@ -139,7 +148,7 @@ fun IssuesScreen(
                                 viewModel.toggleState(issue)
                                 scope.launch { navigator.navigateBack() }
                             },
-                            onAddComment = { body -> viewModel.addComment(issue, body) },
+                            onAddComment = { body, attachments -> viewModel.addComment(issue, body, attachments) },
                         )
                     } else {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -177,7 +186,18 @@ fun IssuesScreen(
                 viewModel.toggleState(issue)
                 scope.launch { navigator.navigateBack() }
             },
-            onAddComment = { body -> viewModel.addComment(issue, body) },
+            onAddComment = { body, attachments -> viewModel.addComment(issue, body, attachments) },
+        )
+    }
+
+    if (state.showCreateSheet) {
+        CreateIssueSheet(
+            repos = state.configuredRepos,
+            isCreating = state.isCreating,
+            onDismiss = { viewModel.dismissCreateSheet() },
+            onCreate = { repo, title, body, attachments ->
+                viewModel.createIssue(repo, title, body, attachments)
+            },
         )
     }
 }

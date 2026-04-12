@@ -2,6 +2,9 @@ package com.crossdashboard.app.ui.screen.issues
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +28,9 @@ import com.crossdashboard.app.domain.model.GiteaComment
 import com.crossdashboard.app.domain.model.GiteaIssue
 import com.crossdashboard.app.ui.component.*
 import com.crossdashboard.app.ui.screen.tasks.PomodoroViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -35,7 +43,7 @@ fun IssuePropertySheet(
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
     onToggleState: () -> Unit,
-    onAddComment: (String) -> Unit,
+    onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     /** When true, renders content inline (no ModalBottomSheet wrapper) for tablet detail pane. */
     inlineMode: Boolean = false,
     pomodoroVm: PomodoroViewModel = hiltViewModel(),
@@ -126,12 +134,37 @@ internal fun IssueReadContent(
     comments: List<GiteaComment>,
     commentLoading: Boolean,
     onToggleState: () -> Unit,
-    onAddComment: (String) -> Unit,
+    onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     onPomodoroStart: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var newComment by remember { mutableStateOf("") }
+    var pendingAttachments by remember { mutableStateOf<List<PendingAttachment>>(emptyList()) }
     val isOpen = issue.state == "open"
+
+    val fileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val bytes = withContext(Dispatchers.IO) {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            } ?: return@launch
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val fileName = run {
+                var name = "attachment"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0) name = cursor.getString(idx)
+                    }
+                }
+                name
+            }
+            pendingAttachments = pendingAttachments + PendingAttachment(fileName, mimeType, bytes)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // Scrollable section (metadata + body + comments)
@@ -251,6 +284,36 @@ internal fun IssueReadContent(
             }
         }
 
+        // Pending comment attachments
+        if (pendingAttachments.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                pendingAttachments.forEach { att ->
+                    InputChip(
+                        selected = false,
+                        onClick = {},
+                        label = { Text(att.fileName, style = MaterialTheme.typography.labelSmall) },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { pendingAttachments = pendingAttachments - att },
+                                modifier = Modifier.size(18.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Remove ${att.fileName}",
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
         // Comment input — always visible at bottom
         Row(
             modifier = Modifier
@@ -266,13 +329,20 @@ internal fun IssueReadContent(
                 maxLines = 4,
             )
             IconButton(
+                onClick = { fileLauncher.launch("*/*") },
+                modifier = Modifier.semantics { contentDescription = "Attach file to comment" },
+            ) {
+                Icon(Icons.Outlined.AttachFile, contentDescription = null)
+            }
+            IconButton(
                 onClick = {
-                    if (newComment.isNotBlank()) {
-                        onAddComment(newComment.trim())
+                    if (newComment.isNotBlank() || pendingAttachments.isNotEmpty()) {
+                        onAddComment(newComment.trim(), pendingAttachments)
                         newComment = ""
+                        pendingAttachments = emptyList()
                     }
                 },
-                enabled = newComment.isNotBlank(),
+                enabled = newComment.isNotBlank() || pendingAttachments.isNotEmpty(),
                 modifier = Modifier.semantics { contentDescription = "Post comment" },
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null)
@@ -294,7 +364,7 @@ fun IssueDetailContent(
     commentLoading: Boolean,
     onSave: (String, String) -> Unit,
     onToggleState: () -> Unit,
-    onAddComment: (String) -> Unit,
+    onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     onDismiss: () -> Unit = {},
     pomodoroVm: PomodoroViewModel = hiltViewModel(),
 ) {
