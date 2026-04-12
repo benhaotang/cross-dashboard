@@ -123,7 +123,7 @@ native-android/
 ### Network
 - `CalDavClient` uses raw OkHttp 5 — no Retrofit. CalDAV uses non-standard HTTP methods (`PROPFIND`, `REPORT`, `MKCALENDAR`) that require direct `Request.Builder` usage.
 - `ICalParser` is a hand-written RFC 5545 line-by-line parser (no third-party iCal library) supporting VEVENT/VTODO/VJOURNAL read + serialization.
-- `GiteaClient` uses kotlinx.serialization DTOs with `toDomain()` mappers.
+- `GiteaClient` uses kotlinx.serialization DTOs with `toDomain()` mappers. Multipart uploads (OkHttp `MultipartBody`) are used for issue and comment attachments.
 
 ### Nextcloud Auth (three options)
 1. **Nextcloud SSO** (`NextcloudSsoHelper`) — AIDL IPC via `Android-SingleSignOn`; preferred when NC app is installed (e.g. LineageOS + F-Droid).
@@ -164,6 +164,35 @@ Read-only detail views render descriptions and note bodies as GitHub-Flavoured M
 | Issue detail (`CommentItem`) | Comment body | `MarkdownText` directly |
 
 **Rule:** Use `ReadMarkdownField` / `MarkdownText` only in read-only branches. Edit forms (`TaskEditForm`, `NoteEditForm`, etc.) always use plain `OutlinedTextField` — never pass markdown-rendered content into an editor.
+
+### Issues (Gitea) — Feature Details
+
+All Gitea issue operations go through `GiteaClient` → `IssueRepository` → `IssuesViewModel`.
+
+**Create issue**
+- FAB (`+`) on `IssuesScreen` calls `viewModel.showCreateSheet()`.
+- `CreateIssueSheet` (bottom sheet) provides: repository dropdown (from `GITEA_REPOS` credential), title, description, and optional file attachments.
+- Flow: `POST /repos/{owner}/{repo}/issues` → save to Room → upload each `PendingAttachment` via `POST /repos/{owner}/{repo}/issues/{index}/assets` (multipart/form-data).
+
+**Attachments — creating / uploading**
+- `PendingAttachment(fileName, mimeType, bytes)` is a UI-layer data class defined in `IssuesViewModel.kt`.
+- Files are read from a `Uri` via `ContentResolver.openInputStream()` inside a `Dispatchers.IO` coroutine launched from `rememberCoroutineScope()` in the composable.
+- Issue attachments: uploaded after `createIssue()` succeeds.
+- Comment attachments: uploaded after `addComment()` succeeds.
+- `GiteaClient.uploadIssueAttachment()` / `uploadCommentAttachment()` both POST `multipart/form-data` with a single field named `attachment`.
+
+**Attachments — fetching / displaying**
+- `GiteaAttachment(id, name, downloadUrl, size, uuid)` is defined in `domain/model/Models.kt`.
+- `IssuesUiState` holds `issueAttachments: Map<Long, List<GiteaAttachment>>` (keyed by issue id) and `commentAttachments: Map<Long, List<GiteaAttachment>>` (keyed by comment id).
+- Loaded in `loadComments()` using `async`/`await` in parallel: issue attachments (`GET /repos/{owner}/{repo}/issues/{index}/assets`) and all per-comment attachments (`GET /repos/{owner}/{repo}/issues/comments/{id}/assets`) are fetched alongside comments.
+- `AttachmentLink` composable (in `IssuePropertySheet.kt`) renders each attachment as a tappable row with a paperclip icon, filename, and file size. Tapping fires `Intent.ACTION_VIEW` with the download URL to open in the system browser.
+- Issue attachments appear as a dedicated "Attachments" section below the issue description in `IssueReadContent`.
+- Comment attachments appear below each comment's markdown body inside `CommentItem`.
+
+**Comment input with attachments**
+- Paperclip icon button beside the send button opens the system file picker (`ActivityResultContracts.GetContent("*/*")`).
+- Selected files appear as `InputChip` removable chips above the text field.
+- On send, `onAddComment(body, pendingAttachments)` is called; the ViewModel posts the comment then uploads each attachment.
 
 ---
 
@@ -220,7 +249,7 @@ Priority: `!` → low(9), `!!` → medium(5), `!!!` → high(1). Tags: `#word` �
 | Events | `EventsViewModel` | Day/week/month filter, calendar color dots, adaptive list-detail |
 | Tasks | `TasksViewModel` | Quick input bar, nested subtask tree, filter, kanban chips, Pomodoro |
 | Notes | `NotesViewModel` | Grid/list view, search, VJOURNAL CRUD |
-| Issues | `IssuesViewModel` | State filter, comments, open/close toggle, Pomodoro |
+| Issues | `IssuesViewModel` | State filter, create issue (FAB), comments, attachments (issue + comment), open/close toggle, Pomodoro |
 | Views | `ViewsViewModel` | Kanban + Covey Four Quadrants, assign modal, sync back to CalDAV/Gitea |
 | Inbox | `InboxViewModel` | Unified list; total estimated time from durations and `#Xm`/`#Xh` tags |
 | Settings | `SettingsViewModel` | CalDAV (SSO/LoginFlow/Manual), calendars, Gitea, theme, nav toggles, Pomodoro, alarms, widget sync, biometric |
@@ -273,6 +302,8 @@ Property sheets: `ModalBottomSheet` on phone; inline detail pane (`NavigableList
 **Phase 5** — Live notifications: Notification channels, `PomodoroForegroundService` with `Notification.ProgressStyle` live update (API 36), `PomodoroViewModel` + `PomodoroBar` + `PomodoroModal`, session logging to task description.
 
 **Phase 6** — Polish: `NavigableListDetailPaneScaffold` on all list screens (events/tasks/notes/issues), `FoldableUtils.kt` hinge avoidance, predictive back in `PropertySheet`, shared element transitions on Tasks, full TalkBack accessibility audit, dark mode refinement, ProGuard rules.
+
+**Phase 7** — Issues enhancements: `CreateIssueSheet` (create issue with title, body, repo selector, file attachments via SAF), `PendingAttachment` UI data class, `GiteaAttachment` domain model, `AttachmentLink` composable, `GiteaClient` multipart upload/fetch methods for issue and comment assets, attachment display in `IssueReadContent` (issue-level section) and `CommentItem` (per-comment), attachment support in comment input bar.
 
 ### Remaining / Next Steps
 - End-to-end smoke test: `./gradlew assembleDebug` — fix any remaining compilation errors

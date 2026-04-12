@@ -3,6 +3,7 @@ package com.crossdashboard.app.ui.screen.issues
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.crossdashboard.app.domain.model.GiteaAttachment
 import com.crossdashboard.app.domain.model.GiteaComment
 import com.crossdashboard.app.domain.model.GiteaIssue
 import com.crossdashboard.app.ui.component.*
@@ -40,6 +42,8 @@ fun IssuePropertySheet(
     issue: GiteaIssue,
     comments: List<GiteaComment>,
     commentLoading: Boolean,
+    issueAttachments: List<GiteaAttachment> = emptyList(),
+    commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
     onToggleState: () -> Unit,
@@ -108,6 +112,8 @@ fun IssuePropertySheet(
                     issue = issue,
                     comments = comments,
                     commentLoading = commentLoading,
+                    issueAttachments = issueAttachments,
+                    commentAttachments = commentAttachments,
                     onToggleState = onToggleState,
                     onAddComment = onAddComment,
                     onPomodoroStart = { pomodoroVm.start(issue.title) },
@@ -133,6 +139,8 @@ internal fun IssueReadContent(
     issue: GiteaIssue,
     comments: List<GiteaComment>,
     commentLoading: Boolean,
+    issueAttachments: List<GiteaAttachment> = emptyList(),
+    commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     onPomodoroStart: () -> Unit,
@@ -227,6 +235,20 @@ internal fun IssueReadContent(
                 }
             }
 
+            if (issueAttachments.isNotEmpty()) {
+                item {
+                    SheetSectionHeader(title = "Attachments (${issueAttachments.size})")
+                    Column(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        issueAttachments.forEach { att ->
+                            AttachmentLink(attachment = att)
+                        }
+                    }
+                }
+            }
+
             item {
                 TextButton(
                     onClick = {
@@ -279,7 +301,10 @@ internal fun IssueReadContent(
                 }
             } else {
                 items(comments, key = { it.id }) { comment ->
-                    CommentItem(comment = comment)
+                    CommentItem(
+                        comment = comment,
+                        attachments = commentAttachments[comment.id] ?: emptyList(),
+                    )
                 }
             }
         }
@@ -362,6 +387,8 @@ fun IssueDetailContent(
     issue: GiteaIssue,
     comments: List<GiteaComment>,
     commentLoading: Boolean,
+    issueAttachments: List<GiteaAttachment> = emptyList(),
+    commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
     onSave: (String, String) -> Unit,
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
@@ -372,6 +399,8 @@ fun IssueDetailContent(
         issue = issue,
         comments = comments,
         commentLoading = commentLoading,
+        issueAttachments = issueAttachments,
+        commentAttachments = commentAttachments,
         onDismiss = onDismiss,
         onSave = onSave,
         onToggleState = onToggleState,
@@ -389,7 +418,10 @@ private val commentDtFmt = DateTimeFormatter.ofPattern("d MMM HH:mm")
     .withZone(ZoneId.systemDefault())
 
 @Composable
-private fun CommentItem(comment: GiteaComment) {
+private fun CommentItem(
+    comment: GiteaComment,
+    attachments: List<GiteaAttachment> = emptyList(),
+) {
     Surface(
         shape = MaterialTheme.shapes.small,
         tonalElevation = 1.dp,
@@ -420,6 +452,61 @@ private fun CommentItem(comment: GiteaComment) {
                 content = comment.body,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (attachments.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    attachments.forEach { att ->
+                        AttachmentLink(attachment = att)
+                    }
+                }
+            }
         }
     }
+}
+
+// ─── Attachment hyperlink row ─────────────────────────────────────────────────
+
+@Composable
+private fun AttachmentLink(attachment: GiteaAttachment) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(attachment.downloadUrl))
+                )
+            }
+            .semantics { contentDescription = "Open attachment ${attachment.name}" }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            Icons.Outlined.AttachFile,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = attachment.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (attachment.size > 0) {
+            Text(
+                text = formatFileSize(attachment.size),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun formatFileSize(bytes: Long): String = when {
+    bytes < 1024 -> "${bytes} B"
+    bytes < 1024 * 1024 -> "${"%.1f".format(bytes / 1024.0)} KB"
+    else -> "${"%.1f".format(bytes / (1024.0 * 1024))} MB"
 }

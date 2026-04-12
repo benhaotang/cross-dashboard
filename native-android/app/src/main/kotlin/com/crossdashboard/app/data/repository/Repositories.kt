@@ -225,6 +225,12 @@ class IssueRepository @Inject constructor(
         repo: String, commentId: Long,
         fileName: String, bytes: ByteArray, mimeType: String,
     ): String = client.uploadCommentAttachment(repo, commentId, fileName, bytes, mimeType)
+
+    suspend fun fetchIssueAttachments(repo: String, issueNumber: Int) =
+        client.fetchIssueAttachments(repo, issueNumber)
+
+    suspend fun fetchCommentAttachments(repo: String, commentId: Long) =
+        client.fetchCommentAttachments(repo, commentId)
 }
 
 // ─── Stats Repository ─────────────────────────────────────────────────────────

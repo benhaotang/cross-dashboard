@@ -110,6 +110,28 @@ class GiteaClient @Inject constructor(
             put("$base/api/v1/repos/$repo/issues/$number/labels", payload)
         }
 
+    suspend fun fetchIssueAttachments(repo: String, issueNumber: Int): List<GiteaAttachment> =
+        withContext(Dispatchers.IO) {
+            val base = instanceUrl() ?: return@withContext emptyList()
+            val response = get("$base/api/v1/repos/$repo/issues/$issueNumber/assets")
+                ?: return@withContext emptyList()
+            runCatching { json.decodeFromString<List<GiteaAttachmentDto>>(response) }
+                .getOrNull()
+                ?.map { it.toDomain() }
+                ?: emptyList()
+        }
+
+    suspend fun fetchCommentAttachments(repo: String, commentId: Long): List<GiteaAttachment> =
+        withContext(Dispatchers.IO) {
+            val base = instanceUrl() ?: return@withContext emptyList()
+            val response = get("$base/api/v1/repos/$repo/issues/comments/$commentId/assets")
+                ?: return@withContext emptyList()
+            runCatching { json.decodeFromString<List<GiteaAttachmentDto>>(response) }
+                .getOrNull()
+                ?.map { it.toDomain() }
+                ?: emptyList()
+        }
+
     suspend fun createIssue(repo: String, title: String, body: String): GiteaIssue =
         withContext(Dispatchers.IO) {
             val base = instanceUrl() ?: throw IOException("No Gitea instance configured")
@@ -279,5 +301,13 @@ class GiteaClient @Inject constructor(
         val browser_download_url: String = "",
         val size: Long = 0,
         val uuid: String = "",
-    )
+    ) {
+        fun toDomain() = GiteaAttachment(
+            id = id,
+            name = name,
+            downloadUrl = browser_download_url,
+            size = size,
+            uuid = uuid,
+        )
+    }
 }

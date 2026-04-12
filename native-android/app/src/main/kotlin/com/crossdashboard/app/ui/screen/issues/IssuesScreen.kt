@@ -139,6 +139,8 @@ fun IssuesScreen(
                             issue = issue,
                             comments = comments,
                             commentLoading = commentLoading,
+                            issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
+                            commentAttachments = state.commentAttachments,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
                             onSave = { title, body ->
                                 viewModel.saveIssue(issue, title, body)
@@ -177,6 +179,8 @@ fun IssuesScreen(
             issue = issue,
             comments = comments,
             commentLoading = commentLoading,
+            issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
+            commentAttachments = state.commentAttachments,
             onDismiss = { scope.launch { navigator.navigateBack() } },
             onSave = { title, body ->
                 viewModel.saveIssue(issue, title, body)
