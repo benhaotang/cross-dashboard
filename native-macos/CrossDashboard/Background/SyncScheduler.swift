@@ -9,6 +9,7 @@ import CrossDashboardKit
 /// - On fire: calls `AppContainer.shared.syncAll()`, then asks
 ///   `NotificationScheduler` to reschedule all event alarms.
 /// - Call `scheduleIfNeeded()` once from `CrossDashboardApp.init()`.
+@MainActor
 final class SyncScheduler {
 
     static let shared = SyncScheduler()
@@ -28,8 +29,15 @@ final class SyncScheduler {
         scheduler.interval = syncInterval()
         scheduler.tolerance = scheduler.interval * 0.1
         scheduler.qualityOfService = .utility
-        scheduler.schedule { [weak self] completion in
-            self?.performSync(completion: completion)
+        // The NSBackgroundActivityScheduler callback fires on a background thread,
+        // so hop to the main actor before touching any @MainActor-isolated singletons.
+        scheduler.schedule { completion in
+            Task { @MainActor in
+                await AppContainer.shared.syncAll()
+                let events = AppContainer.shared.eventRepository.events
+                await NotificationScheduler.shared.rescheduleAll(events: events)
+                completion(.finished)
+            }
         }
         activity = scheduler
     }
@@ -44,16 +52,6 @@ final class SyncScheduler {
     }
 
     // ─── Private ──────────────────────────────────────────────────────────────
-
-    private func performSync(completion: NSBackgroundActivityScheduler.CompletionHandler) {
-        Task {
-            await AppContainer.shared.syncAll()
-            // After sync, reschedule event notifications.
-            let events = AppContainer.shared.eventRepository.events
-            await NotificationScheduler.shared.rescheduleAll(events: events)
-            completion(.finished)
-        }
-    }
 
     private func syncInterval() -> TimeInterval {
         Double(AppPreferences.shared.syncIntervalMinutes) * 60

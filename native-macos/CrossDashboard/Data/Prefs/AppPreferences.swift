@@ -4,6 +4,7 @@ import Observation
 /// Non-sensitive preferences backed by UserDefaults.
 /// Mirrors AppPreferences.kt (DataStore) on Android.
 @Observable
+@MainActor
 final class AppPreferences {
     static let shared = AppPreferences()
 
