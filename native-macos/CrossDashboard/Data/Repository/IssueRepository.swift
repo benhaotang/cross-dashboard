@@ -34,12 +34,25 @@ final class IssueRepository {
         let (open, closed) = await (openFetch, closedFetch)
         let all = open + closed
         guard !all.isEmpty else { return }
-        await MainActor.run {
-            try? context.delete(model: IssueModel.self)
-            all.forEach { context.insert(IssueModel(from: $0)) }
-            try? context.save()
-            loadFromDB()
+
+        // Mirror Android's deleteAll() + upsertAll() pattern:
+        // Commit deletions first so SwiftData's in-memory context is fully cleared
+        // before inserting new records, avoiding unique-constraint conflicts on issueId.
+        do {
+            try context.delete(model: IssueModel.self)
+            try context.save()
+        } catch {
+            print("[IssueRepository] Failed to clear issues: \(error)")
+            return
         }
+        do {
+            all.forEach { context.insert(IssueModel(from: $0)) }
+            try context.save()
+        } catch {
+            print("[IssueRepository] Failed to save issues: \(error)")
+            return
+        }
+        loadFromDB()
     }
 
     func update(
@@ -50,9 +63,7 @@ final class IssueRepository {
         state: String? = nil
     ) async throws -> GiteaIssue {
         let updated = try await client.updateIssue(repo: repo, number: number, title: title, body: body, state: state)
-        await MainActor.run {
-            upsertInDB(updated)
-        }
+        upsertInDB(updated)
         if state == "closed" {
             await statsRepo.incrementIssuesClosed()
         }
@@ -84,13 +95,15 @@ final class IssueRepository {
         async let closedFetch = client.fetchIssues(repositories: [repo], state: "closed")
         let (open, closed) = await (openFetch, closedFetch)
         if let updated = (open + closed).first(where: { $0.number == number }) {
-            await MainActor.run { upsertInDB(updated) }
+            upsertInDB(updated)
         }
     }
 
     func createIssue(repo: String, title: String, body: String) async throws -> GiteaIssue {
         let issue = try await client.createIssue(repo: repo, title: title, body: body)
-        await MainActor.run { context.insert(IssueModel(from: issue)); try? context.save(); loadFromDB() }
+        context.insert(IssueModel(from: issue))
+        try? context.save()
+        loadFromDB()
         return issue
     }
 

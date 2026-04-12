@@ -18,30 +18,46 @@ struct ContentView: View {
             if appViewModel.isLocked {
                 BiometricLockView()
             } else {
-                NavigationSplitView(columnVisibility: $columnVisibility) {
-                    sidebar
-                } content: {
-                    contentColumn
-                } detail: {
-                    detailColumn
-                }
-                .navigationSplitViewStyle(.balanced)
-                .overlay(alignment: .bottomTrailing) {
-                    PomodoroFloatingBar()
-                }
-                .onChange(of: selectedScreen) { _, newScreen in
-                    appViewModel.selectedScreen = newScreen
-                }
-                .onChange(of: appViewModel.selectedScreen) { _, newScreen in
-                    selectedScreen = newScreen
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .crossDashboardOpenEvent)) { note in
-                    if let uid = note.userInfo?["eventUID"] as? String {
-                        selectedScreen = .events
-                        appViewModel.selectedEventID = uid
+                splitView
+                    .overlay(alignment: .bottomTrailing) {
+                        PomodoroFloatingBar()
                     }
-                }
+                    .onChange(of: selectedScreen) { _, newScreen in
+                        appViewModel.selectedScreen = newScreen
+                    }
+                    .onChange(of: appViewModel.selectedScreen) { _, newScreen in
+                        selectedScreen = newScreen
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .crossDashboardOpenEvent)) { note in
+                        if let uid = note.userInfo?["eventUID"] as? String {
+                            selectedScreen = .events
+                            appViewModel.selectedEventID = uid
+                        }
+                    }
             }
+        }
+    }
+
+    /// Views doesn't use a detail pane, so we switch to a two-column split to
+    /// avoid the empty "Select an item" placeholder eating half the screen.
+    @ViewBuilder
+    private var splitView: some View {
+        if selectedScreen == .views {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                sidebar
+            } detail: {
+                ViewsView()
+            }
+            .navigationSplitViewStyle(.balanced)
+        } else {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                sidebar
+            } content: {
+                contentColumn
+            } detail: {
+                detailColumn
+            }
+            .navigationSplitViewStyle(.balanced)
         }
     }
 
@@ -97,7 +113,7 @@ struct ContentView: View {
         case .issues:
             IssuesView()
         case .views:
-            ViewsView()
+            EmptyView()
         case nil:
             ContentUnavailableView(
                 "CrossDashboard",

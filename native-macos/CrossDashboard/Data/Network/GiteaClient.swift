@@ -31,10 +31,15 @@ final class GiteaClient: Sendable {
             while true {
                 let url = "\(base)/api/v1/repos/\(repo)/issues?state=\(state)&type=issues&limit=50&page=\(page)"
                 guard let data = await get(url) else { break }
-                guard let dtos = try? decoder.decode([GiteaIssueDto].self, from: data), !dtos.isEmpty else { break }
-                results += dtos.map { $0.toDomain(repo: repo) }
-                page += 1
-                if dtos.count < 50 { break }
+                do {
+                    let dtos = try decoder.decode([GiteaIssueDto].self, from: data)
+                    if dtos.isEmpty { break }
+                    results += dtos.map { $0.toDomain(repo: repo) }
+                    page += 1
+                    if dtos.count < 50 { break }
+                } catch {
+                    break
+                }
             }
         }
         return results
@@ -242,6 +247,15 @@ final class GiteaClient: Sendable {
 
     // ─── DTOs ─────────────────────────────────────────────────────────────────
 
+    // Date parsing uses value-typed ISO8601FormatStyle (Sendable, macOS 12+).
+    // Gitea uses RFC-3339 / ISO-8601, e.g. "2024-01-15T10:30:00Z" or
+    // "2024-01-15T10:30:00.000Z". Try plain first, fall back to fractional seconds.
+    private static func parseDate(_ string: String) -> Date {
+        if let d = try? Date(string, strategy: .iso8601) { return d }
+        if let d = try? Date(string, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return d }
+        return Date()
+    }
+
     private struct GiteaIssueDto: Codable {
         let id: Int64
         let number: Int
@@ -255,15 +269,13 @@ final class GiteaClient: Sendable {
         let html_url: String
 
         func toDomain(repo: String) -> GiteaIssue {
-            let isoDecoder = ISO8601DateFormatter()
-            let created = isoDecoder.date(from: created_at) ?? Date()
-            let updated = isoDecoder.date(from: updated_at) ?? Date()
-            return GiteaIssue(
+            GiteaIssue(
                 id: id, number: number, title: title, body: body ?? "",
                 state: state,
                 labels: labels?.map(\.name) ?? [],
                 assignees: assignees?.map(\.login) ?? [],
-                createdAt: created, updatedAt: updated,
+                createdAt: GiteaClient.parseDate(created_at),
+                updatedAt: GiteaClient.parseDate(updated_at),
                 repository: repo, htmlUrl: html_url
             )
         }
@@ -278,7 +290,7 @@ final class GiteaClient: Sendable {
         func toDomain() -> GiteaComment {
             GiteaComment(
                 id: id, body: body, user: user.login,
-                createdAt: ISO8601DateFormatter().date(from: created_at) ?? Date()
+                createdAt: GiteaClient.parseDate(created_at)
             )
         }
     }
