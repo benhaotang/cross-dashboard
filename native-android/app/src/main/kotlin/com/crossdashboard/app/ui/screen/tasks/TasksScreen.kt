@@ -78,6 +78,13 @@ fun TasksScreenContent(
     var selectedTask by remember { mutableStateOf<CalDavTask?>(null) }
     val scope = rememberCoroutineScope()
 
+    fun openTask(task: CalDavTask) {
+        selectedTask = task
+        if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+            scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, task.uid) }
+        }
+    }
+
     // Handle deep link auto-focus (widget add-task shortcut)
     LaunchedEffect(pendingAction) {
         if (pendingAction == "add_task") {
@@ -94,7 +101,9 @@ fun TasksScreenContent(
             val target = state.rootTasks.find { it.uid == initialUid }
             if (target != null) {
                 selectedTask = target
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
+                if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
+                }
                 initialNavigationDone = true
             }
         }
@@ -176,18 +185,12 @@ fun TasksScreenContent(
                                                 depth = 0,
                                                 expanded = task.uid in state.expandedUids,
                                                 onExpandToggle = { viewModel.toggleExpand(task.uid) },
-                                onTaskClick = {
-                                    selectedTask = task
-                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, task.uid) }
-                                },
+                                                onTaskClick = { openTask(task) },
                                                 onToggleComplete = { viewModel.toggleComplete(task) },
                                                 colorResolver = colorResolver,
                                                 subtasksFlow = viewModel.subtasksOf(task.uid),
                                                 expandedUids = state.expandedUids,
-                                onSubtaskClick = {
-                                    selectedTask = it
-                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, it.uid) }
-                                },
+                                                onSubtaskClick = { openTask(it) },
                                                 onSubtaskToggle = { viewModel.toggleComplete(it) },
                                                 onSubtaskExpand = { viewModel.toggleExpand(it.uid) },
                                                 isSelected = task.uid == selectedUid,
