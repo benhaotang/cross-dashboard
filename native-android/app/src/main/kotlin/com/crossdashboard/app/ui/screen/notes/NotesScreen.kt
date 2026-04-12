@@ -46,6 +46,15 @@ fun NotesScreen(
     var showCreateSheet by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
 
+    fun openNote(note: Note) {
+        selectedNote = note
+        if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+            scope.launch {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, note.uid)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             if (showSearch) {
@@ -136,12 +145,7 @@ fun NotesScreen(
                                     note = note,
                                     colorResolver = colorResolver,
                                     isSelected = navigator.currentDestination?.contentKey == note.uid,
-                                    onClick = {
-                                        selectedNote = note
-                                        scope.launch {
-                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, note.uid)
-                                        }
-                                    },
+                                    onClick = { openNote(note) },
                                 )
                             }
                         }
@@ -189,14 +193,14 @@ fun NotesScreen(
         NotePropertySheet(
             note = note,
             colorResolver = colorResolver,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedNote = null },
             onSave = { updated ->
                 viewModel.updateNote(updated)
-                scope.launch { navigator.navigateBack() }
+                selectedNote = null
             },
             onDelete = {
                 viewModel.deleteNote(note)
-                scope.launch { navigator.navigateBack() }
+                selectedNote = null
             },
         )
     }

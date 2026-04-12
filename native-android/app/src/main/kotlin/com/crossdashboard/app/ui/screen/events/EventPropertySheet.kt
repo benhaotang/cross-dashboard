@@ -36,7 +36,7 @@ fun EventPropertySheet(
                 title = event.summary,
                 editing = false,
                 onEditToggle = null,   // events are read-only
-                onClose = onDismiss,
+                onClose = null,
             )
 
             ReadField(label = "Start", value = dtFmt.format(event.start))

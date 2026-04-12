@@ -73,7 +73,7 @@ fun IssuePropertySheet(
                     }
                     editing = !editing
                 },
-                onClose = onDismiss,
+                onClose = null,
             )
 
             if (editing) {

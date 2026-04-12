@@ -43,6 +43,15 @@ fun EventsScreen(
     var selectedEvent by remember { mutableStateOf<CalendarEvent?>(null) }
     val scope = rememberCoroutineScope()
 
+    fun openEvent(event: CalendarEvent) {
+        selectedEvent = event
+        if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] !=
+            androidx.compose.material3.adaptive.layout.PaneAdaptedValue.Hidden
+        ) {
+            scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, event.uid) }
+        }
+    }
+
     // When opened via a notification tap, auto-navigate the detail pane to the target event.
     // Runs whenever events load or the uid changes; the flag prevents double-navigation.
     var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
@@ -51,7 +60,11 @@ fun EventsScreen(
             val target = state.events.find { it.uid == initialUid }
             if (target != null) {
                 selectedEvent = target
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
+                if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] !=
+                    androidx.compose.material3.adaptive.layout.PaneAdaptedValue.Hidden
+                ) {
+                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.uid)
+                }
                 initialNavigationDone = true
             }
         }
@@ -125,11 +138,8 @@ fun EventsScreen(
                                     EventListRow(
                                         event = event,
                                         colorResolver = colorResolver,
-                        isSelected = navigator.currentDestination?.contentKey == event.uid,
-                                    onClick = {
-                                        selectedEvent = event
-                                        scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, event.uid) }
-                                    },
+                                        isSelected = navigator.currentDestination?.contentKey == event.uid,
+                                        onClick = { openEvent(event) },
                                     )
                                 }
                             }
@@ -169,7 +179,7 @@ fun EventsScreen(
         EventPropertySheet(
             event = event,
             colorResolver = colorResolver,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedEvent = null },
         )
     }
 }

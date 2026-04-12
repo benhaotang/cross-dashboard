@@ -38,6 +38,16 @@ fun IssuesScreen(
     var selectedIssue by remember { mutableStateOf<GiteaIssue?>(null) }
     val scope = rememberCoroutineScope()
 
+    fun openIssue(issue: GiteaIssue) {
+        selectedIssue = issue
+        viewModel.loadComments(issue)
+        if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+            scope.launch {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue.id.toString())
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -114,14 +124,8 @@ fun IssuesScreen(
                                 items(state.issues, key = { it.id }) { issue ->
                                     IssueListRow(
                                         issue = issue,
-                        isSelected = navigator.currentDestination?.contentKey == issue.id.toString(),
-                                    onClick = {
-                                        selectedIssue = issue
-                                        viewModel.loadComments(issue)
-                                        scope.launch {
-                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue.id.toString())
-                                        }
-                                    },
+                                        isSelected = navigator.currentDestination?.contentKey == issue.id.toString(),
+                                        onClick = { openIssue(issue) },
                                     )
                                 }
                             }
@@ -181,14 +185,14 @@ fun IssuesScreen(
             commentLoading = commentLoading,
             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
             commentAttachments = state.commentAttachments,
-            onDismiss = { scope.launch { navigator.navigateBack() } },
+            onDismiss = { selectedIssue = null },
             onSave = { title, body ->
                 viewModel.saveIssue(issue, title, body)
-                scope.launch { navigator.navigateBack() }
+                selectedIssue = null
             },
             onToggleState = {
                 viewModel.toggleState(issue)
-                scope.launch { navigator.navigateBack() }
+                selectedIssue = null
             },
             onAddComment = { body, attachments -> viewModel.addComment(issue, body, attachments) },
         )
