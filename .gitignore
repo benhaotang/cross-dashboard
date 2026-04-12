@@ -20,6 +20,25 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Xcode / Swift (macOS native)
+DerivedData/
+**/xcuserdata/
+**/*.xcuserstate
+**/*.xcscmblueprint
+**/*.xccheckout
+**/*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.swiftdoc
+*.swiftmodule
+*.swiftsourceinfo
+.build/
+.swiftpm/configuration/
+*.xcactivitylog
+xcodebuild*.log
+
 # Metro
 .metro-health-check*
 

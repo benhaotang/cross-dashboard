@@ -1,0 +1,366 @@
+import SwiftUI
+import CrossDashboardKit
+
+/// Full settings window with tabbed sections.
+/// Mirrors SettingsScreen on Android. Opens via Cmd+, (macOS Settings scene).
+struct SettingsView: View {
+
+    @State private var viewModel = SettingsViewModel()
+
+    var body: some View {
+        TabView {
+            CalDavSettingsTab(viewModel: viewModel)
+                .tabItem { Label("CalDAV", systemImage: "server.rack") }
+
+            GiteaSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Gitea", systemImage: "chevron.left.forwardslash.chevron.right") }
+
+            AppearanceSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Appearance", systemImage: "paintbrush") }
+
+            TaskDefaultsTab(viewModel: viewModel)
+                .tabItem { Label("Tasks", systemImage: "checklist") }
+
+            PomodoroSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Pomodoro", systemImage: "timer") }
+
+            NotificationsSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Notifications", systemImage: "bell") }
+
+            SecuritySettingsTab(viewModel: viewModel)
+                .tabItem { Label("Security", systemImage: "lock.shield") }
+
+            AboutSettingsTab(viewModel: viewModel)
+                .tabItem { Label("About", systemImage: "info.circle") }
+        }
+        .frame(minWidth: 520, minHeight: 400)
+        .onAppear { viewModel.loadAll() }
+    }
+}
+
+// ─── CalDAV Tab ───────────────────────────────────────────────────────────────
+
+private struct CalDavSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Authentication") {
+                Picker("Method", selection: $viewModel.caldavAuthMethod) {
+                    Text("Login Flow v2").tag(CalDavAuthMethod.loginFlowV2)
+                    Text("Manual").tag(CalDavAuthMethod.manual)
+                }
+                .pickerStyle(.segmented)
+
+                if viewModel.caldavAuthMethod == .loginFlowV2 {
+                    TextField("Nextcloud Server URL", text: $viewModel.caldavServer)
+                        .textContentType(.URL)
+                    Button("Sign in via Browser…") {
+                        viewModel.startLoginFlowV2()
+                    }
+                    .disabled(viewModel.caldavServer.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if !viewModel.caldavLoginFlowStatus.isEmpty {
+                        Text(viewModel.caldavLoginFlowStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    TextField("Server URL", text: $viewModel.caldavServer)
+                        .textContentType(.URL)
+                    TextField("Username", text: $viewModel.caldavUsername)
+                        .textContentType(.username)
+                    SecureField("Password", text: $viewModel.caldavPassword)
+                        .textContentType(.password)
+                }
+            }
+
+            Section {
+                HStack {
+                    Button("Save & Test Connection") {
+                        viewModel.testCalDavConnection()
+                    }
+                    .disabled(viewModel.caldavIsTestingConnection)
+
+                    if viewModel.caldavIsTestingConnection {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+
+                if let result = viewModel.caldavConnectionResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(result.hasPrefix("Error") ? .red : .green)
+                }
+            }
+
+            if !viewModel.availableCalendars.isEmpty {
+                Section("Calendars") {
+                    ForEach(viewModel.availableCalendars) { cal in
+                        Toggle(
+                            cal.displayName,
+                            isOn: Binding(
+                                get: { viewModel.selectedCalendarHrefs.contains(cal.href) },
+                                set: { on in
+                                    if on { viewModel.selectedCalendarHrefs.insert(cal.href) }
+                                    else  { viewModel.selectedCalendarHrefs.remove(cal.href) }
+                                }
+                            )
+                        )
+                    }
+                }
+
+                Section("Defaults") {
+                    Picker("Default event calendar", selection: $viewModel.defaultEventCalendarHref) {
+                        Text("None").tag("")
+                        ForEach(viewModel.availableCalendars.filter { $0.components.contains("VEVENT") }) { cal in
+                            Text(cal.displayName).tag(cal.href)
+                        }
+                    }
+                    Picker("Default task calendar", selection: $viewModel.defaultTaskCalendarHref) {
+                        Text("None").tag("")
+                        ForEach(viewModel.availableCalendars.filter { $0.components.contains("VTODO") }) { cal in
+                            Text(cal.displayName).tag(cal.href)
+                        }
+                    }
+                }
+
+                Section {
+                    Button("Save Calendar Settings") {
+                        viewModel.saveCalendars()
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Gitea Tab ────────────────────────────────────────────────────────────────
+
+private struct GiteaSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Gitea Connection") {
+                TextField("Instance URL (e.g. https://git.example.com)", text: $viewModel.giteaInstance)
+                    .textContentType(.URL)
+                SecureField("Access Token", text: $viewModel.giteaToken)
+            }
+
+            Section("Repositories (one per line or comma-separated)") {
+                TextEditor(text: $viewModel.giteaReposInput)
+                    .frame(minHeight: 80)
+                    .font(.system(.body, design: .monospaced))
+            }
+
+            Section {
+                Button("Save Gitea Settings") {
+                    viewModel.saveGitea()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Appearance Tab ───────────────────────────────────────────────────────────
+
+private struct AppearanceSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+    @Environment(AppViewModel.self) private var appViewModel
+
+    var body: some View {
+        Form {
+            Section("Theme") {
+                Picker("Color scheme", selection: Binding(
+                    get: { appViewModel.theme },
+                    set: { appViewModel.theme = $0 }
+                )) {
+                    ForEach(ThemePreference.allCases, id: \.self) { theme in
+                        Text(theme.rawValue.capitalized).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Visible screens") {
+                ForEach(allScreens, id: \.self) { screen in
+                    Toggle(screen, isOn: Binding(
+                        get: { viewModel.visibleScreensSet.contains(screen) },
+                        set: { on in
+                            if on { viewModel.visibleScreensSet.insert(screen) }
+                            else  { viewModel.visibleScreensSet.remove(screen) }
+                        }
+                    ))
+                }
+            }
+
+            Section("Kanban columns (comma-separated)") {
+                TextField("e.g. backlog, planned, inprogress, done", text: $viewModel.kanbanColumnsInput)
+            }
+
+            Section {
+                Button("Save Appearance") {
+                    viewModel.saveAppearance()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Task Defaults Tab ────────────────────────────────────────────────────────
+
+private struct TaskDefaultsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Quick input time-of-day defaults") {
+                Stepper("Morning: \(viewModel.taskMorningHour):00", value: $viewModel.taskMorningHour, in: 0...23)
+                Stepper("Afternoon: \(viewModel.taskAfternoonHour):00", value: $viewModel.taskAfternoonHour, in: 0...23)
+                Stepper("Night: \(viewModel.taskNightHour):00", value: $viewModel.taskNightHour, in: 0...23)
+                Stepper("Default: \(viewModel.taskDefaultHour):00", value: $viewModel.taskDefaultHour, in: 0...23)
+            }
+
+            Section {
+                Button("Save Task Defaults") {
+                    viewModel.saveTaskDefaults()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Pomodoro Tab ─────────────────────────────────────────────────────────────
+
+private struct PomodoroSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Timer durations") {
+                Stepper("Work: \(viewModel.pomodoroWork) min", value: $viewModel.pomodoroWork, in: 1...120)
+                Stepper("Short break: \(viewModel.pomodoroShort) min", value: $viewModel.pomodoroShort, in: 1...60)
+                Stepper("Long break: \(viewModel.pomodoroLong) min", value: $viewModel.pomodoroLong, in: 1...120)
+                Stepper("Sessions until long break: \(viewModel.pomodoroSessions)", value: $viewModel.pomodoroSessions, in: 1...12)
+            }
+
+            Section("Menu bar") {
+                Toggle("Show Pomodoro in menu bar", isOn: $viewModel.showPomodoroInMenuBar)
+            }
+
+            Section {
+                Button("Save Pomodoro Settings") {
+                    viewModel.savePomodoro()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Notifications Tab ────────────────────────────────────────────────────────
+
+private struct NotificationsSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Event reminders") {
+                Toggle("Enable notifications", isOn: $viewModel.notificationsEnabled)
+                if viewModel.notificationsEnabled {
+                    Stepper(
+                        "Remind \(viewModel.notificationMinutesBefore) min before",
+                        value: $viewModel.notificationMinutesBefore,
+                        in: 0...120,
+                        step: 5
+                    )
+                }
+            }
+
+            Section("Background sync") {
+                Stepper(
+                    "Sync every \(viewModel.syncIntervalMinutes) min",
+                    value: $viewModel.syncIntervalMinutes,
+                    in: 15...480,
+                    step: 15
+                )
+                .accessibilityLabel("Sync interval: \(viewModel.syncIntervalMinutes) minutes")
+            }
+
+            Section {
+                Button("Save Notification Settings") {
+                    viewModel.saveNotifications()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Security Tab ─────────────────────────────────────────────────────────────
+
+private struct SecuritySettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Biometric Lock") {
+                Toggle("Lock app with Touch ID", isOn: $viewModel.biometricLockEnabled)
+                    .accessibilityLabel("Enable Touch ID lock")
+
+                if viewModel.biometricLockEnabled {
+                    Text("The app will require Touch ID (or PIN fallback) on launch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Save Security Settings") {
+                    viewModel.saveSecurity()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── About Tab ────────────────────────────────────────────────────────────────
+
+private struct AboutSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Version", value: viewModel.appVersion)
+                LabeledContent("Last synced", value: viewModel.lastSyncLabel)
+            }
+
+            Section {
+                Button("Sync Now") {
+                    Task { await viewModel.syncNow() }
+                }
+                .accessibilityLabel("Trigger manual sync")
+            }
+
+            Section {
+                Link("Source code (GitHub)",
+                     destination: URL(string: "https://github.com/your-repo/cross-dashboard")!)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
