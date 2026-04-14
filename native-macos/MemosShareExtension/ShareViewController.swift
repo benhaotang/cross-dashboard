@@ -41,6 +41,7 @@ private struct ShareComposeView: View {
     @State private var isCapturing = false
     @State private var errorMessage: String? = nil
     @State private var pendingFile: PendingFile? = nil
+    @State private var editedFilename: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -49,15 +50,19 @@ private struct ShareComposeView: View {
                 .fontWeight(.semibold)
 
             if let file = pendingFile {
-                HStack(spacing: 6) {
-                    Image(systemName: "paperclip").foregroundStyle(.secondary)
-                    Text(file.filename).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(ByteCountFormatter.string(fromByteCount: Int64(file.data.count), countStyle: .file))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperclip").foregroundStyle(.secondary)
+                        TextField("Filename", text: $editedFilename)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption)
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(file.data.count), countStyle: .file))
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
                 }
                 .padding(8)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .onAppear { editedFilename = file.filename }
             }
 
             TextEditor(text: $content)
@@ -131,36 +136,54 @@ private struct ShareComposeView: View {
         let allTypes = provider.registeredTypeIdentifiers
         print("[ShareExt] loadFile: registeredTypeIdentifiers = \(allTypes)")
 
-        // URL-reference types carry a pointer to a file, not file content.
-        // We need a content type so loadFileRepresentation gives us actual bytes.
+        // Step 1 — get the original filename from public.file-url.
+        // loadFileRepresentation copies the file to a macOS temp dir and names it after
+        // the UTI description (e.g. "rich text (RTF).rtf"), not the real filename.
+        // Loading public.file-url gives us the original path so lastPathComponent is correct.
+        let originalFilename = await loadOriginalFilename(from: provider)
+        print("[ShareExt] loadFile: originalFilename = \(originalFilename ?? "nil")")
+
+        // Step 2 — read file bytes.
         let urlOnlyTypes: Set<String> = ["public.url", "public.file-url",
                                          "com.apple.finder.node", "public.vcard"]
         let contentTypeId = allTypes.first { !urlOnlyTypes.contains($0) }
         print("[ShareExt] loadFile: selected contentTypeId = \(contentTypeId ?? "nil")")
 
-        // 1. loadFileRepresentation — the correct API for sandboxed extensions.
-        //    macOS copies the file to a temp path the extension CAN read before calling back.
         if let typeId = contentTypeId {
-            if let file = await loadViaFileRepresentation(provider: provider, typeId: typeId) {
+            if let file = await loadViaFileRepresentation(provider: provider, typeId: typeId,
+                                                          originalFilename: originalFilename) {
                 return file
             }
             print("[ShareExt] loadFile: loadFileRepresentation failed, trying file-url fallback")
         }
 
-        // 2. Fall back: resolve the security-scoped URL ourselves.
         if provider.hasItemConformingToTypeIdentifier("public.file-url") {
-            return await loadViaSecurityScopedURL(provider: provider)
+            return await loadViaSecurityScopedURL(provider: provider, originalFilename: originalFilename)
         }
 
         print("[ShareExt] loadFile: all strategies failed")
         return nil
     }
 
-    private func loadViaFileRepresentation(provider: NSItemProvider, typeId: String) async -> PendingFile? {
-        // Capture suggestedName before entering the callback — macOS temp paths use
-        // the UTI description as the filename, not the original file name.
-        let suggestedName = provider.suggestedName
+    /// Load the original file URL from the item provider and return its last path component.
+    /// This is the only reliable source of the real filename on macOS — suggestedName is
+    /// often nil for Finder shares, and loadFileRepresentation uses a UTI-derived name.
+    private func loadOriginalFilename(from provider: NSItemProvider) async -> String? {
+        guard provider.hasItemConformingToTypeIdentifier("public.file-url") else { return nil }
+        return await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                let url: URL?
+                if let u = item as? URL { url = u }
+                else if let ns = item as? NSURL { url = ns as URL }
+                else if let data = item as? Data { url = URL(dataRepresentation: data, relativeTo: nil) }
+                else { url = nil }
+                continuation.resume(returning: url?.lastPathComponent)
+            }
+        }
+    }
 
+    private func loadViaFileRepresentation(provider: NSItemProvider, typeId: String,
+                                            originalFilename: String?) async -> PendingFile? {
         return await withCheckedContinuation { continuation in
             provider.loadFileRepresentation(forTypeIdentifier: typeId) { url, error in
                 if let error {
@@ -173,27 +196,15 @@ private struct ShareComposeView: View {
                     continuation.resume(returning: nil)
                     return
                 }
-                print("[ShareExt] loadFileRepresentation(\(typeId)): tmp url = \(url), suggestedName = \(suggestedName ?? "nil")")
                 do {
                     let data = try Data(contentsOf: url)
                     let ext = url.pathExtension
                     let mime = UTType(filenameExtension: ext)?.preferredMIMEType
                            ?? UTType(typeId)?.preferredMIMEType
                            ?? "application/octet-stream"
-
-                    // Build filename: prefer the original name from suggestedName.
-                    // suggestedName may or may not already include the extension.
-                    let filename: String
-                    if let suggested = suggestedName, !suggested.isEmpty {
-                        if !ext.isEmpty && !suggested.lowercased().hasSuffix(".\(ext.lowercased())") {
-                            filename = "\(suggested).\(ext)"
-                        } else {
-                            filename = suggested
-                        }
-                    } else {
-                        filename = url.lastPathComponent
-                    }
-
+                    // Use originalFilename (from public.file-url) as it holds the real name.
+                    // Fall back to the temp URL's last component only as last resort.
+                    let filename = originalFilename ?? url.lastPathComponent
                     print("[ShareExt] loadFileRepresentation: \(data.count) bytes, mime=\(mime), filename=\(filename)")
                     continuation.resume(returning: PendingFile(filename: filename, mimeType: mime, data: data))
                 } catch {
@@ -204,7 +215,7 @@ private struct ShareComposeView: View {
         }
     }
 
-    private func loadViaSecurityScopedURL(provider: NSItemProvider) async -> PendingFile? {
+    private func loadViaSecurityScopedURL(provider: NSItemProvider, originalFilename: String?) async -> PendingFile? {
         await withCheckedContinuation { continuation in
             provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, error in
                 if let error { print("[ShareExt] loadItem(file-url) error: \(error)") }
@@ -226,8 +237,9 @@ private struct ShareComposeView: View {
                     let data = try Data(contentsOf: fileURL)
                     let ext = fileURL.pathExtension
                     let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
-                    print("[ShareExt] security-scoped read: \(data.count) bytes, mime=\(mime)")
-                    continuation.resume(returning: PendingFile(filename: fileURL.lastPathComponent, mimeType: mime, data: data))
+                    let filename = originalFilename ?? fileURL.lastPathComponent
+                    print("[ShareExt] security-scoped read: \(data.count) bytes, mime=\(mime), filename=\(filename)")
+                    continuation.resume(returning: PendingFile(filename: filename, mimeType: mime, data: data))
                 } catch {
                     print("[ShareExt] security-scoped Data(contentsOf:) failed: \(error)")
                     continuation.resume(returning: nil)
@@ -277,17 +289,20 @@ private struct ShareComposeView: View {
         print("[ShareExt] capture: host=\(host)")
 
         do {
-            // 1. Upload attachment first, get its resource name
+            // 1. Upload attachment first, get its resource name.
+            //    Use the user-edited filename (may have been renamed in the compose UI).
             var attachmentName: String? = nil
-            if let file = pendingFile {
-                print("[ShareExt] ── Step 1: upload attachment ──")
+            if var file = pendingFile {
+                let finalName = editedFilename.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !finalName.isEmpty { file = PendingFile(filename: finalName, mimeType: file.mimeType, data: file.data) }
+                print("[ShareExt] ── Step 1: upload attachment '\(file.filename)' ──")
                 attachmentName = try await uploadAttachment(file, host: host, token: token)
                 print("[ShareExt] attachmentName = \(attachmentName ?? "nil")")
             }
 
             // 2. Create memo with attachment embedded in the body
             print("[ShareExt] ── Step 2: create memo (attachmentName=\(attachmentName ?? "none")) ──")
-            let memoContent = trimmedText.isEmpty ? (pendingFile?.filename ?? "") : trimmedText
+            let memoContent = trimmedText.isEmpty ? (editedFilename.isEmpty ? (pendingFile?.filename ?? "") : editedFilename) : trimmedText
             let memoName = try await createMemo(
                 content: memoContent,
                 visibility: visibility,

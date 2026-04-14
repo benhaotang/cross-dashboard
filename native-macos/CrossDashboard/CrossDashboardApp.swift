@@ -32,7 +32,12 @@ struct CrossDashboardApp: App {
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
+                // Prefer routing crossdashboard:// URLs to the existing window rather than
+                // opening a new one. `preferring` reuses any open window; `allowing` permits
+                // a new window only when the app is not yet running.
+                .handlesExternalEvents(preferring: Set(["crossdashboard"]), allowing: Set(["crossdashboard"]))
         }
+        .handlesExternalEvents(matching: Set(["*"]))
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {

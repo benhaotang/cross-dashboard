@@ -123,6 +123,14 @@ struct MemosView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateMemoSheetMac(viewModel: viewModel, initialText: captureInitialText)
         }
+        .onAppear {
+            // Handle URL-scheme captures that fired before this view rendered (cold-start).
+            if let text = appViewModel.captureInitialText {
+                captureInitialText = text
+                showCreateSheet = true
+                appViewModel.consumeCaptureTrigger()
+            }
+        }
         .onChange(of: appViewModel.captureInitialText) { _, newText in
             guard let text = newText else { return }
             captureInitialText = text
