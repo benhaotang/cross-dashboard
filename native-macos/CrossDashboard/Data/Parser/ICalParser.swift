@@ -325,8 +325,11 @@ enum ICalParser {
         guard let rawLine = props["__RAW_\(key)"],
               let colonIdx = rawLine.firstIndex(of: ":") else { return nil }
 
-        let paramPart = String(rawLine[rawLine.startIndex ..< colonIdx]).uppercased()
-        let value     = String(rawLine[rawLine.index(after: colonIdx)...]).trimmingCharacters(in: .whitespaces)
+        // Keep rawParamPart in original case so IANA timezone identifiers (e.g. "Europe/Berlin")
+        // are preserved for TimeZone(identifier:), which is case-sensitive.
+        let rawParamPart = String(rawLine[rawLine.startIndex ..< colonIdx])
+        let paramPart    = rawParamPart.uppercased()   // uppercased only for keyword checks
+        let value        = String(rawLine[rawLine.index(after: colonIdx)...]).trimmingCharacters(in: .whitespaces)
 
         // All-day: VALUE=DATE
         if paramPart.contains("VALUE=DATE") {
@@ -345,15 +348,21 @@ enum ICalParser {
             return utcFormatter.date(from: value)
         }
 
-        // TZID param
-        var tz = TimeZone(identifier: "UTC")!
-        if let tzRange = paramPart.range(of: "TZID="),
-           let endIdx = paramPart[tzRange.upperBound...].firstIndex(where: { $0 == ";" || $0 == ":" }) {
-            let tzId = String(paramPart[tzRange.upperBound ..< endIdx])
-            tz = TimeZone(identifier: tzId) ?? TimeZone(identifier: "UTC")!
-        } else if paramPart.contains("TZID=") {
-            let tzId = String(paramPart[paramPart.range(of: "TZID=")!.upperBound...])
-            tz = TimeZone(identifier: tzId) ?? TimeZone(identifier: "UTC")!
+        // TZID param — search rawParamPart case-insensitively so the captured value retains
+        // its original casing (e.g. "Europe/Berlin", not "EUROPE/BERLIN").
+        // RFC 5545: a datetime with no Z and no TZID is "floating" and should be interpreted
+        // in the local system timezone, not UTC.
+        var tz: TimeZone = .current
+        if paramPart.contains("TZID="),
+           let tzRange = rawParamPart.range(of: "TZID=", options: .caseInsensitive) {
+            let remaining = rawParamPart[tzRange.upperBound...]
+            let tzId: String
+            if let endIdx = remaining.firstIndex(where: { $0 == ";" || $0 == ":" }) {
+                tzId = String(remaining[remaining.startIndex ..< endIdx])
+            } else {
+                tzId = String(remaining)
+            }
+            tz = TimeZone(identifier: tzId) ?? .current
         }
 
         localFormatter.timeZone = tz
