@@ -82,7 +82,7 @@ fun ShareCaptureSheet(
                 OutlinedButton(onClick = onDismiss) { Text("Cancel") }
                 Button(
                     onClick = { onCapture(content, visibility, attachments.toList()); onDismiss() },
-                    enabled = content.isNotBlank(),
+                    enabled = content.isNotBlank() || attachments.isNotEmpty(),
                 ) { Text("Capture to Memos") }
             }
         }

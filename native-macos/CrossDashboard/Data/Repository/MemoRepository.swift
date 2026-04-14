@@ -81,21 +81,31 @@ final class MemoRepository {
         visibility: MemoVisibility,
         attachments: [MemoPendingAttachment]
     ) async -> MemosMemo? {
+        print("[MemoRepository] createMemo: \(attachments.count) attachment(s)")
         var names: [String] = []
-        for att in attachments {
+        for (i, att) in attachments.enumerated() {
+            print("[MemoRepository]   uploading attachment[\(i)]: \(att.filename) \(att.mimeType) \(att.data.count) bytes")
             if let uploaded = await client.createAttachment(
                 filename: att.filename,
                 mimeType: att.mimeType,
                 data: att.data
             ) {
+                print("[MemoRepository]   attachment[\(i)] uploaded → \(uploaded.name)")
                 names.append(uploaded.name)
+            } else {
+                print("[MemoRepository]   attachment[\(i)] upload FAILED")
             }
         }
+        print("[MemoRepository] createMemo: calling client with attachmentNames=\(names)")
         guard let memo = await client.createMemo(
             content: content,
             visibility: visibility,
             attachmentNames: names
-        ) else { return nil }
+        ) else {
+            print("[MemoRepository] createMemo: client.createMemo returned nil")
+            return nil
+        }
+        print("[MemoRepository] createMemo: memo created — \(memo.name), attachments in domain model: \(memo.attachments.count)")
         context.insert(MemosModel(from: memo))
         try? context.save()
         loadFromDB()

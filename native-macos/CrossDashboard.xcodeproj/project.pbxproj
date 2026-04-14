@@ -814,6 +814,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 569WLL4Q5F;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = MemosShareExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -976,7 +977,6 @@
 				CODE_SIGN_ENTITLEMENTS = DashboardWidgetExtension/DashboardWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				INFOPLIST_FILE = DashboardWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -998,6 +998,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 569WLL4Q5F;
+				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = MemosShareExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1018,7 +1019,6 @@
 				CODE_SIGN_ENTITLEMENTS = DashboardWidgetExtension/DashboardWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				INFOPLIST_FILE = DashboardWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -87,12 +87,18 @@ final class MemosViewModel {
     // ─── Create ───────────────────────────────────────────────────────────────
 
     func createMemo(content: String, visibility: MemoVisibility, attachments: [MemoPendingAttachment]) async {
-        guard !content.isEmpty else { return }
+        guard !content.isEmpty else {
+            print("[MemosViewModel] createMemo: skipped — empty content")
+            return
+        }
+        print("[MemosViewModel] createMemo: content.count=\(content.count) visibility=\(visibility) attachments=\(attachments.count)")
         isLoading = true
         defer { isLoading = false }
         if await memoRepo.createMemo(content: content, visibility: visibility, attachments: attachments) != nil {
+            print("[MemosViewModel] createMemo: succeeded")
             snackbarMessage = "Memo created"
         } else {
+            print("[MemosViewModel] createMemo: FAILED")
             error = "Failed to create memo"
         }
     }

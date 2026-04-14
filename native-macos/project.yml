@@ -89,13 +89,15 @@ targets:
             NSMessage: captureToMemos
             NSPortName: CrossDashboard
             NSSendTypes:
-              - public.plain-text
+              - public.utf8-plain-text
+              - NSStringPboardType
               - public.url
     entitlements:
       path: CrossDashboard/CrossDashboard.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
         com.apple.security.keychain-access-groups:
           - "$(AppIdentifierPrefix)com.crossdashboard.app"
         com.apple.application-identifier: "$(AppIdentifierPrefix)com.crossdashboard.app"
@@ -136,15 +138,17 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
-          NSExtensionActivationRule:
-            NSExtensionActivationSupportsText: 1
-            NSExtensionActivationSupportsWebURLWithMaxCount: 1
-            NSExtensionActivationSupportsFileWithMaxCount: 10
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: 1
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 10
     entitlements:
       path: MemosShareExtension/MemosShareExtension.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
         com.apple.security.application-groups:
           - group.com.crossdashboard
         com.apple.security.keychain-access-groups:
@@ -155,6 +159,7 @@ targets:
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
     dependencies:
       - target: CrossDashboardKit
         embed: false

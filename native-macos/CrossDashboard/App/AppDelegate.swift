@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// A lightweight `NSPanel` that mirrors the share extension's compose UI.
 /// Uses a callback-based `ServiceComposeView` instead of `NSExtensionContext`.
+@MainActor
 final class ServiceCapturePanel: NSObject {
 
     private static var panel: NSPanel?

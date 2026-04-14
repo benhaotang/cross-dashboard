@@ -53,7 +53,8 @@
 			<string>CrossDashboard</string>
 			<key>NSSendTypes</key>
 			<array>
-				<string>public.plain-text</string>
+				<string>public.utf8-plain-text</string>
+				<string>NSStringPboardType</string>
 				<string>public.url</string>
 			</array>
 		</dict>
