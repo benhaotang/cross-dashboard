@@ -94,7 +94,7 @@ native-android/
 | Biometric | androidx.biometric | 1.4.x |
 | DataStore | Preferences DataStore | 1.1.x |
 | Nextcloud SSO | Android-SingleSignOn (JitPack) | 1.3.4 |
-| Markdown (GFM) | multiplatform-markdown-renderer (mikepenz) | 0.39.2 |
+| Markdown / display LaTeX | multiplatform-markdown-renderer (mikepenz) + KotlinTeX | 0.39.2 / 0.3.3 |
 
 ### Adaptive UI Tiers
 
@@ -156,7 +156,7 @@ native-macos/
 | Pomodoro | `NSStatusItem` menu bar countdown + `NSPopover` |
 | Widget | WidgetKit extension (shared App Group SwiftData store) |
 | Biometric | `LocalAuthentication` (`LAContext`) — Touch ID + SHA-256 PIN in Keychain |
-| Markdown | `swift-markdown-ui` (gonzalezreal, SPM) |
+| Markdown / display LaTeX | `swift-markdown-ui` + `SwiftMath` (SPM) |
 | DI | `AppContainer` singleton + `@Environment` |
 
 ### Navigation
@@ -216,12 +216,17 @@ Uses Android 16 **Live Update** (promoted ongoing notification) API:
 ### Exact Alarms
 `USE_EXACT_ALARM` permission declared (auto-granted, non-revocable — appropriate for a calendar app). Stable alarm IDs from `abs(uid.hashCode()) % 100_000`. `EventAlarmScheduler.rescheduleAll()` called after every sync and on boot.
 
-### Markdown Rendering (GFM)
-Read-only detail views render descriptions and note bodies as GitHub-Flavoured Markdown via `multiplatform-markdown-renderer` (Mike Penz, v0.39.2). The library is pure Compose — no `AndroidView` wrapper.
+### Markdown + Display LaTeX Rendering
+Read-only detail views render descriptions and note bodies as GitHub-Flavoured Markdown. Android uses `multiplatform-markdown-renderer` (Mike Penz, v0.39.2) plus `KotlinTeX` (v0.3.3) for display equations. macOS uses `swift-markdown-ui` plus `SwiftMath`.
 
 **Key components in `ui/component/`:**
 - `MarkdownText(content, modifier)` — low-level composable. Colors are mapped to `MaterialTheme.colorScheme` tokens; typography to the M3 type scale. Images load via the app's existing Coil 3 instance (`Coil3ImageTransformerImpl`).
+- `LatexContentParser.kt` — splits markdown from display-math blocks before rendering.
 - `ReadMarkdownField(label, value, modifier)` — drop-in replacement for `ReadField` when the value may contain markdown. Shows the same small-caps label but renders the body through `MarkdownText`.
+
+**LaTeX rules:**
+- Only `$$...$$` is rendered as LaTeX, and it is styled as centered display math with extra vertical spacing.
+- Inline `$...$` is not rendered as math. It stays in the markdown text and is escaped before markdown parsing so LaTeX underscores and similar characters do not accidentally trigger emphasis or other markdown formatting.
 
 **Where markdown is rendered (read-only paths only):**
 
@@ -233,7 +238,7 @@ Read-only detail views render descriptions and note bodies as GitHub-Flavoured M
 | Issue detail (`IssueReadContent`) | Description (body) | `MarkdownText` directly |
 | Issue detail (`CommentItem`) | Comment body | `MarkdownText` directly |
 
-**Rule:** Use `ReadMarkdownField` / `MarkdownText` only in read-only branches. Edit forms (`TaskEditForm`, `NoteEditForm`, etc.) always use plain `OutlinedTextField` — never pass markdown-rendered content into an editor.
+**Rule:** Use `ReadMarkdownField` / `MarkdownText` only in read-only branches. Edit forms (`TaskEditForm`, `NoteEditForm`, etc.) always use plain `OutlinedTextField` — never pass markdown-rendered content into an editor. When adding LaTeX support, keep inline `$...$` as literal text unless the rendering stack is redesigned to support true inline math.
 
 ### Issues (Gitea) — Feature Details
 
@@ -381,7 +386,7 @@ Property sheets: `ModalBottomSheet` on phone; inline detail pane (`NavigableList
 
 **Phase 2** — Core UI: `CrossDashboardApp` (`@main`), `ContentView` (`NavigationSplitView` 3-col), `AppViewModel`, theme, `DashboardView`, `TasksView` + `QuickInputBar` + `TaskDetailView`, shared components (`PropertyDetailShell`, `ReadField`, `CalendarColorDot`, `StatusBadge`, `PriorityChip`, `TagChip`).
 
-**Phase 3** — Remaining screens: `EventsView`, `NotesView`, `IssuesView` (comments + attachments via `NSOpenPanel`), `InboxView`, `ViewsView` (Kanban + Covey), `SettingsView` (all sections; Login Flow v2 + Manual only — no SSO), `ReadMarkdownField` / `ReadMarkdownView` via `swift-markdown-ui`.
+**Phase 3** — Remaining screens: `EventsView`, `NotesView`, `IssuesView` (comments + attachments via `NSOpenPanel`), `InboxView`, `ViewsView` (Kanban + Covey), `SettingsView` (all sections; Login Flow v2 + Manual only — no SSO), `ReadMarkdownField` / `ReadMarkdownView` via `swift-markdown-ui`, display LaTeX via `SwiftMath`.
 
 **Phase 4** — Background: `SyncScheduler` (`NSBackgroundActivityScheduler`), `NotificationScheduler` (`UNCalendarNotificationTrigger`), on-launch rescheduling (mirrors `BootReceiver`), `UNUserNotificationCenterDelegate`.
 
@@ -453,7 +458,7 @@ The RN `package.json` / `app.json` version fields are legacy and no longer need 
 - Use `NavigationSuiteScaffold` + `NavigableListDetailPaneScaffold` patterns for adaptive layouts.
 - Every interactive composable must have a `contentDescription` for TalkBack.
 - Wrap bottom sheets in `ModalBottomSheet` with `WindowInsets.ime` padding for keyboard avoidance.
-- For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled) or `MarkdownText` (unlabelled). Edit forms always use `OutlinedTextField`.
+- For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled) or `MarkdownText` (unlabelled). `$$...$$` may be rendered as display math; inline `$...$` should remain literal text unless the rendering architecture is explicitly changed. Edit forms always use `OutlinedTextField`.
 
 ### Background Work (Android)
 - Use `WorkManager` for all deferrable background tasks. Inject with `@HiltWorker`.
@@ -473,5 +478,5 @@ The RN `package.json` / `app.json` version fields are legacy and no longer need 
 - Use `Color(.label)`, `Color(.secondaryLabel)`, `Color(.windowBackgroundColor)` — no hardcoded hex or `.black`/`.white`.
 - Navigation via `NavigationSplitView` three-column; detail shown inline (no sheets for primary detail).
 - Every interactive element needs `accessibilityLabel` / `accessibilityValue` / `accessibilityHint` for VoiceOver.
-- For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled) or `ReadMarkdownView` (unlabelled) via `swift-markdown-ui`. Edit forms always use `TextField` / `TextEditor`.
+- For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled) or `ReadMarkdownView` (unlabelled) via `swift-markdown-ui`. `$$...$$` may be rendered as display math via `SwiftMath`; inline `$...$` should remain literal text unless the rendering architecture is explicitly changed. Edit forms always use `TextField` / `TextEditor`.
 - Prefer toolbar `ToolbarItem` over FABs; add `keyboardShortcut` for common actions.

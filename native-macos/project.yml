@@ -23,6 +23,7 @@ schemes:
         CrossDashboard: all
         CrossDashboardKit: [build]
         DashboardWidgetExtension: [build]
+        MemosShareExtension: [build]
     run:
       config: Debug
     test:
@@ -109,6 +110,42 @@ targets:
         product: MarkdownUI
       - package: swift-math
         product: SwiftMath
+      - target: MemosShareExtension
+        embed: true
+
+  MemosShareExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - MemosShareExtension
+    info:
+      path: MemosShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: MemosShareExtension
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+    entitlements:
+      path: MemosShareExtension/MemosShareExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.application-groups:
+          - group.com.crossdashboard
+        com.apple.security.keychain-access-groups:
+          - "$(AppIdentifierPrefix)com.crossdashboard.app"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crossdashboard.app.shareextension
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: CrossDashboardKit
+        embed: false
 
   DashboardWidgetExtension:
     type: app-extension

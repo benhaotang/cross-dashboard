@@ -15,6 +15,9 @@ struct SettingsView: View {
             GiteaSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Gitea", systemImage: "chevron.left.forwardslash.chevron.right") }
 
+            MemosSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Memos", systemImage: "tray.and.arrow.down") }
+
             AppearanceSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Appearance", systemImage: "paintbrush") }
 
@@ -299,6 +302,44 @@ private struct NotificationsSettingsTab: View {
             Section {
                 Button("Save Notification Settings") {
                     viewModel.saveNotifications()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Memos Tab ────────────────────────────────────────────────────────────────
+
+private struct MemosSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Connection") {
+                TextField("Host URL", text: $viewModel.memosHost, prompt: Text("https://memos.example.com"))
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Memos host URL")
+
+                SecureField("Access Token", text: $viewModel.memosToken)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Memos access token")
+
+                if let msg = viewModel.memosConnectionMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(viewModel.memosConnectionSuccess ? Color.green : Color.red)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Test Connection") {
+                        Task { await viewModel.testMemosConnection() }
+                    }
+                    .disabled(viewModel.memosConnectionTesting)
+                    Button("Save") {
+                        viewModel.saveMemos()
+                    }
                 }
             }
         }

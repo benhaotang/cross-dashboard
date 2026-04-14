@@ -30,6 +30,14 @@ final class SettingsViewModel {
     var giteaToken: String = ""
     var giteaReposInput: String = ""  // comma-separated
 
+    // ─── Memos ────────────────────────────────────────────────────────────────
+
+    var memosHost: String = ""
+    var memosToken: String = ""
+    var memosConnectionMessage: String? = nil
+    var memosConnectionTesting: Bool = false
+    var memosConnectionSuccess: Bool = false
+
     // ─── Appearance ───────────────────────────────────────────────────────────
 
     var visibleScreensSet: Set<String> = Set(allScreens)
@@ -101,6 +109,10 @@ final class SettingsViewModel {
            let repos = try? JSONDecoder().decode([String].self, from: Data(raw.utf8)) {
             giteaReposInput = repos.joined(separator: ", ")
         }
+
+        // Memos
+        memosHost  = keychain.get(CredentialKey.memosHost)  ?? ""
+        memosToken = keychain.get(CredentialKey.memosToken) ?? ""
 
         // Appearance
         visibleScreensSet   = Set(prefs.visibleScreens)
@@ -199,6 +211,31 @@ final class SettingsViewModel {
 
     func saveSecurity() {
         container.preferences.biometricLockEnabled = biometricLockEnabled
+    }
+
+    func saveMemos() {
+        container.keychain.set(CredentialKey.memosHost,  value: memosHost.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        container.keychain.set(CredentialKey.memosToken, value: memosToken)
+    }
+
+    func testMemosConnection() async {
+        guard !memosHost.isEmpty, !memosToken.isEmpty else {
+            memosConnectionMessage = "Host and token are required"
+            memosConnectionSuccess = false
+            return
+        }
+        saveMemos()
+        memosConnectionTesting = true
+        memosConnectionMessage = nil
+        defer { memosConnectionTesting = false }
+        let result = await container.memosClient.listMemos(pageSize: 1)
+        if container.memosClient.baseUrl() != nil {
+            memosConnectionSuccess = true
+            memosConnectionMessage = "Connected — \(result.memos.count) memo(s) found"
+        } else {
+            memosConnectionSuccess = false
+            memosConnectionMessage = "Connection failed — check host and token"
+        }
     }
 
     // ─── Actions ──────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.*
 import com.crossdashboard.app.data.network.CalDavClient
+import com.crossdashboard.app.data.network.MemosClient
 import com.crossdashboard.app.data.network.NextcloudLoginFlow
 import com.crossdashboard.app.data.network.NextcloudSsoHelper
 import com.crossdashboard.app.data.network.SsoResultBus
@@ -57,6 +58,12 @@ data class SettingsUiState(
     val giteaToken: String = "",
     val giteaRepos: String = "",        // comma-separated "owner/repo"
 
+    // ── Memos ─────────────────────────────────────────────────────────────────
+    val memosHost: String = "",
+    val memosToken: String = "",
+    val memosConnectionStatus: CalDavConnectionStatus = CalDavConnectionStatus.IDLE,
+    val memosConnectionMessage: String = "",
+
     // ── Appearance ────────────────────────────────────────────────────────────
     val theme: ThemePreference = ThemePreference.SYSTEM,
 
@@ -103,6 +110,7 @@ class SettingsViewModel @Inject constructor(
     private val secureStore: SecureStore,
     private val prefs: AppPreferences,
     private val calDavClient: CalDavClient,
+    private val memosClient: MemosClient,
     private val ssoHelper: NextcloudSsoHelper,
     private val loginFlow: NextcloudLoginFlow,
     private val workManager: WorkManager,
@@ -179,6 +187,8 @@ class SettingsViewModel @Inject constructor(
                     giteaInstance = secureStore.get(CredentialKey.GITEA_INSTANCE) ?: "",
                     giteaToken = secureStore.get(CredentialKey.GITEA_TOKEN) ?: "",
                     giteaRepos = secureStore.get(CredentialKey.GITEA_REPOS) ?: "",
+                    memosHost = secureStore.get(CredentialKey.MEMOS_HOST) ?: "",
+                    memosToken = secureStore.get(CredentialKey.MEMOS_TOKEN) ?: "",
                 )
             }
         }
@@ -439,6 +449,38 @@ class SettingsViewModel @Inject constructor(
         secureStore.set(CredentialKey.GITEA_TOKEN, s.giteaToken)
         secureStore.set(CredentialKey.GITEA_REPOS, s.giteaRepos)
         _state.update { it.copy(infoMessage = "Gitea settings saved") }
+    }
+
+    // ─── Memos section ───────────────────────────────────────────────────────
+
+    fun setMemosHost(v: String) = _state.update { it.copy(memosHost = v) }
+    fun setMemosToken(v: String) = _state.update { it.copy(memosToken = v) }
+
+    fun saveMemos() {
+        val s = _state.value
+        secureStore.set(CredentialKey.MEMOS_HOST, s.memosHost.trimEnd('/'))
+        secureStore.set(CredentialKey.MEMOS_TOKEN, s.memosToken)
+        _state.update { it.copy(infoMessage = "Memos settings saved") }
+    }
+
+    fun testMemosConnection() {
+        val s = _state.value
+        if (s.memosHost.isBlank() || s.memosToken.isBlank()) {
+            _state.update { it.copy(memosConnectionStatus = CalDavConnectionStatus.ERROR, memosConnectionMessage = "Host and token required") }
+            return
+        }
+        _state.update { it.copy(memosConnectionStatus = CalDavConnectionStatus.TESTING) }
+        viewModelScope.launch {
+            // Write credentials first so the injected MemosClient picks them up
+            secureStore.set(CredentialKey.MEMOS_HOST, s.memosHost.trimEnd('/'))
+            secureStore.set(CredentialKey.MEMOS_TOKEN, s.memosToken)
+            val (memos, _) = memosClient.listMemos(pageSize = 1)
+            if (memos.isNotEmpty() || memosClient.baseUrl() != null) {
+                _state.update { it.copy(memosConnectionStatus = CalDavConnectionStatus.SUCCESS, memosConnectionMessage = "Connected successfully") }
+            } else {
+                _state.update { it.copy(memosConnectionStatus = CalDavConnectionStatus.ERROR, memosConnectionMessage = "Connection failed — check host and token") }
+            }
+        }
     }
 
     // ─── Appearance ───────────────────────────────────────────────────────────

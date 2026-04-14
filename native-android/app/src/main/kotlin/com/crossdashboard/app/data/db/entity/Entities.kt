@@ -72,3 +72,22 @@ data class DailyStatsEntity(
     val pomodoroSessions: Int = 0,
     val issuesClosed: Int = 0,
 )
+
+@Entity(tableName = "memos")
+data class MemoEntity(
+    @PrimaryKey val name: String,   // "memos/{id}"
+    val state: String,              // MemoState.name
+    val content: String,
+    val visibility: String,         // MemoVisibility.name
+    val tagsJson: String,           // JSON array of strings
+    val pinned: Boolean,
+    val attachmentsJson: String,    // JSON array of MemosAttachment serialized
+    val propertyHasLink: Boolean,
+    val propertyHasTaskList: Boolean,
+    val propertyHasIncompleteTasks: Boolean,
+    val propertyTitle: String,
+    val snippet: String,
+    val createTimeEpoch: Long,
+    val displayTimeEpoch: Long,
+    val updateTimeEpoch: Long,
+)

@@ -33,6 +33,7 @@ final class AppViewModel {
     var selectedEventID: String?
     var selectedNoteID: String?
     var selectedIssueID: Int64?
+    var selectedMemoID: String?
 
     var visibleScreens: [Screen] {
         Screen.allCases.filter { preferences.visibleScreens.contains($0.rawValue) }
@@ -69,6 +70,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
     case notes     = "Notes"
     case issues    = "Issues"
     case views     = "Views"
+    case memos     = "Memos"
 
     var id: String { rawValue }
 
@@ -81,6 +83,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .notes:     return "note.text"
         case .issues:    return "exclamationmark.bubble"
         case .views:     return "rectangle.3.group"
+        case .memos:     return "tray.and.arrow.down"
         }
     }
 

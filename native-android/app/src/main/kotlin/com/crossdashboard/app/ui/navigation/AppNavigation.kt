@@ -21,6 +21,7 @@ import com.crossdashboard.app.ui.screen.inbox.InboxScreen
 import com.crossdashboard.app.ui.screen.issues.IssuesScreen
 import com.crossdashboard.app.ui.screen.notes.NotesScreen
 import com.crossdashboard.app.ui.screen.settings.SettingsScreen
+import com.crossdashboard.app.ui.screen.memos.MemosScreen
 import com.crossdashboard.app.ui.screen.tasks.TasksScreenContent
 import com.crossdashboard.app.ui.screen.views.ViewsScreen
 import com.crossdashboard.app.ui.viewmodel.NavigationViewModel
@@ -40,6 +41,7 @@ val ALL_NAV_ITEMS = listOf(
     NavItem(Destination.Notes, "Notes", Icons.AutoMirrored.Filled.Notes, Icons.AutoMirrored.Outlined.Notes),
     NavItem(Destination.Issues, "Issues", Icons.Filled.BugReport, Icons.Outlined.BugReport),
     NavItem(Destination.Views, "Views", Icons.Filled.ViewColumn, Icons.Outlined.ViewColumn),
+    NavItem(Destination.Memos, "Memos", Icons.Filled.StickyNote2, Icons.Outlined.StickyNote2),
     NavItem(Destination.Settings, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
@@ -153,6 +155,9 @@ fun AppNavigation(
                 entry<Destination.Views> {
                     ViewsScreen(onNavigate = { backStack += it })
                 }
+                entry<Destination.Memos> {
+                    MemosScreen(onNavigate = { backStack += it })
+                }
                 entry<Destination.Settings> {
                     SettingsScreen()
                 }
@@ -177,6 +182,9 @@ fun AppNavigation(
                 }
                 entry<Destination.NoteDetail> {
                     NotesScreen(colorResolver = colorResolver)
+                }
+                entry<Destination.MemoDetail> {
+                    MemosScreen(onNavigate = { backStack += it })
                 }
             },
         )

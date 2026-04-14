@@ -209,5 +209,43 @@ data class AppSettings(
     val biometricLockEnabled: Boolean = false,
 )
 
-val ALL_SCREENS = listOf("Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views")
+// ─── Memos (usememos.com) ─────────────────────────────────────────────────────
+
+@Serializable enum class MemoState { NORMAL, ARCHIVED }
+@Serializable enum class MemoVisibility { PRIVATE, PROTECTED, PUBLIC }
+
+@Serializable
+data class MemoProperty(
+    val hasLink: Boolean = false,
+    val hasTaskList: Boolean = false,
+    val hasIncompleteTasks: Boolean = false,
+    val title: String = "",
+)
+
+@Serializable
+data class MemosAttachment(
+    val name: String,           // "attachments/{id}"
+    val filename: String,
+    val externalLink: String,
+    val type: String,           // MIME type
+    val size: Long,
+    val memo: String = "",      // "memos/{id}" back-reference
+)
+
+data class MemosMemo(
+    val name: String,           // "memos/{id}"
+    val state: MemoState = MemoState.NORMAL,
+    val content: String,
+    val visibility: MemoVisibility = MemoVisibility.PRIVATE,
+    val tags: List<String> = emptyList(),
+    val pinned: Boolean = false,
+    val attachments: List<MemosAttachment> = emptyList(),
+    val property: MemoProperty = MemoProperty(),
+    val snippet: String = "",
+    val createTime: Instant,
+    val displayTime: Instant,
+    val updateTime: Instant,
+)
+
+val ALL_SCREENS = listOf("Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Memos")
 val DEFAULT_KANBAN_COLUMNS = listOf("backlog", "planned", "inprogress", "done")

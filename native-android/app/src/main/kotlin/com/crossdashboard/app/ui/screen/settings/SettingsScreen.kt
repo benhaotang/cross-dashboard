@@ -120,6 +120,10 @@ fun SettingsScreen(
             item { SectionHeader("Gitea") }
             item { GiteaSection(state = state, vm = vm) }
 
+            // ── Memos ─────────────────────────────────────────────────────────
+            item { SectionHeader("Memos") }
+            item { MemosSection(state = state, vm = vm) }
+
             // ── Appearance ───────────────────────────────────────────────────
             item { SectionHeader("Appearance") }
             item { AppearanceSection(state = state, vm = vm) }
@@ -552,6 +556,58 @@ private fun GiteaSection(state: SettingsUiState, vm: SettingsViewModel) {
         )
         Button(onClick = vm::saveGitea, modifier = Modifier.fillMaxWidth()) {
             Text("Save Gitea Settings")
+        }
+    }
+}
+
+// ─── Memos section ────────────────────────────────────────────────────────────
+
+@Composable
+private fun MemosSection(state: SettingsUiState, vm: SettingsViewModel) {
+    var showToken by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = state.memosHost,
+            onValueChange = vm::setMemosHost,
+            label = { Text("Memos Host URL") },
+            placeholder = { Text("https://memos.example.com") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = state.memosToken,
+            onValueChange = vm::setMemosToken,
+            label = { Text("Access Token") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { showToken = !showToken }) {
+                    Icon(
+                        if (showToken) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (showToken) "Hide token" else "Show token",
+                    )
+                }
+            },
+        )
+        if (state.memosConnectionStatus != CalDavConnectionStatus.IDLE) {
+            val (color, text) = when (state.memosConnectionStatus) {
+                CalDavConnectionStatus.TESTING -> MaterialTheme.colorScheme.onSurfaceVariant to "Testing…"
+                CalDavConnectionStatus.SUCCESS -> MaterialTheme.colorScheme.primary to state.memosConnectionMessage
+                CalDavConnectionStatus.ERROR -> MaterialTheme.colorScheme.error to state.memosConnectionMessage
+                else -> MaterialTheme.colorScheme.onSurfaceVariant to ""
+            }
+            Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = vm::testMemosConnection,
+                modifier = Modifier.weight(1f),
+                enabled = state.memosConnectionStatus != CalDavConnectionStatus.TESTING,
+            ) { Text("Test") }
+            Button(onClick = vm::saveMemos, modifier = Modifier.weight(1f)) { Text("Save") }
         }
     }
 }

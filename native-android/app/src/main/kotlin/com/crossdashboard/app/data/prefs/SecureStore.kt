@@ -126,4 +126,6 @@ object CredentialKey {
     const val GITEA_TOKEN = "gitea_token"
     const val GITEA_INSTANCE = "gitea_instance"
     const val GITEA_REPOS = "gitea_repos"
+    const val MEMOS_HOST = "memos_host"
+    const val MEMOS_TOKEN = "memos_token"
 }

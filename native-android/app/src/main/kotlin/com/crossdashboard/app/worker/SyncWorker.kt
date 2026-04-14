@@ -43,6 +43,7 @@ class SyncWorker @AssistedInject constructor(
     private val taskRepository: TaskRepository,
     private val noteRepository: NoteRepository,
     private val issueRepository: IssueRepository,
+    private val memoRepository: MemoRepository,
     private val secureStore: SecureStore,
     private val prefs: AppPreferences,
     private val alarmScheduler: EventAlarmScheduler,
@@ -74,10 +75,15 @@ class SyncWorker @AssistedInject constructor(
                         .onFailure { e -> Log.e(TAG, "Issue sync failed", e) }
                 }
             }
+            val memos = async {
+                runCatching { memoRepository.syncMemos() }
+                    .onFailure { e -> Log.e(TAG, "Memo sync failed", e) }
+            }
             events.await()
             tasks.await()
             notes.await()
             issues.await()
+            memos.await()
         }
 
         // Always reschedule alarms regardless of whether syncs succeeded

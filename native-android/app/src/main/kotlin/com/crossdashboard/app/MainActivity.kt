@@ -2,7 +2,9 @@ package com.crossdashboard.app
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,11 +15,14 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.crossdashboard.app.data.network.SsoResultBus
 import com.crossdashboard.app.data.prefs.AppPreferences
+import com.crossdashboard.app.data.repository.PendingAttachment
 import com.crossdashboard.app.ui.CrossDashboardRoot
 import com.nextcloud.android.sso.AccountImporter
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -28,6 +33,8 @@ class MainActivity : ComponentActivity() {
 
     // Deep link action forwarded to nav graph
     private var pendingAction by mutableStateOf<String?>(null)
+    // Share payload shown as ShareCaptureSheet overlay
+    var pendingSharePayload by mutableStateOf<SharePayload?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -36,19 +43,63 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         pendingAction = intent.data?.resolvePendingAction()
+        lifecycleScope.launch { pendingSharePayload = parseShareIntent(intent) }
 
         setContent {
             // Theme is applied inside CrossDashboardRoot based on user preference.
             CrossDashboardRoot(
                 pendingAction = pendingAction,
                 onActionConsumed = { pendingAction = null },
+                pendingSharePayload = pendingSharePayload,
+                onShareConsumed = { pendingSharePayload = null },
             )
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         pendingAction = intent.data?.resolvePendingAction()
+        lifecycleScope.launch { pendingSharePayload = parseShareIntent(intent) }
+    }
+
+    private suspend fun parseShareIntent(intent: Intent): SharePayload? = withContext(Dispatchers.IO) {
+        val action = intent.action ?: return@withContext null
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return@withContext null
+
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+
+        val uris = when (action) {
+            Intent.ACTION_SEND -> {
+                val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION") intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                }
+                listOfNotNull(uri)
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java) ?: emptyList()
+                } else {
+                    @Suppress("DEPRECATION") intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+                }
+            }
+            else -> emptyList()
+        }
+
+        val attachments = uris.mapNotNull { uri ->
+            runCatching {
+                val bytes = contentResolver.openInputStream(uri)?.readBytes() ?: return@runCatching null
+                val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+                val name = uri.lastPathSegment ?: "file"
+                PendingAttachment(name, mime, bytes)
+            }.getOrNull()
+        }
+
+        if (text == null && attachments.isEmpty()) return@withContext null
+        SharePayload(text = text, subject = subject, attachments = attachments)
     }
 
     /**
@@ -79,6 +130,13 @@ class MainActivity : ComponentActivity() {
         const val ACTION_ADD_TASK = "add_task"
     }
 }
+
+/** Payload parsed from an incoming share intent. */
+data class SharePayload(
+    val text: String?,
+    val subject: String?,
+    val attachments: List<PendingAttachment>,
+)
 
 /**
  * Resolves a deep-link URI to a pending action string consumed by [CrossDashboardRoot]
