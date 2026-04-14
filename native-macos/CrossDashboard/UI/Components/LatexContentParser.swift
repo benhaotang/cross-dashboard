@@ -2,7 +2,6 @@ import Foundation
 
 enum ContentSegment: Hashable {
     case markdown(String)
-    case inlineMath(String)
     case displayMath(String)
 }
 
@@ -39,34 +38,47 @@ func parseLatex(_ content: String) -> [ContentSegment] {
 
         let secondIndex = content.index(index, offsetBy: 1, limitedBy: content.endIndex)
         let isDisplay = secondIndex.map { $0 < content.endIndex && content[$0] == "$" } ?? false
-        let searchStart = isDisplay ? content.index(after: secondIndex!) : content.index(after: index)
 
+        if !isDisplay {
+            guard let closingIndex = findClosingDelimiter(
+                in: content,
+                start: content.index(after: index),
+                isDisplay: false
+            ) else {
+                markdown.append("$")
+                index = content.index(after: index)
+                continue
+            }
+
+            let inlineLatex = String(content[content.index(after: index)..<closingIndex])
+            markdown.append(escapeInlineLatexForMarkdown(inlineLatex))
+            index = content.index(after: closingIndex)
+            continue
+        }
+
+        let searchStart = content.index(after: secondIndex!)
         guard let closingIndex = findClosingDelimiter(
             in: content,
             start: searchStart,
-            isDisplay: isDisplay
+            isDisplay: true
         ) else {
             markdown.append("$")
-            if isDisplay {
-                markdown.append("$")
-                index = content.index(after: secondIndex!)
-            } else {
-                index = content.index(after: index)
-            }
+            markdown.append("$")
+            index = content.index(after: secondIndex!)
             continue
         }
 
         let latexStart = searchStart
         let latex = String(content[latexStart..<closingIndex])
         guard !latex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            markdown.append(isDisplay ? "$$" : "$")
-            index = isDisplay ? searchStart : content.index(after: index)
+            markdown.append("$$")
+            index = searchStart
             continue
         }
 
         flushMarkdown()
-        segments.append(isDisplay ? .displayMath(latex) : .inlineMath(latex))
-        index = isDisplay ? content.index(after: content.index(after: closingIndex)) : content.index(after: closingIndex)
+        segments.append(.displayMath(latex))
+        index = content.index(after: content.index(after: closingIndex))
     }
 
     flushMarkdown()
@@ -114,3 +126,15 @@ private func findClosingDelimiter(
 
     return nil
 }
+
+private func escapeInlineLatexForMarkdown(_ latex: String) -> String {
+    let escaped = latex.reduce(into: "") { partialResult, character in
+        if markdownSpecials.contains(character) {
+            partialResult.append("\\")
+        }
+        partialResult.append(character)
+    }
+    return "\\$\(escaped)\\$"
+}
+
+private let markdownSpecials: Set<Character> = ["_", "*", "[", "]", "~"]

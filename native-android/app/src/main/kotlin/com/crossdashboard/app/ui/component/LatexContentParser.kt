@@ -2,7 +2,6 @@ package com.crossdashboard.app.ui.component
 
 sealed interface ContentSegment {
     data class Markdown(val content: String) : ContentSegment
-    data class InlineMath(val latex: String) : ContentSegment
     data class DisplayMath(val latex: String) : ContentSegment
 }
 
@@ -35,43 +34,65 @@ fun parseLatex(content: String): List<ContentSegment> {
         }
 
         val isDisplay = index + 1 < content.length && content[index + 1] == '$'
-        val delimiterLength = if (isDisplay) 2 else 1
-        val closingIndex = findClosingDelimiter(
-            content = content,
-            startIndex = index + delimiterLength,
-            isDisplay = isDisplay,
-        )
-
-        if (closingIndex == -1) {
-            markdown.append('$')
-            if (isDisplay) {
+        if (!isDisplay) {
+            val closingIndex = findClosingDelimiter(
+                content = content,
+                startIndex = index + 1,
+                isDisplay = false,
+            )
+            if (closingIndex == -1) {
                 markdown.append('$')
-                index += 2
-            } else {
                 index += 1
+                continue
             }
+
+            val inlineLatex = content.substring(index + 1, closingIndex)
+            markdown.append(escapeInlineLatexForMarkdown(inlineLatex))
+            index = closingIndex + 1
             continue
         }
 
-        val latex = content.substring(index + delimiterLength, closingIndex)
+        val closingIndex = findClosingDelimiter(
+            content = content,
+            startIndex = index + 2,
+            isDisplay = true,
+        )
+        if (closingIndex == -1) {
+            markdown.append('$')
+            markdown.append('$')
+            index += 2
+            continue
+        }
+
+        val latex = content.substring(index + 2, closingIndex)
         if (latex.isBlank()) {
-            markdown.append(if (isDisplay) "$$" else "$")
-            index += delimiterLength
+            markdown.append("$$")
+            index += 2
             continue
         }
 
         flushMarkdown()
-        segments += if (isDisplay) {
-            ContentSegment.DisplayMath(latex)
-        } else {
-            ContentSegment.InlineMath(latex)
-        }
-        index = closingIndex + delimiterLength
+        segments += ContentSegment.DisplayMath(latex)
+        index = closingIndex + 2
     }
 
     flushMarkdown()
     return segments
 }
+
+private fun escapeInlineLatexForMarkdown(latex: String): String {
+    val escaped = buildString {
+        latex.forEach { char ->
+            if (char in MARKDOWN_SPECIALS) {
+                append('\\')
+            }
+            append(char)
+        }
+    }
+    return "\\$$escaped\\$"
+}
+
+private val MARKDOWN_SPECIALS = setOf('_', '*', '[', ']', '~')
 
 private fun findClosingDelimiter(
     content: String,

@@ -1,10 +1,13 @@
 package com.crossdashboard.app.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,11 +72,7 @@ fun MarkdownText(
                 is ContentSegment.DisplayMath -> LatexText(
                     latex = segment.latex,
                     mode = MTMathViewMode.KMTMathViewModeDisplay,
-                )
-
-                is ContentSegment.InlineMath -> LatexText(
-                    latex = segment.latex,
-                    mode = MTMathViewMode.KMTMathViewModeText,
+                    centered = true,
                 )
             }
         }
@@ -84,16 +83,32 @@ fun MarkdownText(
 private fun LatexText(
     latex: String,
     mode: MTMathViewMode,
+    centered: Boolean = false,
 ) {
-    MTMathView(
-        latex = latex,
-        modifier = Modifier.fillMaxWidth(),
-        fontSize = MaterialTheme.typography.bodyLarge.fontSize.takeOrElse { 18.sp },
-        textColor = MaterialTheme.colorScheme.onSurface,
-        font = null,
-        mode = mode,
-        textAlignment = MTTextAlignment.KMTTextAlignmentLeft,
-        displayErrorInline = true,
-        errorFontSize = MaterialTheme.typography.bodySmall.fontSize.takeOrElse { 14.sp },
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = if (centered) 8.dp else 0.dp),
+        contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart,
+    ) {
+        MTMathView(
+            latex = latex,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = if (centered) {
+                MaterialTheme.typography.titleMedium.fontSize.takeOrElse { 20.sp }
+            } else {
+                MaterialTheme.typography.bodyLarge.fontSize.takeOrElse { 18.sp }
+            },
+            textColor = MaterialTheme.colorScheme.onSurface,
+            font = null,
+            mode = mode,
+            textAlignment = if (centered) {
+                MTTextAlignment.KMTTextAlignmentCenter
+            } else {
+                MTTextAlignment.KMTTextAlignmentLeft
+            },
+            displayErrorInline = true,
+            errorFontSize = MaterialTheme.typography.bodySmall.fontSize.takeOrElse { 14.sp },
+        )
+    }
 }

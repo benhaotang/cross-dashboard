@@ -25,19 +25,11 @@ struct ReadMarkdownView: View {
                     MathView(
                         latex: latex,
                         displayMode: true,
-                        fontSize: 18,
-                        textAlignment: .left
+                        fontSize: 20,
+                        textAlignment: .center
                     )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                case .inlineMath(let latex):
-                    MathView(
-                        latex: latex,
-                        displayMode: false,
-                        fontSize: 16,
-                        textAlignment: .left
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
         }
