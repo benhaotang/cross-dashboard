@@ -46,7 +46,7 @@ fun CreateMemoSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        contentWindowInsets = WindowInsets.ime,
+        contentWindowInsets = { WindowInsets.ime },
     ) {
         Column(
             modifier = Modifier

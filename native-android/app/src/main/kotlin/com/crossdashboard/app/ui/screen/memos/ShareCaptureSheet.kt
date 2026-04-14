@@ -30,7 +30,7 @@ fun ShareCaptureSheet(
     var visibility by remember { mutableStateOf(MemoVisibility.PRIVATE) }
     val attachments = remember { mutableStateListOf(*sharedAttachments.toTypedArray()) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = WindowInsets.ime) {
+    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = { WindowInsets.ime }) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

@@ -40,7 +40,7 @@ fun CreateEventFromMemoSheet(
 
     val dateFmt = DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault())
 
-    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = WindowInsets.ime) {
+    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = { WindowInsets.ime }) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 16.dp)

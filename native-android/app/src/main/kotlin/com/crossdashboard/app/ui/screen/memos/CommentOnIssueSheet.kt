@@ -28,7 +28,7 @@ fun CommentOnIssueSheet(
 
     val repoIssues = issuesByRepo[selectedRepo] ?: emptyList()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = WindowInsets.ime) {
+    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = { WindowInsets.ime }) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
