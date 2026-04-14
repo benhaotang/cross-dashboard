@@ -115,7 +115,7 @@ private fun CreateIssueContent(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(repoMenuExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                     )
                     ExposedDropdownMenu(
                         expanded = repoMenuExpanded,

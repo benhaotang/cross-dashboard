@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Comment
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -135,7 +137,7 @@ fun MemoPropertySheet(
                     }
                     if (hasGitea) {
                         FilledTonalButton(onClick = { showCommentIssueSheet = true }) {
-                            Icon(Icons.Outlined.Comment, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Comment Issue")
                         }
@@ -182,7 +184,7 @@ fun MemoPropertySheet(
                     }
                     if (hasGitea) {
                         IconButton(onClick = { showCommentIssueSheet = true }, modifier = Modifier.semantics { contentDescription = "Comment on issue" }) {
-                            Icon(Icons.Outlined.Comment, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null)
                         }
                     }
                     if (hasLink && firstUrl != null) {
@@ -300,7 +302,7 @@ fun MemoPropertySheet(
                     },
                     modifier = Modifier.semantics { contentDescription = "Send comment" },
                 ) {
-                    Icon(Icons.Outlined.Send, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null)
                 }
             }
         }

@@ -83,7 +83,8 @@ class MainActivity : ComponentActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java) ?: emptyList()
                 } else {
-                    @Suppress("DEPRECATION") intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
                 }
             }
             else -> emptyList()
@@ -111,8 +112,9 @@ class MainActivity : ComponentActivity() {
      * bypasses the launcher and arrives here as REQUEST_AUTH_TOKEN_SSO = 4243.
      */
     @Deprecated("Required for Nextcloud SSO library two-step auth flow")
-    @Suppress("OVERRIDE_DEPRECATION")
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == AccountImporter.REQUEST_AUTH_TOKEN_SSO) {
             try {

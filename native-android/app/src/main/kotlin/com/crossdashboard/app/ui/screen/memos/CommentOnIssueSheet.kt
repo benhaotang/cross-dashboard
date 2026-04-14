@@ -43,7 +43,7 @@ fun CommentOnIssueSheet(
                     readOnly = true,
                     label = { Text("Repository") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(repoExpanded) },
-                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                    modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                 )
                 ExposedDropdownMenu(expanded = repoExpanded, onDismissRequest = { repoExpanded = false }) {
                     repos.forEach { repo ->
@@ -76,7 +76,7 @@ fun CommentOnIssueSheet(
                         label = { Text("Issue") },
                         placeholder = { Text("Select an issue…") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(issueExpanded) },
-                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                     )
                     ExposedDropdownMenu(
                         expanded = issueExpanded,

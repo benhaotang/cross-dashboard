@@ -221,15 +221,14 @@ private fun MemoListRow(
     onArchive: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
-                SwipeToDismissBoxValue.StartToEnd -> { onArchive(); true }
-                else -> false
-            }
-        },
-    )
+    val dismissState = rememberSwipeToDismissBoxState()
+    LaunchedEffect(dismissState.currentValue) {
+        when (dismissState.currentValue) {
+            SwipeToDismissBoxValue.EndToStart -> onDelete()
+            SwipeToDismissBoxValue.StartToEnd -> onArchive()
+            else -> {}
+        }
+    }
 
     SwipeToDismissBox(
         state = dismissState,
