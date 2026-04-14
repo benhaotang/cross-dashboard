@@ -192,13 +192,12 @@ class MemosViewModel @Inject constructor(
 
     /** Extract markdown task items from memo content. */
     fun extractTasks(memo: MemosMemo): List<ParsedTask> {
-        val parser = TaskInputParser()
         return memo.content
             .lines()
             .filter { it.trimStart().startsWith("- [ ]") }
             .mapNotNull { line ->
                 val raw = line.trimStart().removePrefix("- [ ]").trim()
-                if (raw.isNotBlank()) parser.parse(raw) else null
+                if (raw.isNotBlank()) TaskInputParser.parse(raw) else null
             }
     }
 

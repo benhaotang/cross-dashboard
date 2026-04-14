@@ -190,14 +190,61 @@ private struct AppearanceSettingsTab: View {
             }
 
             Section("Visible screens") {
-                ForEach(allScreens, id: \.self) { screen in
-                    Toggle(screen, isOn: Binding(
-                        get: { viewModel.visibleScreensSet.contains(screen) },
-                        set: { on in
-                            if on { viewModel.visibleScreensSet.insert(screen) }
-                            else  { viewModel.visibleScreensSet.remove(screen) }
+                Text("Drag to reorder. Toggle to show / hide.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                // ── Visible (drag to reorder) ──────────────────────────────
+                List {
+                    ForEach(viewModel.orderedVisibleScreens, id: \.self) { screen in
+                        HStack(spacing: 8) {
+                            Image(systemName: Screen(rawValue: screen)?.systemImage ?? "circle")
+                                .frame(width: 18)
+                                .foregroundStyle(.secondary)
+                            Text(screen)
+                            Spacer()
+                            Button {
+                                viewModel.toggleVisibleScreen(screen)
+                            } label: {
+                                Image(systemName: "eye.slash.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Hide \(screen)")
                         }
-                    ))
+                        .padding(.vertical, 2)
+                    }
+                    .onMove { viewModel.moveVisibleScreen(from: $0, to: $1) }
+                }
+                .frame(height: max(56, CGFloat(viewModel.orderedVisibleScreens.count) * 38))
+                .listStyle(.plain)
+                .environment(\.editMode, .constant(.active))
+
+                // ── Hidden (toggle to restore) ─────────────────────────────
+                if !viewModel.hiddenScreens.isEmpty {
+                    Divider()
+                    Text("Hidden screens")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(viewModel.hiddenScreens, id: \.self) { screen in
+                        HStack(spacing: 8) {
+                            Image(systemName: Screen(rawValue: screen)?.systemImage ?? "circle")
+                                .frame(width: 18)
+                                .foregroundStyle(.secondary)
+                            Text(screen)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                viewModel.toggleVisibleScreen(screen)
+                            } label: {
+                                Image(systemName: "eye.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tint)
+                            .accessibilityLabel("Show \(screen)")
+                        }
+                        .padding(.vertical, 2)
+                    }
                 }
             }
 

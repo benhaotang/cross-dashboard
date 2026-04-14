@@ -1,7 +1,6 @@
 package com.crossdashboard.app.data.repository
 
 import android.util.Log
-import com.crossdashboard.app.data.db.Mappers
 import com.crossdashboard.app.data.db.dao.MemosDao
 import com.crossdashboard.app.data.db.toDomain
 import com.crossdashboard.app.data.db.toEntity

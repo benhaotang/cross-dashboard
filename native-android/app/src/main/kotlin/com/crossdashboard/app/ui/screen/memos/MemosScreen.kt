@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import com.crossdashboard.app.domain.model.MemosMemo
 import com.crossdashboard.app.domain.model.MemoState
 import com.crossdashboard.app.ui.navigation.Destination
@@ -49,6 +50,7 @@ fun MemosScreen(
     var showCreateSheet by remember { mutableStateOf(false) }
 
     val navigator = rememberListDetailPaneScaffoldNavigator<MemosMemo>()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -69,7 +71,9 @@ fun MemosScreen(
                         state = state,
                         onSelectMemo = { memo ->
                             selectedMemo = memo
-                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, memo)
+                            coroutineScope.launch {
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, memo)
+                            }
                         },
                         onSetStateFilter = vm::setStateFilter,
                         onSetTagFilter = vm::setTagFilter,
@@ -83,7 +87,7 @@ fun MemosScreen(
             },
             detailPane = {
                 AnimatedPane {
-                    val memo = navigator.currentDestination?.content ?: selectedMemo
+                    val memo = navigator.currentDestination?.contentKey ?: selectedMemo
                     if (memo != null) {
                         MemoPropertySheet(
                             memo = memo,

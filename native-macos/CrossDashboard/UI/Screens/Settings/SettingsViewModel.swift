@@ -40,7 +40,9 @@ final class SettingsViewModel {
 
     // ─── Appearance ───────────────────────────────────────────────────────────
 
-    var visibleScreensSet: Set<String> = Set(allScreens)
+    /// Visible screens in display order. Screens not in this list are hidden.
+    var orderedVisibleScreens: [String] = allScreens
+    var hiddenScreens: [String] { allScreens.filter { !orderedVisibleScreens.contains($0) } }
     var kanbanColumnsInput: String = ""
 
     // ─── Task defaults ────────────────────────────────────────────────────────
@@ -115,7 +117,7 @@ final class SettingsViewModel {
         memosToken = keychain.get(CredentialKey.memosToken) ?? ""
 
         // Appearance
-        visibleScreensSet   = Set(prefs.visibleScreens)
+        orderedVisibleScreens = prefs.visibleScreens.isEmpty ? allScreens : prefs.visibleScreens
         kanbanColumnsInput  = prefs.kanbanColumns.joined(separator: ", ")
 
         // Task defaults
@@ -174,8 +176,23 @@ final class SettingsViewModel {
         }
     }
 
+    func toggleVisibleScreen(_ screen: String) {
+        if orderedVisibleScreens.contains(screen) {
+            guard orderedVisibleScreens.count > 1 else { return }
+            orderedVisibleScreens.removeAll { $0 == screen }
+        } else {
+            orderedVisibleScreens.append(screen)
+        }
+        saveAppearance()
+    }
+
+    func moveVisibleScreen(from: IndexSet, to: Int) {
+        orderedVisibleScreens.move(fromOffsets: from, toOffset: to)
+        saveAppearance()
+    }
+
     func saveAppearance() {
-        container.preferences.visibleScreens = allScreens.filter { visibleScreensSet.contains($0) }
+        container.preferences.visibleScreens = orderedVisibleScreens
         let cols = kanbanColumnsInput
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }

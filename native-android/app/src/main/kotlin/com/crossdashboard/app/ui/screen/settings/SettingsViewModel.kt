@@ -502,6 +502,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { prefs.setVisibleScreens(current) }
     }
 
+    fun moveVisibleScreen(from: Int, to: Int) {
+        val current = _state.value.visibleScreens.toMutableList()
+        if (from !in current.indices || to !in current.indices) return
+        val item = current.removeAt(from)
+        current.add(to, item)
+        viewModelScope.launch { prefs.setVisibleScreens(current) }
+    }
+
     // ─── Task defaults ────────────────────────────────────────────────────────
 
     fun setTaskDefaults(d: TaskDefaults) {

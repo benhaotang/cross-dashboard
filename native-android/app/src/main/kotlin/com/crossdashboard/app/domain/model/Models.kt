@@ -247,5 +247,5 @@ data class MemosMemo(
     val updateTime: Instant,
 )
 
-val ALL_SCREENS = listOf("Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Memos")
+val ALL_SCREENS = listOf("Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Capture")
 val DEFAULT_KANBAN_COLUMNS = listOf("backlog", "planned", "inprogress", "done")

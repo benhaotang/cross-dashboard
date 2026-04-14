@@ -43,7 +43,7 @@ fun Destination.screenName(): String = when (this) {
     is Destination.Notes -> "Notes"
     is Destination.Issues -> "Issues"
     is Destination.Views -> "Views"
-    is Destination.Memos -> "Memos"
+    is Destination.Memos -> "Capture"
     is Destination.Settings -> "Settings"
     else -> ""
 }
@@ -56,7 +56,7 @@ fun Destination.label(): String = when (this) {
     is Destination.Notes -> "Notes"
     is Destination.Issues -> "Issues"
     is Destination.Views -> "Views"
-    is Destination.Memos -> "Memos"
+    is Destination.Memos -> "Capture"
     is Destination.Settings -> "Settings"
     else -> ""
 }

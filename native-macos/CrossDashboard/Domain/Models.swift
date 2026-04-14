@@ -476,7 +476,7 @@ public struct MemosMemo: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-public let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Memos"]
+public let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Capture"]
 public let defaultKanbanColumns: [String] = ["backlog", "planned", "inprogress", "done"]
 
 public struct AppSettings: Codable, Equatable, Sendable {

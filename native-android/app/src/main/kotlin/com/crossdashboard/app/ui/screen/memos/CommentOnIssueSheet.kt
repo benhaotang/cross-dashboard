@@ -28,7 +28,7 @@ fun CommentOnIssueSheet(
 
     val repoIssues = issuesByRepo[selectedRepo] ?: emptyList()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, windowInsets = WindowInsets.ime) {
+    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = WindowInsets.ime) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -63,7 +63,7 @@ fun CommentOnIssueSheet(
             if (repoIssues.isEmpty()) {
                 Text(
                     if (selectedRepo.isEmpty()) "No Gitea repository configured — add one in Settings."
-                    else "No open issues synced for "$selectedRepo". Run a sync first.",
+                    else "No open issues synced for \"$selectedRepo\". Run a sync first.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
