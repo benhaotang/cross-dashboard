@@ -295,7 +295,7 @@ public final class PersistenceController {
     public let container: ModelContainer
 
     /// All SwiftData model types registered in the schema.
-    public static let schema = Schema([
+    public nonisolated static let schema = Schema([
         EventModel.self,
         TaskModel.self,
         NoteModel.self,
@@ -307,7 +307,7 @@ public final class PersistenceController {
     /// Returns the SwiftData store URL inside the shared App Group container so
     /// the widget extension can read the same database as the main app.
     /// Falls back to the default location if the group container is unavailable.
-    public static func groupContainerURL(appGroupID: String = "group.com.crossdashboard") -> URL? {
+    public nonisolated static func groupContainerURL(appGroupID: String = "group.com.crossdashboard") -> URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?
             .appendingPathComponent("CrossDashboard.sqlite")
@@ -315,12 +315,13 @@ public final class PersistenceController {
 
     private init() {
         do {
-            let config: ModelConfiguration
-            if let storeURL = PersistenceController.groupContainerURL() {
-                config = ModelConfiguration(schema: PersistenceController.schema, url: storeURL)
-            } else {
-                config = ModelConfiguration(schema: PersistenceController.schema, isStoredInMemoryOnly: false)
-            }
+            // Use the App Group container so the widget extension reads the same store.
+            // groupContainer: .identifier(...) is the correct SwiftData API for this;
+            // the URL-based ModelConfiguration init is not available on macOS 15.
+            let config = ModelConfiguration(
+                schema: PersistenceController.schema,
+                groupContainer: .identifier("group.com.crossdashboard")
+            )
             container = try ModelContainer(
                 for: PersistenceController.schema,
                 configurations: [config]

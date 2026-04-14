@@ -1,13 +1,10 @@
 import Foundation
-import os.log
 import CrossDashboardKit
 
 /// Memos API client using URLSession + Codable DTOs.
 /// Auth: Authorization: Bearer <token>
 /// Direct Swift port of MemosClient.kt.
 final class MemosClient: Sendable {
-
-    private static let log = Logger(subsystem: "com.crossdashboard", category: "MemosClient")
 
     private let keychain: KeychainStore
     private let session: URLSession
@@ -39,10 +36,7 @@ final class MemosClient: Sendable {
         orderBy: String = "display_time desc",
         pageSize: Int = 50
     ) async -> (memos: [MemosMemo], nextPageToken: String?) {
-        guard let base = baseUrl() else {
-            Self.log.warning("[listMemos] baseUrl is nil — Memos host not configured")
-            return ([], nil)
-        }
+        guard let base = baseUrl() else { return ([], nil) }
         var comps = URLComponents(string: "\(base)/api/v1/memos")!
         var items: [URLQueryItem] = [
             URLQueryItem(name: "pageSize", value: "\(pageSize)"),
@@ -52,24 +46,10 @@ final class MemosClient: Sendable {
         if let f = filter  { items.append(URLQueryItem(name: "filter", value: f)) }
         if let t = pageToken { items.append(URLQueryItem(name: "pageToken", value: t)) }
         comps.queryItems = items
-        guard let url = comps.url else {
-            Self.log.error("[listMemos] Failed to build URL from components")
-            return ([], nil)
-        }
-        Self.log.debug("[listMemos] GET \(url.absoluteString, privacy: .public)")
-        guard let data = await get(url.absoluteString) else {
-            Self.log.error("[listMemos] HTTP request failed or returned non-2xx for \(url.absoluteString, privacy: .public)")
-            return ([], nil)
-        }
-        Self.log.debug("[listMemos] Response body (\(data.count) bytes): \(String(data: data, encoding: .utf8) ?? "<non-UTF8>", privacy: .public)")
-        guard let dto = try? decoder.decode(MemoListDto.self, from: data) else {
-            // Decode failed — log the raw JSON to surface field mismatches
-            let raw = String(data: data, encoding: .utf8) ?? "<non-UTF8>"
-            Self.log.error("[listMemos] JSON decode failed. Raw response: \(raw, privacy: .public)")
-            return ([], nil)
-        }
+        guard let url = comps.url else { return ([], nil) }
+        guard let data = await get(url.absoluteString) else { return ([], nil) }
+        guard let dto = try? decoder.decode(MemoListDto.self, from: data) else { return ([], nil) }
         let memos = dto.memos.compactMap { $0.toDomain() }
-        Self.log.info("[listMemos] Decoded \(memos.count) memos (state=\(state.rawValue, privacy: .public)), nextPageToken=\(dto.nextPageToken ?? "nil", privacy: .public)")
         return (memos, dto.nextPageToken.flatMap { $0.isEmpty ? nil : $0 })
     }
 
@@ -86,11 +66,7 @@ final class MemosClient: Sendable {
         visibility: MemoVisibility = .private,
         attachmentNames: [String] = []
     ) async -> MemosMemo? {
-        guard let base = baseUrl() else {
-            print("[MemosClient] createMemo: no baseUrl")
-            return nil
-        }
-        print("[MemosClient] createMemo: visibility=\(visibility.rawValue) attachmentNames=\(attachmentNames)")
+        guard let base = baseUrl() else { return nil }
         var body: [String: Any] = [
             "state": "NORMAL",
             "content": content,
@@ -99,18 +75,8 @@ final class MemosClient: Sendable {
         if !attachmentNames.isEmpty {
             body["attachments"] = attachmentNames.map { ["name": $0] }
         }
-        guard let data = await postJSON("\(base)/api/v1/memos", body: body) else {
-            print("[MemosClient] createMemo: postJSON returned nil")
-            return nil
-        }
-        if let memo = try? decoder.decode(MemoDtoFull.self, from: data).toDomain() {
-            print("[MemosClient] createMemo: success — name=\(memo.name) attachments=\(memo.attachments.count)")
-            return memo
-        } else {
-            let raw = String(data: data, encoding: .utf8) ?? "<?>"
-            print("[MemosClient] createMemo: decode failed — raw=\(raw)")
-            return nil
-        }
+        guard let data = await postJSON("\(base)/api/v1/memos", body: body) else { return nil }
+        return try? decoder.decode(MemoDtoFull.self, from: data).toDomain()
     }
 
     func updateMemo(
@@ -179,29 +145,15 @@ final class MemosClient: Sendable {
         data fileData: Data,
         memoName: String? = nil
     ) async -> MemosAttachment? {
-        guard let base = baseUrl() else {
-            print("[MemosClient] createAttachment: no baseUrl")
-            return nil
-        }
-        print("[MemosClient] createAttachment: filename=\(filename) mimeType=\(mimeType) size=\(fileData.count) memoName=\(memoName ?? "nil")")
+        guard let base = baseUrl() else { return nil }
         var body: [String: Any] = [
             "filename": filename,
             "type": mimeType,
             "content": fileData.base64EncodedString(),
         ]
         if let m = memoName { body["memo"] = m }
-        guard let data = await postJSON("\(base)/api/v1/attachments", body: body) else {
-            print("[MemosClient] createAttachment: postJSON returned nil")
-            return nil
-        }
-        if let att = try? decoder.decode(AttachmentDto.self, from: data).toDomain() {
-            print("[MemosClient] createAttachment: success — name=\(att.name)")
-            return att
-        } else {
-            let raw = String(data: data, encoding: .utf8) ?? "<?>"
-            print("[MemosClient] createAttachment: decode failed — raw=\(raw)")
-            return nil
-        }
+        guard let data = await postJSON("\(base)/api/v1/attachments", body: body) else { return nil }
+        return try? decoder.decode(AttachmentDto.self, from: data).toDomain()
     }
 
     @discardableResult
@@ -269,86 +221,41 @@ final class MemosClient: Sendable {
     // ─── HTTP helpers ─────────────────────────────────────────────────────────
 
     private func get(_ urlStr: String) async -> Data? {
-        guard let url = URL(string: urlStr) else {
-            Self.log.error("[get] Invalid URL: \(urlStr, privacy: .public)")
-            return nil
-        }
+        guard let url = URL(string: urlStr) else { return nil }
         var req = URLRequest(url: url)
         req.timeoutInterval = 30
         addBearer(&req)
-        do {
-            let (data, resp) = try await session.data(for: req)
-            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            guard (200..<300).contains(status) else {
-                let body = String(data: data, encoding: .utf8) ?? "<non-UTF8>"
-                Self.log.error("[get] HTTP \(status) for \(urlStr, privacy: .public) — body: \(body, privacy: .public)")
-                return nil
-            }
-            return data
-        } catch {
-            Self.log.error("[get] Request error for \(urlStr, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
+        guard let (data, resp) = try? await session.data(for: req),
+              (200..<300).contains((resp as? HTTPURLResponse)?.statusCode ?? -1) else { return nil }
+        return data
     }
 
     private func postJSON(_ urlStr: String, body: [String: Any]) async -> Data? {
         guard let url = URL(string: urlStr),
-              let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
-            print("[MemosClient] postJSON: bad URL or body serialization failed — \(urlStr)")
-            return nil
-        }
-        // Log body but truncate base64 blobs so the console stays readable
-        let bodyLog = (String(data: bodyData, encoding: .utf8) ?? "<?>")
-            .replacingOccurrences(of: #""content":"[^"]{80}[^"]*""#,
-                                  with: #""content":"<base64 truncated>""#,
-                                  options: .regularExpression)
-        print("[MemosClient] POST \(urlStr)")
-        print("[MemosClient]   body: \(bodyLog)")
+              let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = bodyData
         req.timeoutInterval = 60
         addBearer(&req)
-        do {
-            let (data, resp) = try await session.data(for: req)
-            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
-            print("[MemosClient]   → HTTP \(status): \(raw)")
-            guard (200..<300).contains(status) else { return nil }
-            return data
-        } catch {
-            print("[MemosClient]   → request threw: \(error)")
-            return nil
-        }
+        guard let (data, resp) = try? await session.data(for: req),
+              (200..<300).contains((resp as? HTTPURLResponse)?.statusCode ?? -1) else { return nil }
+        return data
     }
 
     private func patchJSON(_ urlStr: String, body: [String: Any]) async -> Data? {
         guard let url = URL(string: urlStr),
-              let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
-            print("[MemosClient] patchJSON: bad URL or body serialization failed — \(urlStr)")
-            return nil
-        }
-        let bodyLog = String(data: bodyData, encoding: .utf8) ?? "<?>"
-        print("[MemosClient] PATCH \(urlStr)")
-        print("[MemosClient]   body: \(bodyLog)")
+              let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "PATCH"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = bodyData
         req.timeoutInterval = 60
         addBearer(&req)
-        do {
-            let (data, resp) = try await session.data(for: req)
-            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
-            print("[MemosClient]   → HTTP \(status): \(raw)")
-            guard (200..<300).contains(status) else { return nil }
-            return data
-        } catch {
-            print("[MemosClient]   → request threw: \(error)")
-            return nil
-        }
+        guard let (data, resp) = try? await session.data(for: req),
+              (200..<300).contains((resp as? HTTPURLResponse)?.statusCode ?? -1) else { return nil }
+        return data
     }
 
     private func delete(_ urlStr: String) async -> Bool {

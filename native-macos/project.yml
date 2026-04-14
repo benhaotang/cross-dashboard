@@ -43,6 +43,7 @@ targets:
     deploymentTarget: "15.0"
     sources:
       - CrossDashboard/Domain/Models.swift
+      - CrossDashboard/Domain/WidgetDataStore.swift
       - CrossDashboard/Data/Persistence/PersistenceController.swift
       - CrossDashboard/Data/Prefs/AppPreferences.swift
       - CrossDashboard/Data/Prefs/KeychainStore.swift
@@ -121,6 +122,8 @@ targets:
       - package: swift-math
         product: SwiftMath
       - target: MemosShareExtension
+        embed: true
+      - target: DashboardWidgetExtension
         embed: true
 
   MemosShareExtension:

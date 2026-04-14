@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import WidgetKit
 import CrossDashboardKit
 
 /// AppContainer creates and vends all singletons for the app.
@@ -68,6 +69,53 @@ final class AppContainer {
             group.addTask { await self.memoRepository.syncMemos() }
         }
         preferences.lastSyncDate = Date()
+        writeWidgetSnapshot()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func writeWidgetSnapshot() {
+        let now = Date()
+        let weekFromNow = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
+
+        let events = eventRepository.events
+            .filter { $0.start >= now && $0.start <= weekFromNow }
+            .sorted { $0.start < $1.start }
+            .prefix(5)
+            .map { e in
+                WidgetUpcomingEvent(
+                    id: e.uid,
+                    summary: e.summary,
+                    startEpoch: e.start.timeIntervalSince1970,
+                    calendarColor: nil
+                )
+            }
+
+        let tasks = taskRepository.allTasks
+            .filter {
+                $0.status != .completed &&
+                $0.status != .cancelled &&
+                $0.due != nil &&
+                $0.due! <= weekFromNow
+            }
+            .sorted { ($0.due ?? .distantFuture) < ($1.due ?? .distantFuture) }
+            .prefix(5)
+            .map { t in
+                WidgetDueTask(
+                    id: t.uid,
+                    summary: t.summary,
+                    dueEpoch: t.due?.timeIntervalSince1970,
+                    isOverdue: (t.due ?? .distantFuture) < now,
+                    priority: t.priority
+                )
+            }
+
+        let snapshot = WidgetSnapshot(
+            upcomingEvents: Array(events),
+            dueSoonTasks: Array(tasks),
+            openIssuesCount: issueRepository.openIssues.count,
+            syncIntervalMinutes: preferences.syncIntervalMinutes
+        )
+        WidgetDataStore.save(snapshot)
     }
 
     // ─── Credential helpers ───────────────────────────────────────────────────

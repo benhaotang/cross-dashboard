@@ -1,123 +1,56 @@
 import WidgetKit
 import SwiftUI
-import SwiftData
 import CrossDashboardKit
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
 
 struct DashboardWidgetEntry: TimelineEntry {
     let date: Date
-    let upcomingEvents: [WidgetEvent]
-    let dueSoonTasks: [WidgetTask]
+    let upcomingEvents: [WidgetUpcomingEvent]
+    let dueSoonTasks: [WidgetDueTask]
     let openIssuesCount: Int
-}
-
-struct WidgetEvent: Identifiable {
-    let id: String
-    let summary: String
-    let start: Date
-    let calendarColor: String?
-}
-
-struct WidgetTask: Identifiable {
-    let id: String
-    let summary: String
-    let due: Date?
-    let isOverdue: Bool
-    let priority: Int
+    /// True when no snapshot has been written yet (app never synced).
+    let isEmpty: Bool
 }
 
 // ─── Timeline Provider ────────────────────────────────────────────────────────
+// Data flows via App Group UserDefaults (written by AppContainer.writeWidgetSnapshot()
+// after every sync). This is simpler and more reliable than sharing a live
+// SwiftData store across process boundaries.
 
 struct DashboardWidgetProvider: TimelineProvider {
-
-    private let appGroupID = "group.com.crossdashboard"
 
     func placeholder(in context: Context) -> DashboardWidgetEntry {
         .placeholder
     }
 
     func getSnapshot(in context: Context, completion: @escaping (DashboardWidgetEntry) -> Void) {
-        if context.isPreview {
-            completion(.placeholder)
-        } else {
-            completion(loadEntry())
-        }
+        completion(context.isPreview ? .placeholder : loadEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<DashboardWidgetEntry>) -> Void) {
         let entry = loadEntry()
-        // Refresh in 30 min to pick up sync changes
-        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
+        // Use the same sync interval the user configured. The main app also calls
+        // WidgetCenter.shared.reloadAllTimelines() after each sync, so this is just
+        // a safety-net fallback in case the app hasn't run.
+        let intervalMinutes = WidgetDataStore.load()?.syncIntervalMinutes ?? 60
+        let nextRefresh = Calendar.current.date(byAdding: .minute, value: intervalMinutes, to: Date()) ?? Date()
         completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
     }
 
     // ─── Data loading ─────────────────────────────────────────────────────────
 
     private func loadEntry() -> DashboardWidgetEntry {
-        guard let container = makeContainer() else {
-            return DashboardWidgetEntry(date: Date(), upcomingEvents: [], dueSoonTasks: [], openIssuesCount: 0)
+        guard let snapshot = WidgetDataStore.load() else {
+            return DashboardWidgetEntry(date: Date(), upcomingEvents: [], dueSoonTasks: [], openIssuesCount: 0, isEmpty: true)
         }
-        let ctx = ModelContext(container)
-
-        let now = Date()
-        let weekFromNow = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
-
-        // Upcoming events (next 7 days, up to 5)
-        let eventDescriptor = FetchDescriptor<EventModel>(
-            predicate: #Predicate { $0.startEpoch >= now.timeIntervalSince1970 && $0.startEpoch <= weekFromNow.timeIntervalSince1970 },
-            sortBy: [SortDescriptor(\.startEpoch)]
-        )
-        let eventModels = (try? ctx.fetch(eventDescriptor)) ?? []
-        let events = eventModels.prefix(5).map { m in
-            WidgetEvent(
-                id: m.uid,
-                summary: m.summary,
-                start: Date(timeIntervalSince1970: m.startEpoch),
-                calendarColor: nil
-            )
-        }
-
-        // Due-soon tasks (next 7 days, not completed, up to 5)
-        let taskDescriptor = FetchDescriptor<TaskModel>(
-            predicate: #Predicate {
-                $0.statusRaw != "completed" &&
-                $0.dueEpoch != nil &&
-                ($0.dueEpoch ?? 0) <= weekFromNow.timeIntervalSince1970
-            },
-            sortBy: [SortDescriptor(\.dueEpoch)]
-        )
-        let taskModels = (try? ctx.fetch(taskDescriptor)) ?? []
-        let tasks = taskModels.prefix(5).map { m in
-            WidgetTask(
-                id: m.uid,
-                summary: m.summary,
-                due: m.dueEpoch.map { Date(timeIntervalSince1970: $0) },
-                isOverdue: (m.dueEpoch ?? Double.infinity) < now.timeIntervalSince1970,
-                priority: m.priority
-            )
-        }
-
-        // Open issues count
-        let issueDescriptor = FetchDescriptor<IssueModel>(
-            predicate: #Predicate { $0.state == "open" }
-        )
-        let openIssuesCount = (try? ctx.fetchCount(issueDescriptor)) ?? 0
-
         return DashboardWidgetEntry(
-            date: now,
-            upcomingEvents: Array(events),
-            dueSoonTasks: Array(tasks),
-            openIssuesCount: openIssuesCount
+            date: Date(timeIntervalSince1970: snapshot.writtenAt),
+            upcomingEvents: snapshot.upcomingEvents,
+            dueSoonTasks: snapshot.dueSoonTasks,
+            openIssuesCount: snapshot.openIssuesCount,
+            isEmpty: false
         )
-    }
-
-    private func makeContainer() -> ModelContainer? {
-        let schema = Schema([EventModel.self, TaskModel.self, NoteModel.self, IssueModel.self, StatsModel.self])
-        let storeURL = PersistenceController.groupContainerURL(appGroupID: appGroupID)
-        guard let storeURL else { return try? ModelContainer(for: schema) }
-        let config = ModelConfiguration(schema: schema, url: storeURL)
-        return try? ModelContainer(for: schema, configurations: [config])
     }
 }
 
@@ -127,14 +60,15 @@ extension DashboardWidgetEntry {
     static let placeholder = DashboardWidgetEntry(
         date: Date(),
         upcomingEvents: [
-            WidgetEvent(id: "1", summary: "Team standup", start: Date().addingTimeInterval(3600), calendarColor: nil),
-            WidgetEvent(id: "2", summary: "Design review", start: Date().addingTimeInterval(7200), calendarColor: nil),
+            WidgetUpcomingEvent(id: "1", summary: "Team standup",    startEpoch: Date().addingTimeInterval(3600).timeIntervalSince1970, calendarColor: nil),
+            WidgetUpcomingEvent(id: "2", summary: "Design review",   startEpoch: Date().addingTimeInterval(7200).timeIntervalSince1970, calendarColor: nil),
         ],
         dueSoonTasks: [
-            WidgetTask(id: "a", summary: "Write release notes", due: Date().addingTimeInterval(86400), isOverdue: false, priority: 1),
-            WidgetTask(id: "b", summary: "Fix CI flake", due: Date().addingTimeInterval(-3600), isOverdue: true, priority: 5),
+            WidgetDueTask(id: "a", summary: "Write release notes", dueEpoch: Date().addingTimeInterval(86400).timeIntervalSince1970, isOverdue: false, priority: 1),
+            WidgetDueTask(id: "b", summary: "Fix CI flake",        dueEpoch: Date().addingTimeInterval(-3600).timeIntervalSince1970,  isOverdue: true,  priority: 5),
         ],
-        openIssuesCount: 4
+        openIssuesCount: 4,
+        isEmpty: false
     )
 }
 
@@ -171,12 +105,16 @@ private struct SmallWidgetView: View {
 
             Spacer()
 
-            if let next = entry.upcomingEvents.first {
+            if entry.isEmpty {
+                Text("Open the app to sync")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if let next = entry.upcomingEvents.first {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(next.summary)
                         .font(.caption.weight(.medium))
                         .lineLimit(2)
-                    Text(next.start, style: .relative)
+                    Text(Date(timeIntervalSince1970: next.startEpoch), style: .relative)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -217,7 +155,7 @@ private struct MediumWidgetView: View {
                 Label("Events", systemImage: "calendar")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
-                ForEach(entry.upcomingEvents.prefix(3)) { event in
+                ForEach(Array(entry.upcomingEvents.prefix(3))) { event in
                     HStack(spacing: 4) {
                         Circle()
                             .fill(Color.accentColor)
@@ -226,13 +164,13 @@ private struct MediumWidgetView: View {
                             .font(.caption)
                             .lineLimit(1)
                     }
-                    Text(event.start.formatted(date: .omitted, time: .shortened))
+                    Text(Date(timeIntervalSince1970: event.startEpoch).formatted(date: .omitted, time: .shortened))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .padding(.leading, 10)
                 }
                 if entry.upcomingEvents.isEmpty {
-                    Text("None upcoming")
+                    Text(entry.isEmpty ? "Sync to load" : "None upcoming")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -246,7 +184,7 @@ private struct MediumWidgetView: View {
                 Label("Tasks", systemImage: "checklist")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
-                ForEach(entry.dueSoonTasks.prefix(3)) { task in
+                ForEach(Array(entry.dueSoonTasks.prefix(3))) { task in
                     HStack(spacing: 4) {
                         Circle()
                             .fill(task.isOverdue ? Color.red : Color.accentColor)
@@ -258,7 +196,7 @@ private struct MediumWidgetView: View {
                     }
                 }
                 if entry.dueSoonTasks.isEmpty {
-                    Text("All caught up!")
+                    Text(entry.isEmpty ? "Sync to load" : "All caught up!")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -287,22 +225,24 @@ private struct LargeWidgetView: View {
             Divider()
 
             SectionHeader(title: "Upcoming Events", icon: "calendar")
-            ForEach(entry.upcomingEvents.prefix(3)) { event in
+            ForEach(Array(entry.upcomingEvents.prefix(3))) { event in
                 HStack {
                     Circle().fill(Color.accentColor).frame(width: 7, height: 7)
                     Text(event.summary).font(.caption).lineLimit(1)
                     Spacer()
-                    Text(event.start, style: .time).font(.caption2).foregroundStyle(.secondary)
+                    Text(Date(timeIntervalSince1970: event.startEpoch), style: .time)
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
             if entry.upcomingEvents.isEmpty {
-                Text("No upcoming events").font(.caption2).foregroundStyle(.tertiary)
+                Text(entry.isEmpty ? "Open app and sync" : "No upcoming events")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }
 
             Divider()
 
             SectionHeader(title: "Due Soon", icon: "checklist")
-            ForEach(entry.dueSoonTasks.prefix(3)) { task in
+            ForEach(Array(entry.dueSoonTasks.prefix(3))) { task in
                 HStack {
                     Circle()
                         .fill(task.isOverdue ? Color.red : Color.accentColor)
@@ -312,15 +252,16 @@ private struct LargeWidgetView: View {
                         .lineLimit(1)
                         .foregroundStyle(task.isOverdue ? .red : .primary)
                     Spacer()
-                    if let due = task.due {
-                        Text(due, style: .relative)
+                    if let dueEpoch = task.dueEpoch {
+                        Text(Date(timeIntervalSince1970: dueEpoch), style: .relative)
                             .font(.caption2)
                             .foregroundStyle(task.isOverdue ? .red : .secondary)
                     }
                 }
             }
             if entry.dueSoonTasks.isEmpty {
-                Text("All caught up!").font(.caption2).foregroundStyle(.tertiary)
+                Text(entry.isEmpty ? "Open app and sync" : "All caught up!")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }
 
             Divider()

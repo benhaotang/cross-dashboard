@@ -15,6 +15,7 @@
 		1E540EFF344808791430730D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24C2E6BFCBDFBDEDBDF9582 /* Models.swift */; };
 		1E5ED21FC1B38020605467F2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB56FFA82C4FC6BE7B9003 /* SettingsView.swift */; };
 		1EA5B4D1A9CD18CB37AD03DD /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1B82C3E517A89D42B70D1A /* DashboardView.swift */; };
+		20972339A263E9DC41092EB2 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */; };
 		20E81A96BBBEAB6C594A5D44 /* IssueRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DB561CAC39C76ACD9BF34F /* IssueRepository.swift */; };
 		245112A632D3A87FFC2EB09E /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715AA46225159588276265C9 /* MemosClient.swift */; };
 		2697C698A778CC760DEBDCA5 /* IssueDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DCE7367F0C445E1C130FA01 /* IssueDetailView.swift */; };
@@ -71,9 +72,11 @@
 		CA1C786027A4BF984392B91C /* NoteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4004EDB3584A193C372D5F /* NoteRepository.swift */; };
 		CCD2D0961469E0C5709F9606 /* IssuesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4435E04964FCEE31197528E /* IssuesViewModel.swift */; };
 		D19C351B8B149D2295E9C75B /* TasksViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC7C0D148AC9E90D28331BB /* TasksViewModel.swift */; };
+		D4B4411FD71E748985BD1F77 /* WidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */; };
 		D6C4F80C8F28AA9E8FCC7690 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584E5C5339A9E03FFBFA86E1 /* SettingsViewModel.swift */; };
 		D7519DF1C8572D49DBCE15AA /* CalendarColorDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A0A390C1802F0384E7435C /* CalendarColorDot.swift */; };
 		E115E63D543E7577541EB592 /* MemosShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E3A16CE2C646A2EDE1CC186C /* DashboardWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 891F8C29767BA7EA579216A4 /* DashboardWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E47AF0B04B5E81BFDA3967DF /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 9AC9C4F3845F628424973DA5 /* MarkdownUI */; };
 		E947FDC930EC466B499CF62F /* MemoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239E5C6041C1D527D6783DC8 /* MemoDetailView.swift */; };
 		F0A81911A037820E31AFD7C9 /* EventRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E38FD03364C23FCE12BEDA /* EventRepository.swift */; };
@@ -110,6 +113,13 @@
 			remoteGlobalIDString = 43176C6F7C929882118B1E24;
 			remoteInfo = CrossDashboardKit;
 		};
+		BEED9B31EAF71AD4672B6260 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F4A7E74091B9DD079D24BC62 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 73E33B398D8E6AC05DE42D3A;
+			remoteInfo = DashboardWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -120,6 +130,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				E115E63D543E7577541EB592 /* MemosShareExtension.appex in Embed Foundation Extensions */,
+				E3A16CE2C646A2EDE1CC186C /* DashboardWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -201,6 +212,7 @@
 		F2F2D4FCE9E9E3C592E10719 /* GiteaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiteaClient.swift; sourceTree = "<group>"; };
 		F4435E04964FCEE31197528E /* IssuesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssuesViewModel.swift; sourceTree = "<group>"; };
 		F8081A02CDB2975117B4B90A /* SyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncScheduler.swift; sourceTree = "<group>"; };
+		FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
 		FD28C03C68C4B62C59435754 /* MemosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosView.swift; sourceTree = "<group>"; };
 		FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MemosShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -529,6 +541,7 @@
 			isa = PBXGroup;
 			children = (
 				F24C2E6BFCBDFBDEDBDF9582 /* Models.swift */,
+				FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -585,6 +598,7 @@
 			dependencies = (
 				0F41CD5B15E9DB363BA9087D /* PBXTargetDependency */,
 				8392BADB4BB5949B641C7A2D /* PBXTargetDependency */,
+				8A5643EFF3E5771B8C6C8CB5 /* PBXTargetDependency */,
 			);
 			name = CrossDashboard;
 			packageProductDependencies = (
@@ -672,6 +686,7 @@
 				6DAF738052CD6D8DB479867D /* KeychainStore.swift in Sources */,
 				1E540EFF344808791430730D /* Models.swift in Sources */,
 				A4FC232AA76A8E04B4257064 /* PersistenceController.swift in Sources */,
+				20972339A263E9DC41092EB2 /* WidgetDataStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -738,6 +753,7 @@
 				D19C351B8B149D2295E9C75B /* TasksViewModel.swift in Sources */,
 				BDEF50B97C219027FCE259B0 /* ViewsView.swift in Sources */,
 				C43458AB154B1C8E05983074 /* ViewsViewModel.swift in Sources */,
+				D4B4411FD71E748985BD1F77 /* WidgetDataStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -775,6 +791,11 @@
 			isa = PBXTargetDependency;
 			target = F9E79F6ABB15EB966175354C /* MemosShareExtension */;
 			targetProxy = 09A8AF6CF7049D502B006BA8 /* PBXContainerItemProxy */;
+		};
+		8A5643EFF3E5771B8C6C8CB5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 73E33B398D8E6AC05DE42D3A /* DashboardWidgetExtension */;
+			targetProxy = BEED9B31EAF71AD4672B6260 /* PBXContainerItemProxy */;
 		};
 		E0032277DC3A3835EF99BFD1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -977,6 +998,7 @@
 				CODE_SIGN_ENTITLEMENTS = DashboardWidgetExtension/DashboardWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				INFOPLIST_FILE = DashboardWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1019,6 +1041,7 @@
 				CODE_SIGN_ENTITLEMENTS = DashboardWidgetExtension/DashboardWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				INFOPLIST_FILE = DashboardWidgetExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

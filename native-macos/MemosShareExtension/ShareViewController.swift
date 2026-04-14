@@ -102,30 +102,18 @@ private struct ShareComposeView: View {
     // MARK: - Load shared payload
 
     private func loadPayload() async {
-        guard let items = extensionContext?.inputItems as? [NSExtensionItem] else {
-            print("[ShareExt] loadPayload: no input items")
-            return
-        }
-        print("[ShareExt] loadPayload: \(items.count) NSExtensionItem(s)")
+        guard let items = extensionContext?.inputItems as? [NSExtensionItem] else { return }
         var textParts: [String] = []
 
-        for (i, item) in items.enumerated() {
+        for item in items {
             let providers = item.attachments ?? []
-            print("[ShareExt] item[\(i)]: \(providers.count) provider(s)")
-            for (j, provider) in providers.enumerated() {
-                print("[ShareExt]   provider[\(j)] registeredTypeIdentifiers: \(provider.registeredTypeIdentifiers)")
+            for provider in providers {
                 if provider.hasItemConformingToTypeIdentifier("public.file-url") {
                     if let file = await loadFile(from: provider) {
-                        print("[ShareExt]   → loaded file: \(file.filename) \(file.mimeType) \(file.data.count) bytes")
                         pendingFile = file
-                    } else {
-                        print("[ShareExt]   → loadFile returned nil")
                     }
                 } else if let text = await loadText(from: provider) {
-                    print("[ShareExt]   → loaded text: \(text.prefix(120))")
                     textParts.append(text)
-                } else {
-                    print("[ShareExt]   → could not load item (no matching type)")
                 }
             }
         }
@@ -134,34 +122,29 @@ private struct ShareComposeView: View {
 
     private func loadFile(from provider: NSItemProvider) async -> PendingFile? {
         let allTypes = provider.registeredTypeIdentifiers
-        print("[ShareExt] loadFile: registeredTypeIdentifiers = \(allTypes)")
 
         // Step 1 — get the original filename from public.file-url.
         // loadFileRepresentation copies the file to a macOS temp dir and names it after
         // the UTI description (e.g. "rich text (RTF).rtf"), not the real filename.
         // Loading public.file-url gives us the original path so lastPathComponent is correct.
         let originalFilename = await loadOriginalFilename(from: provider)
-        print("[ShareExt] loadFile: originalFilename = \(originalFilename ?? "nil")")
 
         // Step 2 — read file bytes.
         let urlOnlyTypes: Set<String> = ["public.url", "public.file-url",
                                          "com.apple.finder.node", "public.vcard"]
         let contentTypeId = allTypes.first { !urlOnlyTypes.contains($0) }
-        print("[ShareExt] loadFile: selected contentTypeId = \(contentTypeId ?? "nil")")
 
         if let typeId = contentTypeId {
             if let file = await loadViaFileRepresentation(provider: provider, typeId: typeId,
                                                           originalFilename: originalFilename) {
                 return file
             }
-            print("[ShareExt] loadFile: loadFileRepresentation failed, trying file-url fallback")
         }
 
         if provider.hasItemConformingToTypeIdentifier("public.file-url") {
             return await loadViaSecurityScopedURL(provider: provider, originalFilename: originalFilename)
         }
 
-        print("[ShareExt] loadFile: all strategies failed")
         return nil
     }
 
@@ -186,13 +169,7 @@ private struct ShareComposeView: View {
                                             originalFilename: String?) async -> PendingFile? {
         return await withCheckedContinuation { continuation in
             provider.loadFileRepresentation(forTypeIdentifier: typeId) { url, error in
-                if let error {
-                    print("[ShareExt] loadFileRepresentation(\(typeId)) error: \(error)")
-                    continuation.resume(returning: nil)
-                    return
-                }
-                guard let url = url else {
-                    print("[ShareExt] loadFileRepresentation(\(typeId)): url is nil")
+                guard error == nil, let url = url else {
                     continuation.resume(returning: nil)
                     return
                 }
@@ -205,10 +182,8 @@ private struct ShareComposeView: View {
                     // Use originalFilename (from public.file-url) as it holds the real name.
                     // Fall back to the temp URL's last component only as last resort.
                     let filename = originalFilename ?? url.lastPathComponent
-                    print("[ShareExt] loadFileRepresentation: \(data.count) bytes, mime=\(mime), filename=\(filename)")
                     continuation.resume(returning: PendingFile(filename: filename, mimeType: mime, data: data))
                 } catch {
-                    print("[ShareExt] loadFileRepresentation: Data(contentsOf:) failed: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -217,20 +192,14 @@ private struct ShareComposeView: View {
 
     private func loadViaSecurityScopedURL(provider: NSItemProvider, originalFilename: String?) async -> PendingFile? {
         await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, error in
-                if let error { print("[ShareExt] loadItem(file-url) error: \(error)") }
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
                 let url: URL?
                 if let u = item as? URL { url = u }
                 else if let ns = item as? NSURL { url = ns as URL }
-                else {
-                    print("[ShareExt] loadItem(file-url): item type=\(type(of: item)) — not URL")
-                    url = nil
-                }
+                else { url = nil }
                 guard let fileURL = url else { continuation.resume(returning: nil); return }
 
-                print("[ShareExt] loadItem(file-url): \(fileURL)")
                 let accessing = fileURL.startAccessingSecurityScopedResource()
-                print("[ShareExt] startAccessingSecurityScopedResource = \(accessing)")
                 defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
 
                 do {
@@ -238,10 +207,8 @@ private struct ShareComposeView: View {
                     let ext = fileURL.pathExtension
                     let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
                     let filename = originalFilename ?? fileURL.lastPathComponent
-                    print("[ShareExt] security-scoped read: \(data.count) bytes, mime=\(mime), filename=\(filename)")
                     continuation.resume(returning: PendingFile(filename: filename, mimeType: mime, data: data))
                 } catch {
-                    print("[ShareExt] security-scoped Data(contentsOf:) failed: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -286,7 +253,6 @@ private struct ShareComposeView: View {
             errorMessage = "Memos host not configured."
             return
         }
-        print("[ShareExt] capture: host=\(host)")
 
         do {
             // 1. Upload attachment first, get its resource name.
@@ -295,13 +261,10 @@ private struct ShareComposeView: View {
             if var file = pendingFile {
                 let finalName = editedFilename.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !finalName.isEmpty { file = PendingFile(filename: finalName, mimeType: file.mimeType, data: file.data) }
-                print("[ShareExt] ── Step 1: upload attachment '\(file.filename)' ──")
                 attachmentName = try await uploadAttachment(file, host: host, token: token)
-                print("[ShareExt] attachmentName = \(attachmentName ?? "nil")")
             }
 
             // 2. Create memo with attachment embedded in the body
-            print("[ShareExt] ── Step 2: create memo (attachmentName=\(attachmentName ?? "none")) ──")
             let memoContent = trimmedText.isEmpty ? (editedFilename.isEmpty ? (pendingFile?.filename ?? "") : editedFilename) : trimmedText
             let memoName = try await createMemo(
                 content: memoContent,
@@ -310,28 +273,20 @@ private struct ShareComposeView: View {
                 host: host,
                 token: token
             )
-            print("[ShareExt] memoName = \(memoName)")
 
             // 3. Belt-and-suspenders: also call SetMemoAttachments
             if let attachmentName, let file = pendingFile {
-                print("[ShareExt] ── Step 3: setMemoAttachments ──")
-                do {
-                    try await setMemoAttachments(
-                        memoName: memoName,
-                        attachmentName: attachmentName,
-                        file: file,
-                        host: host,
-                        token: token
-                    )
-                } catch {
-                    // Non-fatal — memo was already created with attachment in body
-                    print("[ShareExt] setMemoAttachments failed (non-fatal): \(error)")
-                }
+                try? await setMemoAttachments(
+                    memoName: memoName,
+                    attachmentName: attachmentName,
+                    file: file,
+                    host: host,
+                    token: token
+                )
             }
 
             extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         } catch {
-            print("[ShareExt] capture FAILED: \(error)")
             errorMessage = error.localizedDescription
         }
     }
@@ -339,9 +294,7 @@ private struct ShareComposeView: View {
     // MARK: - API helpers
 
     private func uploadAttachment(_ file: PendingFile, host: String, token: String) async throws -> String {
-        let urlString = "\(host)/api/v1/attachments"
-        print("[ShareExt] POST \(urlString)")
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        guard let url = URL(string: "\(host)/api/v1/attachments") else { throw URLError(.badURL) }
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -354,29 +307,20 @@ private struct ShareComposeView: View {
             "content": file.data.base64EncodedString(),
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: bodyObj)
-        print("[ShareExt]   body keys: filename=\(file.filename) type=\(file.mimeType) content=<\(file.data.count) bytes base64>")
 
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
-        print("[ShareExt]   → HTTP \(status)")
-        print("[ShareExt]   → body: \(raw)")
 
         guard status == 200 else {
             throw NSError(domain: "com.crossdashboard", code: status,
                           userInfo: [NSLocalizedDescriptionKey: "uploadAttachment HTTP \(status): \(raw)"])
         }
 
-        // Parse "name" from response — may be at top level or nested
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = json["name"] as? String else {
             throw NSError(domain: "com.crossdashboard", code: -2,
-                          userInfo: [NSLocalizedDescriptionKey: "uploadAttachment: non-JSON response: \(raw)"])
-        }
-        print("[ShareExt]   → parsed JSON keys: \(json.keys.sorted())")
-
-        guard let name = json["name"] as? String else {
-            throw NSError(domain: "com.crossdashboard", code: -3,
-                          userInfo: [NSLocalizedDescriptionKey: "uploadAttachment: no 'name' in response: \(raw)"])
+                          userInfo: [NSLocalizedDescriptionKey: "uploadAttachment: unexpected response: \(raw)"])
         }
         return name
     }
@@ -388,9 +332,7 @@ private struct ShareComposeView: View {
         host: String,
         token: String
     ) async throws -> String {
-        let urlString = "\(host)/api/v1/memos"
-        print("[ShareExt] POST \(urlString)")
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        guard let url = URL(string: "\(host)/api/v1/memos") else { throw URLError(.badURL) }
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -407,30 +349,19 @@ private struct ShareComposeView: View {
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: bodyObj)
 
-        let bodyStr = String(data: req.httpBody!, encoding: .utf8) ?? ""
-        print("[ShareExt]   body: \(bodyStr)")
-
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
-        print("[ShareExt]   → HTTP \(status)")
-        print("[ShareExt]   → body: \(raw)")
 
         guard status == 200 else {
             throw NSError(domain: "com.crossdashboard", code: status,
                           userInfo: [NSLocalizedDescriptionKey: "createMemo HTTP \(status): \(raw)"])
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NSError(domain: "com.crossdashboard", code: -2,
-                          userInfo: [NSLocalizedDescriptionKey: "createMemo: non-JSON response: \(raw)"])
-        }
-        print("[ShareExt]   → parsed JSON keys: \(json.keys.sorted())")
-        print("[ShareExt]   → attachments in response: \(json["attachments"] ?? "KEY MISSING")")
-
-        guard let name = json["name"] as? String else {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = json["name"] as? String else {
             throw NSError(domain: "com.crossdashboard", code: -3,
-                          userInfo: [NSLocalizedDescriptionKey: "createMemo: no 'name' in response: \(raw)"])
+                          userInfo: [NSLocalizedDescriptionKey: "createMemo: unexpected response: \(raw)"])
         }
         return name
     }
@@ -443,9 +374,7 @@ private struct ShareComposeView: View {
         token: String
     ) async throws {
         // memoName = "memos/{id}" — use as-is in the path: /api/v1/memos/{id}/attachments
-        let urlString = "\(host)/api/v1/\(memoName)/attachments"
-        print("[ShareExt] PATCH \(urlString)")
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        guard let url = URL(string: "\(host)/api/v1/\(memoName)/attachments") else { throw URLError(.badURL) }
 
         var req = URLRequest(url: url)
         req.httpMethod = "PATCH"
@@ -457,16 +386,12 @@ private struct ShareComposeView: View {
             "attachments": [["name": attachmentName, "filename": file.filename, "type": file.mimeType]],
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: bodyObj)
-        let bodyStr = String(data: req.httpBody!, encoding: .utf8) ?? ""
-        print("[ShareExt]   body: \(bodyStr)")
 
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
-        print("[ShareExt]   → HTTP \(status)")
-        print("[ShareExt]   → body: \(raw)")
 
         guard (200...204).contains(status) else {
+            let raw = String(data: data, encoding: .utf8) ?? "<binary \(data.count) bytes>"
             throw NSError(domain: "com.crossdashboard", code: status,
                           userInfo: [NSLocalizedDescriptionKey: "setMemoAttachments HTTP \(status): \(raw)"])
         }
