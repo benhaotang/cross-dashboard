@@ -287,5 +287,6 @@ class MemosViewModel @Inject constructor(
     }
 
     fun clearSnackbar() = _state.update { it.copy(snackbarMessage = null) }
+    fun showSnackbar(msg: String) = _state.update { it.copy(snackbarMessage = msg) }
     fun clearError() = _state.update { it.copy(error = null) }
 }

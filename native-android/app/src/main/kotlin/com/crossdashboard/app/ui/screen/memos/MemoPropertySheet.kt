@@ -45,10 +45,10 @@ fun MemoPropertySheet(
     commentsLoading: Boolean,
     memosHost: String,
     memosToken: String,
+    configuredRepos: List<String>,
     issuesByRepo: Map<String, List<GiteaIssue>>,
     onLoadComments: () -> Unit,
     onAddComment: (String) -> Unit,
-    onShare: () -> Unit,
     onDelete: () -> Unit,
     onArchive: () -> Unit,
     onExtractTasks: (MemosMemo) -> List<ParsedTask>,
@@ -75,8 +75,9 @@ fun MemoPropertySheet(
     // Determine which action buttons are relevant
     val hasIncompleteTasks = memo.property.hasIncompleteTasks
     val hasDate = onDetectDate(memo) != null
-    val hasGitea = issuesByRepo.isNotEmpty()
-    val hasLink = memo.property.hasLink
+    // Mirror macOS: show the button whenever Gitea repos are configured, even if no issues are synced yet
+    val hasGitea = configuredRepos.isNotEmpty()
+    // Detect links directly from content rather than relying on the server-computed flag
     val firstUrl = onFirstUrl(memo)
 
     LazyColumn(
@@ -142,7 +143,7 @@ fun MemoPropertySheet(
                             Text("Comment Issue")
                         }
                     }
-                    if (hasLink && firstUrl != null) {
+                    if (firstUrl != null) {
                         FilledTonalButton(onClick = {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(firstUrl)))
                         }) {
@@ -151,17 +152,16 @@ fun MemoPropertySheet(
                             Text("Open URL")
                         }
                     }
-                    FilledTonalButton(onClick = {
-                        vm.createShare(memo.name) { url ->
-                            if (url != null) {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("memo share link", url))
-                            }
+                    if (memoUrl != null) {
+                        FilledTonalButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("memo link", memoUrl))
+                            vm.showSnackbar("Link copied")
+                        }) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Copy Link")
                         }
-                    }) {
-                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Share")
                     }
                 }
             } else {
@@ -187,7 +187,7 @@ fun MemoPropertySheet(
                             Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null)
                         }
                     }
-                    if (hasLink && firstUrl != null) {
+                    if (firstUrl != null) {
                         IconButton(
                             onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(firstUrl))) },
                             modifier = Modifier.semantics { contentDescription = "Open URL" },
@@ -195,18 +195,17 @@ fun MemoPropertySheet(
                             Icon(Icons.Outlined.OpenInBrowser, contentDescription = null)
                         }
                     }
-                    IconButton(
-                        onClick = {
-                            vm.createShare(memo.name) { url ->
-                                if (url != null) {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("memo share link", url))
-                                }
-                            }
-                        },
-                        modifier = Modifier.semantics { contentDescription = "Share memo" },
-                    ) {
-                        Icon(Icons.Outlined.Share, contentDescription = null)
+                    if (memoUrl != null) {
+                        IconButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("memo link", memoUrl))
+                                vm.showSnackbar("Link copied")
+                            },
+                            modifier = Modifier.semantics { contentDescription = "Copy memo link" },
+                        ) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                        }
                     }
                 }
             }
