@@ -24,6 +24,7 @@
 		376AD8B5A2C7569BF64C5706 /* PomodoroBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A905388D0594811F78934D82 /* PomodoroBar.swift */; };
 		38C980829D29F567E0D0117F /* PropertyDetailShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */; };
 		3BEE8DCBD1EB812CE2611B85 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15C4B07371FCB5B50F3B1C0 /* NotesViewModel.swift */; };
+		3C1DBED35E864A0E86D15CED /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC4418E41F7F57079BAD880 /* AppDelegate.swift */; };
 		3DACA0DD54B4DBADA1071183 /* LatexContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9DD039757364E86BE0C96E /* LatexContentParser.swift */; };
 		4810154ADBC886FEFE82BADD /* DashboardWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */; };
 		4ACAEDED9DA6EB3B7FCE2C51 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F26B3C275BE1B5FE71ECAB /* InboxViewModel.swift */; };
@@ -185,6 +186,7 @@
 		B25F0DFF6C1DD02054B7791E /* DashboardWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DashboardWidgetExtension.entitlements; sourceTree = "<group>"; };
 		BF1B82C3E517A89D42B70D1A /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		C4609EBB710853F6A19CB30E /* QuickInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickInputBar.swift; sourceTree = "<group>"; };
+		CFC4418E41F7F57079BAD880 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDetailShell.swift; sourceTree = "<group>"; };
 		D5C9F86DEC54B1D3BE011ACD /* ViewsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewsView.swift; sourceTree = "<group>"; };
 		D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidget.swift; sourceTree = "<group>"; };
@@ -241,6 +243,14 @@
 				839D6DF48CB125F528EA3A95 /* Screens */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		0E7974E8DBFB2F7157EE90F4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CFC4418E41F7F57079BAD880 /* AppDelegate.swift */,
+			);
+			path = App;
 			sourceTree = "<group>";
 		};
 		146893F7DBB3FDBC431334AA /* Issues */ = {
@@ -464,6 +474,7 @@
 				0F82AE3F18687BD645FBB7D9 /* CrossDashboard.entitlements */,
 				E6E61F0E1DC1C3754E00B2DB /* CrossDashboardApp.swift */,
 				26B5CC6E24F65DFE9A56027D /* Info.plist */,
+				0E7974E8DBFB2F7157EE90F4 /* App */,
 				A08D8AD9287BB54AFE28A2CA /* Background */,
 				AC16992B6FABCD4552D0F1A8 /* Data */,
 				F9DE0F726E32BD5F0A2D9D6E /* Domain */,
@@ -669,6 +680,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				17D6AF566C85C3459AB455A5 /* AppContainer.swift in Sources */,
+				3C1DBED35E864A0E86D15CED /* AppDelegate.swift in Sources */,
 				BF7510E9EA80246EAB16BED2 /* AppViewModel.swift in Sources */,
 				B171C41B4965205A55000335 /* BiometricLockView.swift in Sources */,
 				7C7E4720E8627F69D9557F6F /* CalDavClient.swift in Sources */,

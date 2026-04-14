@@ -83,6 +83,14 @@ targets:
         NSCalendarsUsageDescription: "CrossDashboard accesses your calendars to display events."
         NSRemindersUsageDescription: "CrossDashboard manages your tasks."
         com.apple.developer.networking.wifi-info: false
+        NSServices:
+          - NSMenuItem:
+              default: "Capture to Memos"
+            NSMessage: captureToMemos
+            NSPortName: CrossDashboard
+            NSSendTypes:
+              - public.plain-text
+              - public.url
     entitlements:
       path: CrossDashboard/CrossDashboard.entitlements
       properties:
@@ -128,6 +136,10 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionActivationRule:
+            NSExtensionActivationSupportsText: 1
+            NSExtensionActivationSupportsWebURLWithMaxCount: 1
+            NSExtensionActivationSupportsFileWithMaxCount: 10
     entitlements:
       path: MemosShareExtension/MemosShareExtension.entitlements
       properties:

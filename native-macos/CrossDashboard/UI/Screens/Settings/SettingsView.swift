@@ -218,7 +218,6 @@ private struct AppearanceSettingsTab: View {
                 }
                 .frame(height: max(56, CGFloat(viewModel.orderedVisibleScreens.count) * 38))
                 .listStyle(.plain)
-                .environment(\.editMode, .constant(.active))
 
                 // ── Hidden (toggle to restore) ─────────────────────────────
                 if !viewModel.hiddenScreens.isEmpty {

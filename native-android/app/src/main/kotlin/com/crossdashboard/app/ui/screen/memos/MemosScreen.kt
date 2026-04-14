@@ -46,10 +46,12 @@ fun MemosScreen(
         }
     }
 
-    var selectedMemo by remember { mutableStateOf<MemosMemo?>(null) }
+    var selectedMemoName by remember { mutableStateOf<String?>(null) }
     var showCreateSheet by remember { mutableStateOf(false) }
 
-    val navigator = rememberListDetailPaneScaffoldNavigator<MemosMemo>()
+    // Use String (memo.name) as the key — MemosMemo is not Parcelable and cannot be
+    // saved by SaveableStateRegistry, which causes a crash when AnimatedPane is disposed.
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
@@ -70,9 +72,9 @@ fun MemosScreen(
                     MemosListPane(
                         state = state,
                         onSelectMemo = { memo ->
-                            selectedMemo = memo
+                            selectedMemoName = memo.name
                             coroutineScope.launch {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, memo)
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, memo.name)
                             }
                         },
                         onSetStateFilter = vm::setStateFilter,
@@ -87,7 +89,8 @@ fun MemosScreen(
             },
             detailPane = {
                 AnimatedPane {
-                    val memo = navigator.currentDestination?.contentKey ?: selectedMemo
+                    val memoName = navigator.currentDestination?.contentKey ?: selectedMemoName
+                    val memo = memoName?.let { name -> state.memos.find { it.name == name } }
                     if (memo != null) {
                         MemoPropertySheet(
                             memo = memo,

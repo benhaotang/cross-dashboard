@@ -39,6 +39,25 @@
 	<string>NSApplication</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>CrossDashboard manages your tasks.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Capture to Memos</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>captureToMemos</string>
+			<key>NSPortName</key>
+			<string>CrossDashboard</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>public.url</string>
+			</array>
+		</dict>
+	</array>
 	<key>com.apple.developer.networking.wifi-info</key>
 	<false/>
 </dict>

@@ -80,7 +80,12 @@ private struct ShareComposeView: View {
         var parts: [String] = []
         for item in items {
             for provider in (item.attachments ?? []) {
-                if provider.hasItemConformingToTypeIdentifier("public.url") {
+                if provider.hasItemConformingToTypeIdentifier("public.file-url") {
+                    // Files shared from Finder — use their path as a reference
+                    if let fileURL = try? await provider.loadItem(forTypeIdentifier: "public.file-url") as? URL {
+                        parts.append(fileURL.path)
+                    }
+                } else if provider.hasItemConformingToTypeIdentifier("public.url") {
                     if let url = try? await provider.loadItem(forTypeIdentifier: "public.url") as? URL {
                         parts.append(url.absoluteString)
                     }

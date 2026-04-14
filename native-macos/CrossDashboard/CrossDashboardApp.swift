@@ -4,6 +4,8 @@ import CrossDashboardKit
 @main
 struct CrossDashboardApp: App {
 
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     @State private var appViewModel = AppViewModel()
     @State private var pomodoroViewModel = PomodoroViewModel.shared
 
