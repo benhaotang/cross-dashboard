@@ -11,6 +11,7 @@
 		08A0AFB5AD12CDEDC1C6F97E /* TagChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4C8B72220EFCEF15AC5589 /* TagChip.swift */; };
 		0FB1CBCB39D9E27D260BE3C6 /* PriorityChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = E814E328379D4398953E77EC /* PriorityChip.swift */; };
 		17D6AF566C85C3459AB455A5 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124F842B5C6A9535389252ED /* AppContainer.swift */; };
+		1D9CFF2F25E421465872FA6B /* MathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D936F67DEE36C473B7420789 /* MathView.swift */; };
 		1E540EFF344808791430730D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24C2E6BFCBDFBDEDBDF9582 /* Models.swift */; };
 		1E5ED21FC1B38020605467F2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB56FFA82C4FC6BE7B9003 /* SettingsView.swift */; };
 		1EA5B4D1A9CD18CB37AD03DD /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1B82C3E517A89D42B70D1A /* DashboardView.swift */; };
@@ -21,6 +22,7 @@
 		376AD8B5A2C7569BF64C5706 /* PomodoroBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A905388D0594811F78934D82 /* PomodoroBar.swift */; };
 		38C980829D29F567E0D0117F /* PropertyDetailShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */; };
 		3BEE8DCBD1EB812CE2611B85 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15C4B07371FCB5B50F3B1C0 /* NotesViewModel.swift */; };
+		3DACA0DD54B4DBADA1071183 /* LatexContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9DD039757364E86BE0C96E /* LatexContentParser.swift */; };
 		4810154ADBC886FEFE82BADD /* DashboardWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */; };
 		4ACAEDED9DA6EB3B7FCE2C51 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F26B3C275BE1B5FE71ECAB /* InboxViewModel.swift */; };
 		4CD9CFB7677104044D5E71D2 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5486FE670D44A72323FEE980 /* TaskDetailView.swift */; };
@@ -43,6 +45,7 @@
 		940F0A1848D5CD30657D5DC1 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1F97B94C3A272728D9E350 /* NotificationScheduler.swift */; };
 		976C934DB8C3115EC80C5386 /* PomodoroStatusItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A2E32979077C211363EB54 /* PomodoroStatusItem.swift */; };
 		9DACFB8A2ECE7BE0C0607243 /* DashboardWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2710E55805AD30A9CA83DDA /* DashboardWidgetBundle.swift */; };
+		9DBCC57C343B3DCDE42E0719 /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = B56A111423460A5DC202CB43 /* SwiftMath */; };
 		A0359D9FD4B86D3B23C6CCC4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7073EC024D219CC1F8EB2F24 /* ContentView.swift */; };
 		A360391D83197DA1D3251555 /* ReadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1497371EB1491387AC05E1A9 /* ReadField.swift */; };
 		A4FC232AA76A8E04B4257064 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1259754BEF7D296DE66A2172 /* PersistenceController.swift */; };
@@ -122,6 +125,7 @@
 		8B8B340CF8F723AE0D386BFB /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
 		980A70DFA48533EC1E9BBF2F /* TaskRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRepository.swift; sourceTree = "<group>"; };
 		99F26B3C275BE1B5FE71ECAB /* InboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViewModel.swift; sourceTree = "<group>"; };
+		9B9DD039757364E86BE0C96E /* LatexContentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatexContentParser.swift; sourceTree = "<group>"; };
 		A15C4B07371FCB5B50F3B1C0 /* NotesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesViewModel.swift; sourceTree = "<group>"; };
 		A1E38FD03364C23FCE12BEDA /* EventRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventRepository.swift; sourceTree = "<group>"; };
 		A2710E55805AD30A9CA83DDA /* DashboardWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetBundle.swift; sourceTree = "<group>"; };
@@ -135,6 +139,7 @@
 		D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDetailShell.swift; sourceTree = "<group>"; };
 		D5C9F86DEC54B1D3BE011ACD /* ViewsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewsView.swift; sourceTree = "<group>"; };
 		D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidget.swift; sourceTree = "<group>"; };
+		D936F67DEE36C473B7420789 /* MathView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathView.swift; sourceTree = "<group>"; };
 		D93B9873D8BA18A211552C47 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		DD3252F90D49D349D0626971 /* CrossDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrossDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6E61F0E1DC1C3754E00B2DB /* CrossDashboardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossDashboardApp.swift; sourceTree = "<group>"; };
@@ -162,6 +167,7 @@
 			files = (
 				7867A5D7A367317C84C89B07 /* CrossDashboardKit.framework in Frameworks */,
 				E47AF0B04B5E81BFDA3967DF /* MarkdownUI in Frameworks */,
+				9DBCC57C343B3DCDE42E0719 /* SwiftMath in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,6 +299,8 @@
 			isa = PBXGroup;
 			children = (
 				66A0A390C1802F0384E7435C /* CalendarColorDot.swift */,
+				9B9DD039757364E86BE0C96E /* LatexContentParser.swift */,
+				D936F67DEE36C473B7420789 /* MathView.swift */,
 				A905388D0594811F78934D82 /* PomodoroBar.swift */,
 				E814E328379D4398953E77EC /* PriorityChip.swift */,
 				D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */,
@@ -481,6 +489,7 @@
 			name = CrossDashboard;
 			packageProductDependencies = (
 				9AC9C4F3845F628424973DA5 /* MarkdownUI */,
+				B56A111423460A5DC202CB43 /* SwiftMath */,
 			);
 			productName = CrossDashboard;
 			productReference = DD3252F90D49D349D0626971 /* CrossDashboard.app */;
@@ -517,6 +526,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				DAA7F7336FEC269173459A8B /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				2EFF18AABC1104BBAEC4A075 /* XCRemoteSwiftPackageReference "SwiftMath" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B55961058119260E187C491 /* Products */;
@@ -567,6 +577,8 @@
 				20E81A96BBBEAB6C594A5D44 /* IssueRepository.swift in Sources */,
 				77A2CD206AF4DCE63EE3F9FC /* IssuesView.swift in Sources */,
 				CCD2D0961469E0C5709F9606 /* IssuesViewModel.swift in Sources */,
+				3DACA0DD54B4DBADA1071183 /* LatexContentParser.swift in Sources */,
+				1D9CFF2F25E421465872FA6B /* MathView.swift in Sources */,
 				5B2CFE5D85A8C49C5236C238 /* NextcloudLoginFlow.swift in Sources */,
 				7EFEDBBEF54C3F603DFC47BA /* NoteDetailView.swift in Sources */,
 				CA1C786027A4BF984392B91C /* NoteRepository.swift in Sources */,
@@ -925,6 +937,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		2EFF18AABC1104BBAEC4A075 /* XCRemoteSwiftPackageReference "SwiftMath" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mgriebling/SwiftMath";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.3;
+			};
+		};
 		DAA7F7336FEC269173459A8B /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
@@ -940,6 +960,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DAA7F7336FEC269173459A8B /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		B56A111423460A5DC202CB43 /* SwiftMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2EFF18AABC1104BBAEC4A075 /* XCRemoteSwiftPackageReference "SwiftMath" */;
+			productName = SwiftMath;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -25,6 +25,7 @@ activity-compose = "1.13.0"
 window = "1.3.0"
 desugar-jdk-libs = "2.1.5"
 markdown-renderer = "0.39.2"
+kotlintex = "0.3.3"
 
 [libraries]
 # Compose BOM — versions for all compose-* libs are pinned here
@@ -112,6 +113,9 @@ desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", ver
 markdown-renderer-android = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-android", version.ref = "markdown-renderer" }
 markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "markdown-renderer" }
 markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "markdown-renderer" }
+
+# LaTeX rendering
+kotlintex-core = { group = "io.github.darriousliu", name = "katex-core", version.ref = "kotlintex" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

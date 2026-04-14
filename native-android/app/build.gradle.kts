@@ -155,4 +155,7 @@ dependencies {
     implementation(libs.markdown.renderer.android)
     implementation(libs.markdown.renderer.m3)
     implementation(libs.markdown.renderer.coil3)
+
+    // LaTeX rendering
+    implementation(libs.kotlintex.core)
 }

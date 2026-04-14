@@ -12,6 +12,9 @@ packages:
   swift-markdown-ui:
     url: https://github.com/gonzalezreal/swift-markdown-ui
     from: "2.3.0"
+  swift-math:
+    url: https://github.com/mgriebling/SwiftMath
+    from: "1.7.3"
 
 schemes:
   CrossDashboard:
@@ -104,6 +107,8 @@ targets:
         embed: false
       - package: swift-markdown-ui
         product: MarkdownUI
+      - package: swift-math
+        product: SwiftMath
 
   DashboardWidgetExtension:
     type: app-extension
