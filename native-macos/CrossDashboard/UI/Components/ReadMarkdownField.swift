@@ -10,12 +10,30 @@ struct ReadMarkdownView: View {
     let content: String
 
     var body: some View {
-        Markdown(content)
-            .markdownTheme(.gitHub)
-            .markdownTextStyle {
-                ForegroundColor(.primary)
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(parseLatex(content).enumerated()), id: \.offset) { _, segment in
+                switch segment {
+                case .markdown(let text):
+                    Markdown(text)
+                        .markdownTheme(.gitHub)
+                        .markdownTextStyle {
+                            ForegroundColor(.primary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                case .displayMath(let latex):
+                    MathView(
+                        latex: latex,
+                        displayMode: true,
+                        fontSize: 20,
+                        textAlignment: .center
+                    )
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
