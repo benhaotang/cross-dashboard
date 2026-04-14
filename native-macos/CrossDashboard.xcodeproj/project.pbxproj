@@ -16,20 +16,25 @@
 		1E5ED21FC1B38020605467F2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB56FFA82C4FC6BE7B9003 /* SettingsView.swift */; };
 		1EA5B4D1A9CD18CB37AD03DD /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1B82C3E517A89D42B70D1A /* DashboardView.swift */; };
 		20E81A96BBBEAB6C594A5D44 /* IssueRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DB561CAC39C76ACD9BF34F /* IssueRepository.swift */; };
+		245112A632D3A87FFC2EB09E /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715AA46225159588276265C9 /* MemosClient.swift */; };
 		2697C698A778CC760DEBDCA5 /* IssueDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DCE7367F0C445E1C130FA01 /* IssueDetailView.swift */; };
+		31133399F744D25AF005AB6E /* MemosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD28C03C68C4B62C59435754 /* MemosView.swift */; };
 		323A071FB565D646FCF13B97 /* CrossDashboardKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 311E4E7D80C394DA195D7FAD /* CrossDashboardKit.framework */; };
 		3736999581794A9D433E7757 /* SyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8081A02CDB2975117B4B90A /* SyncScheduler.swift */; };
 		376AD8B5A2C7569BF64C5706 /* PomodoroBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A905388D0594811F78934D82 /* PomodoroBar.swift */; };
 		38C980829D29F567E0D0117F /* PropertyDetailShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */; };
 		3BEE8DCBD1EB812CE2611B85 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15C4B07371FCB5B50F3B1C0 /* NotesViewModel.swift */; };
+		3C1DBED35E864A0E86D15CED /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC4418E41F7F57079BAD880 /* AppDelegate.swift */; };
 		3DACA0DD54B4DBADA1071183 /* LatexContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9DD039757364E86BE0C96E /* LatexContentParser.swift */; };
 		4810154ADBC886FEFE82BADD /* DashboardWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */; };
 		4ACAEDED9DA6EB3B7FCE2C51 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F26B3C275BE1B5FE71ECAB /* InboxViewModel.swift */; };
 		4CD9CFB7677104044D5E71D2 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5486FE670D44A72323FEE980 /* TaskDetailView.swift */; };
 		53E6D109F76F04DE8AE565E0 /* PomodoroViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135BC930364984F290E438C4 /* PomodoroViewModel.swift */; };
 		5B2CFE5D85A8C49C5236C238 /* NextcloudLoginFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */; };
+		61E48A4E77C4BB702942F927 /* MemoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5877BCA60E880220B7CC2EBF /* MemoRepository.swift */; };
 		6DAF738052CD6D8DB479867D /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD9483C874CB530DF9A120A /* KeychainStore.swift */; };
 		750FF831C1C4F601579209A3 /* StatsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D859CFD78F2E84BF16E90D /* StatsRepository.swift */; };
+		75518D6C95F5F914DD3AA55B /* CommentOnIssueSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 549DE8981E5BE4F792A9E0F7 /* CommentOnIssueSheet.swift */; };
 		76507D9CDEA780837A312414 /* QuickInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4609EBB710853F6A19CB30E /* QuickInputBar.swift */; };
 		77A2CD206AF4DCE63EE3F9FC /* IssuesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9BE685A5717A0732E5C2D4 /* IssuesView.swift */; };
 		7867A5D7A367317C84C89B07 /* CrossDashboardKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 311E4E7D80C394DA195D7FAD /* CrossDashboardKit.framework */; };
@@ -38,12 +43,14 @@
 		7C7E4720E8627F69D9557F6F /* CalDavClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8D454E395BD61234E7A617 /* CalDavClient.swift */; };
 		7EFEDBBEF54C3F603DFC47BA /* NoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D89FD0DB39DE2676008E5EA /* NoteDetailView.swift */; };
 		80844F9AD48B72AE64CB8911 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0024104E8D950E91F15086 /* InboxView.swift */; };
+		8240685D4E05E154266D25F4 /* CrossDashboardKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 311E4E7D80C394DA195D7FAD /* CrossDashboardKit.framework */; };
 		82CA724887FE8C8036EBC525 /* EventsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A16A48DE73D0580DCEEE743 /* EventsViewModel.swift */; };
 		84F12B8D2E60829150A4B166 /* ReadMarkdownField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32DC14708B03F8A2D3A95B2 /* ReadMarkdownField.swift */; };
 		85233EDB04EBC1A877A9D28F /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8B340CF8F723AE0D386BFB /* StatusBadge.swift */; };
 		89A2603CC03469CFE5347784 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6427F1E2158C381D0806D1 /* TasksView.swift */; };
 		940F0A1848D5CD30657D5DC1 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1F97B94C3A272728D9E350 /* NotificationScheduler.swift */; };
 		976C934DB8C3115EC80C5386 /* PomodoroStatusItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A2E32979077C211363EB54 /* PomodoroStatusItem.swift */; };
+		9A25558C186020A5E1A94236 /* MemosViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C14BD4873279F85A6FF1870 /* MemosViewModel.swift */; };
 		9DACFB8A2ECE7BE0C0607243 /* DashboardWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2710E55805AD30A9CA83DDA /* DashboardWidgetBundle.swift */; };
 		9DBCC57C343B3DCDE42E0719 /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = B56A111423460A5DC202CB43 /* SwiftMath */; };
 		A0359D9FD4B86D3B23C6CCC4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7073EC024D219CC1F8EB2F24 /* ContentView.swift */; };
@@ -54,22 +61,34 @@
 		AAE5780C934FEF5E7752FA61 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18746691E76B33BE6C2CBAC8 /* DashboardViewModel.swift */; };
 		B171C41B4965205A55000335 /* BiometricLockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100B0D33E360037D075F415D /* BiometricLockView.swift */; };
 		B2D4DDC02783B69011EDA5C3 /* CrossDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E61F0E1DC1C3754E00B2DB /* CrossDashboardApp.swift */; };
+		BDB70CDC2B875EE6B2DF1DE9 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E1C0DFCEB4C5CAEA73226E /* ShareViewController.swift */; };
 		BDEF50B97C219027FCE259B0 /* ViewsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C9F86DEC54B1D3BE011ACD /* ViewsView.swift */; };
 		BF7510E9EA80246EAB16BED2 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16CE67B6D747A474B4082058 /* AppViewModel.swift */; };
 		C43458AB154B1C8E05983074 /* ViewsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC6CFAED63E2B6FC9A61CAC /* ViewsViewModel.swift */; };
 		C64722C1FF2A96827065E610 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7641D65CA8AFF372C2B8DDED /* AppPreferences.swift */; };
+		C7A28C3199B589B84E7A2AA1 /* ExtractTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F18EBF0EC9F947EA8B0BCE5 /* ExtractTasksSheet.swift */; };
 		C9EE28D62B31B26A64C8677E /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93B9873D8BA18A211552C47 /* EventDetailView.swift */; };
 		CA1C786027A4BF984392B91C /* NoteRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4004EDB3584A193C372D5F /* NoteRepository.swift */; };
 		CCD2D0961469E0C5709F9606 /* IssuesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4435E04964FCEE31197528E /* IssuesViewModel.swift */; };
 		D19C351B8B149D2295E9C75B /* TasksViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC7C0D148AC9E90D28331BB /* TasksViewModel.swift */; };
 		D6C4F80C8F28AA9E8FCC7690 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584E5C5339A9E03FFBFA86E1 /* SettingsViewModel.swift */; };
 		D7519DF1C8572D49DBCE15AA /* CalendarColorDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A0A390C1802F0384E7435C /* CalendarColorDot.swift */; };
+		E115E63D543E7577541EB592 /* MemosShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E47AF0B04B5E81BFDA3967DF /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 9AC9C4F3845F628424973DA5 /* MarkdownUI */; };
+		E947FDC930EC466B499CF62F /* MemoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239E5C6041C1D527D6783DC8 /* MemoDetailView.swift */; };
 		F0A81911A037820E31AFD7C9 /* EventRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E38FD03364C23FCE12BEDA /* EventRepository.swift */; };
+		F25FBC08179D1E7797899464 /* CreateEventFromMemoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A501C75B25BBFE27D3B4F5D /* CreateEventFromMemoSheet.swift */; };
 		FA42214CB2B51BC01933C594 /* GiteaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F2D4FCE9E9E3C592E10719 /* GiteaClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		09A8AF6CF7049D502B006BA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F4A7E74091B9DD079D24BC62 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F9E79F6ABB15EB966175354C;
+			remoteInfo = MemosShareExtension;
+		};
 		0D052EC9FD49992326213961 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F4A7E74091B9DD079D24BC62 /* Project object */;
@@ -84,14 +103,37 @@
 			remoteGlobalIDString = 43176C6F7C929882118B1E24;
 			remoteInfo = CrossDashboardKit;
 		};
+		695586489F059E92D7158D82 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F4A7E74091B9DD079D24BC62 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 43176C6F7C929882118B1E24;
+			remoteInfo = CrossDashboardKit;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		EA3AC0D3866B622086B5BD25 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E115E63D543E7577541EB592 /* MemosShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0A501C75B25BBFE27D3B4F5D /* CreateEventFromMemoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventFromMemoSheet.swift; sourceTree = "<group>"; };
 		0CD9483C874CB530DF9A120A /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		0F82AE3F18687BD645FBB7D9 /* CrossDashboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrossDashboard.entitlements; sourceTree = "<group>"; };
 		100B0D33E360037D075F415D /* BiometricLockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
 		124F842B5C6A9535389252ED /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		1259754BEF7D296DE66A2172 /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
+		12E1C0DFCEB4C5CAEA73226E /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		135BC930364984F290E438C4 /* PomodoroViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroViewModel.swift; sourceTree = "<group>"; };
 		1497371EB1491387AC05E1A9 /* ReadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadField.swift; sourceTree = "<group>"; };
 		1554D6A1D32B6061E86AE3B8 /* EventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsView.swift; sourceTree = "<group>"; };
@@ -99,7 +141,9 @@
 		18746691E76B33BE6C2CBAC8 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		19A2E32979077C211363EB54 /* PomodoroStatusItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroStatusItem.swift; sourceTree = "<group>"; };
 		1A0024104E8D950E91F15086 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		1C14BD4873279F85A6FF1870 /* MemosViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosViewModel.swift; sourceTree = "<group>"; };
 		1DB8A263DE9D84BEE511518C /* TaskInputParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskInputParser.swift; sourceTree = "<group>"; };
+		239E5C6041C1D527D6783DC8 /* MemoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoDetailView.swift; sourceTree = "<group>"; };
 		24DB561CAC39C76ACD9BF34F /* IssueRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueRepository.swift; sourceTree = "<group>"; };
 		26B5CC6E24F65DFE9A56027D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2AF2788BC7737C2CC17EE5F9 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
@@ -109,16 +153,22 @@
 		45D859CFD78F2E84BF16E90D /* StatsRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsRepository.swift; sourceTree = "<group>"; };
 		4BC7C0D148AC9E90D28331BB /* TasksViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksViewModel.swift; sourceTree = "<group>"; };
 		4CC6CFAED63E2B6FC9A61CAC /* ViewsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewsViewModel.swift; sourceTree = "<group>"; };
+		4E88E52A2ABF7DF52CA483B7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5486FE670D44A72323FEE980 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		549DE8981E5BE4F792A9E0F7 /* CommentOnIssueSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentOnIssueSheet.swift; sourceTree = "<group>"; };
 		584E5C5339A9E03FFBFA86E1 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		5877BCA60E880220B7CC2EBF /* MemoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoRepository.swift; sourceTree = "<group>"; };
+		59357A157CABDA13A9081854 /* MemosShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MemosShareExtension.entitlements; sourceTree = "<group>"; };
 		6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextcloudLoginFlow.swift; sourceTree = "<group>"; };
 		66A0A390C1802F0384E7435C /* CalendarColorDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarColorDot.swift; sourceTree = "<group>"; };
 		7073EC024D219CC1F8EB2F24 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		715AA46225159588276265C9 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
 		7641D65CA8AFF372C2B8DDED /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
 		767D7E1190C88C65D6C69418 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7B6427F1E2158C381D0806D1 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		7D89FD0DB39DE2676008E5EA /* NoteDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDetailView.swift; sourceTree = "<group>"; };
 		7DCE7367F0C445E1C130FA01 /* IssueDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssueDetailView.swift; sourceTree = "<group>"; };
+		7F18EBF0EC9F947EA8B0BCE5 /* ExtractTasksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractTasksSheet.swift; sourceTree = "<group>"; };
 		891F8C29767BA7EA579216A4 /* DashboardWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DashboardWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A16A48DE73D0580DCEEE743 /* EventsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsViewModel.swift; sourceTree = "<group>"; };
 		8B4004EDB3584A193C372D5F /* NoteRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRepository.swift; sourceTree = "<group>"; };
@@ -136,6 +186,7 @@
 		B25F0DFF6C1DD02054B7791E /* DashboardWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DashboardWidgetExtension.entitlements; sourceTree = "<group>"; };
 		BF1B82C3E517A89D42B70D1A /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		C4609EBB710853F6A19CB30E /* QuickInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickInputBar.swift; sourceTree = "<group>"; };
+		CFC4418E41F7F57079BAD880 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDetailShell.swift; sourceTree = "<group>"; };
 		D5C9F86DEC54B1D3BE011ACD /* ViewsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewsView.swift; sourceTree = "<group>"; };
 		D7A2B21034E20108DD1EAD51 /* DashboardWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidget.swift; sourceTree = "<group>"; };
@@ -150,6 +201,8 @@
 		F2F2D4FCE9E9E3C592E10719 /* GiteaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiteaClient.swift; sourceTree = "<group>"; };
 		F4435E04964FCEE31197528E /* IssuesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssuesViewModel.swift; sourceTree = "<group>"; };
 		F8081A02CDB2975117B4B90A /* SyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncScheduler.swift; sourceTree = "<group>"; };
+		FD28C03C68C4B62C59435754 /* MemosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosView.swift; sourceTree = "<group>"; };
+		FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MemosShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -158,6 +211,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				323A071FB565D646FCF13B97 /* CrossDashboardKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F43BB07A49D5FF3D6FC1440 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8240685D4E05E154266D25F4 /* CrossDashboardKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -184,6 +245,14 @@
 			path = UI;
 			sourceTree = "<group>";
 		};
+		0E7974E8DBFB2F7157EE90F4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				CFC4418E41F7F57079BAD880 /* AppDelegate.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
 		146893F7DBB3FDBC431334AA /* Issues */ = {
 			isa = PBXGroup;
 			children = (
@@ -203,12 +272,23 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		19191F01F5774CE5B2C55EF3 /* MemosShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				4E88E52A2ABF7DF52CA483B7 /* Info.plist */,
+				59357A157CABDA13A9081854 /* MemosShareExtension.entitlements */,
+				12E1C0DFCEB4C5CAEA73226E /* ShareViewController.swift */,
+			);
+			path = MemosShareExtension;
+			sourceTree = "<group>";
+		};
 		1B55961058119260E187C491 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				DD3252F90D49D349D0626971 /* CrossDashboard.app */,
 				311E4E7D80C394DA195D7FAD /* CrossDashboardKit.framework */,
 				891F8C29767BA7EA579216A4 /* DashboardWidgetExtension.appex */,
+				FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -287,6 +367,7 @@
 				3311ED68E72BCF1568E4A906 /* Events */,
 				96DB39ADC3E76F3CFA3A0D90 /* Inbox */,
 				146893F7DBB3FDBC431334AA /* Issues */,
+				F8D5C41F59823401A9595AF1 /* Memos */,
 				5C2C39CD2F8265B0694F30BA /* Notes */,
 				DFF5F69740AFA463EBCD1D58 /* Settings */,
 				7C1385B19D3A51809EE5B350 /* Tasks */,
@@ -317,6 +398,7 @@
 			children = (
 				A1E38FD03364C23FCE12BEDA /* EventRepository.swift */,
 				24DB561CAC39C76ACD9BF34F /* IssueRepository.swift */,
+				5877BCA60E880220B7CC2EBF /* MemoRepository.swift */,
 				8B4004EDB3584A193C372D5F /* NoteRepository.swift */,
 				45D859CFD78F2E84BF16E90D /* StatsRepository.swift */,
 				980A70DFA48533EC1E9BBF2F /* TaskRepository.swift */,
@@ -379,6 +461,7 @@
 			children = (
 				AB8D454E395BD61234E7A617 /* CalDavClient.swift */,
 				F2F2D4FCE9E9E3C592E10719 /* GiteaClient.swift */,
+				715AA46225159588276265C9 /* MemosClient.swift */,
 				6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */,
 			);
 			path = Network;
@@ -391,6 +474,7 @@
 				0F82AE3F18687BD645FBB7D9 /* CrossDashboard.entitlements */,
 				E6E61F0E1DC1C3754E00B2DB /* CrossDashboardApp.swift */,
 				26B5CC6E24F65DFE9A56027D /* Info.plist */,
+				0E7974E8DBFB2F7157EE90F4 /* App */,
 				A08D8AD9287BB54AFE28A2CA /* Background */,
 				AC16992B6FABCD4552D0F1A8 /* Data */,
 				F9DE0F726E32BD5F0A2D9D6E /* Domain */,
@@ -423,8 +507,22 @@
 			children = (
 				C7303E9323FC72A0CD42FF27 /* CrossDashboard */,
 				B4D487578CAA07457FCFABE7 /* DashboardWidgetExtension */,
+				19191F01F5774CE5B2C55EF3 /* MemosShareExtension */,
 				1B55961058119260E187C491 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		F8D5C41F59823401A9595AF1 /* Memos */ = {
+			isa = PBXGroup;
+			children = (
+				549DE8981E5BE4F792A9E0F7 /* CommentOnIssueSheet.swift */,
+				0A501C75B25BBFE27D3B4F5D /* CreateEventFromMemoSheet.swift */,
+				7F18EBF0EC9F947EA8B0BCE5 /* ExtractTasksSheet.swift */,
+				239E5C6041C1D527D6783DC8 /* MemoDetailView.swift */,
+				FD28C03C68C4B62C59435754 /* MemosView.swift */,
+				1C14BD4873279F85A6FF1870 /* MemosViewModel.swift */,
+			);
+			path = Memos;
 			sourceTree = "<group>";
 		};
 		F9DE0F726E32BD5F0A2D9D6E /* Domain */ = {
@@ -480,11 +578,13 @@
 			buildPhases = (
 				C4D966AF7C15F59CED7B694A /* Sources */,
 				AAF6BA5B7CBB774DA57E1FA7 /* Frameworks */,
+				EA3AC0D3866B622086B5BD25 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				0F41CD5B15E9DB363BA9087D /* PBXTargetDependency */,
+				8392BADB4BB5949B641C7A2D /* PBXTargetDependency */,
 			);
 			name = CrossDashboard;
 			packageProductDependencies = (
@@ -494,6 +594,25 @@
 			productName = CrossDashboard;
 			productReference = DD3252F90D49D349D0626971 /* CrossDashboard.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F9E79F6ABB15EB966175354C /* MemosShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1C85A37E62E861E0AE28F0A7 /* Build configuration list for PBXNativeTarget "MemosShareExtension" */;
+			buildPhases = (
+				FFD064E27832E0693265FCDF /* Sources */,
+				5F43BB07A49D5FF3D6FC1440 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4EBE908322A0F1416A9652D0 /* PBXTargetDependency */,
+			);
+			name = MemosShareExtension;
+			packageProductDependencies = (
+			);
+			productName = MemosShareExtension;
+			productReference = FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -511,6 +630,9 @@
 						ProvisioningStyle = Automatic;
 					};
 					CBF4C0834D82327B442A9646 = {
+						ProvisioningStyle = Automatic;
+					};
+					F9E79F6ABB15EB966175354C = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -536,6 +658,7 @@
 				CBF4C0834D82327B442A9646 /* CrossDashboard */,
 				43176C6F7C929882118B1E24 /* CrossDashboardKit */,
 				73E33B398D8E6AC05DE42D3A /* DashboardWidgetExtension */,
+				F9E79F6ABB15EB966175354C /* MemosShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -557,11 +680,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				17D6AF566C85C3459AB455A5 /* AppContainer.swift in Sources */,
+				3C1DBED35E864A0E86D15CED /* AppDelegate.swift in Sources */,
 				BF7510E9EA80246EAB16BED2 /* AppViewModel.swift in Sources */,
 				B171C41B4965205A55000335 /* BiometricLockView.swift in Sources */,
 				7C7E4720E8627F69D9557F6F /* CalDavClient.swift in Sources */,
 				D7519DF1C8572D49DBCE15AA /* CalendarColorDot.swift in Sources */,
+				75518D6C95F5F914DD3AA55B /* CommentOnIssueSheet.swift in Sources */,
 				A0359D9FD4B86D3B23C6CCC4 /* ContentView.swift in Sources */,
+				F25FBC08179D1E7797899464 /* CreateEventFromMemoSheet.swift in Sources */,
 				B2D4DDC02783B69011EDA5C3 /* CrossDashboardApp.swift in Sources */,
 				1EA5B4D1A9CD18CB37AD03DD /* DashboardView.swift in Sources */,
 				AAE5780C934FEF5E7752FA61 /* DashboardViewModel.swift in Sources */,
@@ -569,6 +695,7 @@
 				F0A81911A037820E31AFD7C9 /* EventRepository.swift in Sources */,
 				7C0C78017AC2B4929E0BC121 /* EventsView.swift in Sources */,
 				82CA724887FE8C8036EBC525 /* EventsViewModel.swift in Sources */,
+				C7A28C3199B589B84E7A2AA1 /* ExtractTasksSheet.swift in Sources */,
 				FA42214CB2B51BC01933C594 /* GiteaClient.swift in Sources */,
 				0601BDCA8D275566CD0A2DF6 /* ICalParser.swift in Sources */,
 				80844F9AD48B72AE64CB8911 /* InboxView.swift in Sources */,
@@ -579,6 +706,11 @@
 				CCD2D0961469E0C5709F9606 /* IssuesViewModel.swift in Sources */,
 				3DACA0DD54B4DBADA1071183 /* LatexContentParser.swift in Sources */,
 				1D9CFF2F25E421465872FA6B /* MathView.swift in Sources */,
+				E947FDC930EC466B499CF62F /* MemoDetailView.swift in Sources */,
+				61E48A4E77C4BB702942F927 /* MemoRepository.swift in Sources */,
+				245112A632D3A87FFC2EB09E /* MemosClient.swift in Sources */,
+				31133399F744D25AF005AB6E /* MemosView.swift in Sources */,
+				9A25558C186020A5E1A94236 /* MemosViewModel.swift in Sources */,
 				5B2CFE5D85A8C49C5236C238 /* NextcloudLoginFlow.swift in Sources */,
 				7EFEDBBEF54C3F603DFC47BA /* NoteDetailView.swift in Sources */,
 				CA1C786027A4BF984392B91C /* NoteRepository.swift in Sources */,
@@ -618,6 +750,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FFD064E27832E0693265FCDF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BDB70CDC2B875EE6B2DF1DE9 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -625,6 +765,16 @@
 			isa = PBXTargetDependency;
 			target = 43176C6F7C929882118B1E24 /* CrossDashboardKit */;
 			targetProxy = 51B3B2D55A1E86A80E162902 /* PBXContainerItemProxy */;
+		};
+		4EBE908322A0F1416A9652D0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 43176C6F7C929882118B1E24 /* CrossDashboardKit */;
+			targetProxy = 695586489F059E92D7158D82 /* PBXContainerItemProxy */;
+		};
+		8392BADB4BB5949B641C7A2D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F9E79F6ABB15EB966175354C /* MemosShareExtension */;
+			targetProxy = 09A8AF6CF7049D502B006BA8 /* PBXContainerItemProxy */;
 		};
 		E0032277DC3A3835EF99BFD1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -656,6 +806,28 @@
 				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
+		};
+		3CCF68B3A35BD4AFAE017928 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MemosShareExtension/MemosShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 569WLL4Q5F;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = MemosShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crossdashboard.app.shareextension;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
 		};
 		47E6FD269C4B0B641A92B3D9 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -819,6 +991,28 @@
 			};
 			name = Debug;
 		};
+		C079063F95D25B1E674DD7D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MemosShareExtension/MemosShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 569WLL4Q5F;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = MemosShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crossdashboard.app.shareextension;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		EEE184FB5FEA9AF885729E89 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -898,6 +1092,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1C85A37E62E861E0AE28F0A7 /* Build configuration list for PBXNativeTarget "MemosShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3CCF68B3A35BD4AFAE017928 /* Debug */,
+				C079063F95D25B1E674DD7D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		20AAB5B6613589D0A3172C6C /* Build configuration list for PBXProject "CrossDashboard" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -21,6 +21,7 @@ final class AppContainer {
 
     let calDavClient: CalDavClient
     let giteaClient: GiteaClient
+    let memosClient: MemosClient
     let loginFlow: NextcloudLoginFlow
 
     let statsRepository: StatsRepository
@@ -28,6 +29,7 @@ final class AppContainer {
     let taskRepository: TaskRepository
     let noteRepository: NoteRepository
     let issueRepository: IssueRepository
+    let memoRepository: MemoRepository
 
     // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ final class AppContainer {
 
         calDavClient = CalDavClient(keychain: keychain)
         giteaClient  = GiteaClient(keychain: keychain)
+        memosClient  = MemosClient(keychain: keychain)
         loginFlow    = NextcloudLoginFlow()
 
         let ctx = persistence.container.mainContext
@@ -47,6 +50,7 @@ final class AppContainer {
         taskRepository  = TaskRepository(context: ctx, client: calDavClient, statsRepo: statsRepository)
         noteRepository  = NoteRepository(context: ctx, client: calDavClient)
         issueRepository = IssueRepository(context: ctx, client: giteaClient, statsRepo: statsRepository)
+        memoRepository  = MemoRepository(context: ctx, client: memosClient)
     }
 
     // ─── Sync all ─────────────────────────────────────────────────────────────
@@ -61,6 +65,7 @@ final class AppContainer {
             group.addTask { await self.taskRepository.sync(calendarHrefs: calendarHrefs) }
             group.addTask { await self.noteRepository.sync(calendarHrefs: calendarHrefs) }
             group.addTask { await self.issueRepository.sync(repositories: repositories) }
+            group.addTask { await self.memoRepository.syncMemos() }
         }
         preferences.lastSyncDate = Date()
     }

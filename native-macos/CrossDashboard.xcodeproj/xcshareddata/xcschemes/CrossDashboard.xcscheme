@@ -49,6 +49,20 @@
                ReferencedContainer = "container:CrossDashboard.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "NO"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F9E79F6ABB15EB966175354C"
+               BuildableName = "MemosShareExtension.appex"
+               BlueprintName = "MemosShareExtension"
+               ReferencedContainer = "container:CrossDashboard.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

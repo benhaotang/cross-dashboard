@@ -17,6 +17,7 @@ sealed class Destination : NavKey {
     @Serializable data object Notes : Destination()
     @Serializable data object Issues : Destination()
     @Serializable data object Views : Destination()
+    @Serializable data object Memos : Destination()
     @Serializable data object Settings : Destination()
 
     // Detail destinations — used in phone (single-pane) mode
@@ -24,10 +25,11 @@ sealed class Destination : NavKey {
     @Serializable data class TaskDetail(val uid: String) : Destination()
     @Serializable data class NoteDetail(val uid: String) : Destination()
     @Serializable data class IssueDetail(val id: Long, val repo: String) : Destination()
+    @Serializable data class MemoDetail(val name: String) : Destination()
 
     companion object {
         val navRoots = listOf(
-            Dashboard, Inbox, Events, Tasks, Notes, Issues, Views, Settings,
+            Dashboard, Inbox, Events, Tasks, Notes, Issues, Views, Memos, Settings,
         )
     }
 }
@@ -41,6 +43,7 @@ fun Destination.screenName(): String = when (this) {
     is Destination.Notes -> "Notes"
     is Destination.Issues -> "Issues"
     is Destination.Views -> "Views"
+    is Destination.Memos -> "Capture"
     is Destination.Settings -> "Settings"
     else -> ""
 }
@@ -53,6 +56,7 @@ fun Destination.label(): String = when (this) {
     is Destination.Notes -> "Notes"
     is Destination.Issues -> "Issues"
     is Destination.Views -> "Views"
+    is Destination.Memos -> "Capture"
     is Destination.Settings -> "Settings"
     else -> ""
 }

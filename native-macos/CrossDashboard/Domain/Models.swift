@@ -392,7 +392,91 @@ public enum ThemePreference: String, Codable, CaseIterable, Sendable {
     case dark   = "DARK"
 }
 
-public let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views"]
+// ─── Memos (usememos.com) ─────────────────────────────────────────────────────
+
+public enum MemoState: String, Codable, CaseIterable, Sendable {
+    case normal   = "NORMAL"
+    case archived = "ARCHIVED"
+}
+
+public enum MemoVisibility: String, Codable, CaseIterable, Sendable {
+    case `private`  = "PRIVATE"
+    case protected_ = "PROTECTED"
+    case `public`   = "PUBLIC"
+}
+
+public struct MemoProperty: Codable, Equatable, Hashable, Sendable {
+    public let hasLink: Bool
+    public let hasTaskList: Bool
+    public let hasIncompleteTasks: Bool
+    public let title: String
+
+    public init(hasLink: Bool = false, hasTaskList: Bool = false,
+                hasIncompleteTasks: Bool = false, title: String = "") {
+        self.hasLink = hasLink
+        self.hasTaskList = hasTaskList
+        self.hasIncompleteTasks = hasIncompleteTasks
+        self.title = title
+    }
+}
+
+public struct MemosAttachment: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { name }
+    public let name: String           // "attachments/{id}"
+    public let filename: String
+    public let externalLink: String
+    public let type: String           // MIME type
+    public let size: Int64
+    public let memo: String           // "memos/{id}" back-reference
+
+    public init(name: String, filename: String, externalLink: String,
+                type: String, size: Int64, memo: String = "") {
+        self.name = name
+        self.filename = filename
+        self.externalLink = externalLink
+        self.type = type
+        self.size = size
+        self.memo = memo
+    }
+}
+
+public struct MemosMemo: Codable, Identifiable, Hashable, Sendable {
+    public var id: String { name }
+    public let name: String           // "memos/{id}"
+    public let state: MemoState
+    public let content: String
+    public let visibility: MemoVisibility
+    public let tags: [String]
+    public let pinned: Bool
+    public let attachments: [MemosAttachment]
+    public let property: MemoProperty
+    public let snippet: String
+    public let createTime: Date
+    public let displayTime: Date
+    public let updateTime: Date
+
+    public init(name: String, state: MemoState = .normal, content: String,
+                visibility: MemoVisibility = .private, tags: [String] = [],
+                pinned: Bool = false, attachments: [MemosAttachment] = [],
+                property: MemoProperty = MemoProperty(), snippet: String = "",
+                createTime: Date = Date(), displayTime: Date = Date(),
+                updateTime: Date = Date()) {
+        self.name = name
+        self.state = state
+        self.content = content
+        self.visibility = visibility
+        self.tags = tags
+        self.pinned = pinned
+        self.attachments = attachments
+        self.property = property
+        self.snippet = snippet
+        self.createTime = createTime
+        self.displayTime = displayTime
+        self.updateTime = updateTime
+    }
+}
+
+public let allScreens: [String] = ["Dashboard", "Inbox", "Events", "Tasks", "Notes", "Issues", "Views", "Capture"]
 public let defaultKanbanColumns: [String] = ["backlog", "planned", "inprogress", "done"]
 
 public struct AppSettings: Codable, Equatable, Sendable {

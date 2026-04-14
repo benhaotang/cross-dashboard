@@ -12,8 +12,9 @@ import com.crossdashboard.app.data.db.entity.*
         NoteEntity::class,
         IssueEntity::class,
         DailyStatsEntity::class,
+        MemoEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,4 +23,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun issueDao(): IssueDao
     abstract fun dailyStatsDao(): DailyStatsDao
+    abstract fun memosDao(): MemosDao
 }

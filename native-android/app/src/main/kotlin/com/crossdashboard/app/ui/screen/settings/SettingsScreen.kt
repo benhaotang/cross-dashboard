@@ -120,6 +120,10 @@ fun SettingsScreen(
             item { SectionHeader("Gitea") }
             item { GiteaSection(state = state, vm = vm) }
 
+            // ── Memos ─────────────────────────────────────────────────────────
+            item { SectionHeader("Memos") }
+            item { MemosSection(state = state, vm = vm) }
+
             // ── Appearance ───────────────────────────────────────────────────
             item { SectionHeader("Appearance") }
             item { AppearanceSection(state = state, vm = vm) }
@@ -497,7 +501,7 @@ private fun DefaultCalendarPicker(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             calendars.forEach { cal ->
@@ -556,6 +560,58 @@ private fun GiteaSection(state: SettingsUiState, vm: SettingsViewModel) {
     }
 }
 
+// ─── Memos section ────────────────────────────────────────────────────────────
+
+@Composable
+private fun MemosSection(state: SettingsUiState, vm: SettingsViewModel) {
+    var showToken by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = state.memosHost,
+            onValueChange = vm::setMemosHost,
+            label = { Text("Memos Host URL") },
+            placeholder = { Text("https://memos.example.com") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = state.memosToken,
+            onValueChange = vm::setMemosToken,
+            label = { Text("Access Token") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { showToken = !showToken }) {
+                    Icon(
+                        if (showToken) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (showToken) "Hide token" else "Show token",
+                    )
+                }
+            },
+        )
+        if (state.memosConnectionStatus != CalDavConnectionStatus.IDLE) {
+            val (color, text) = when (state.memosConnectionStatus) {
+                CalDavConnectionStatus.TESTING -> MaterialTheme.colorScheme.onSurfaceVariant to "Testing…"
+                CalDavConnectionStatus.SUCCESS -> MaterialTheme.colorScheme.primary to state.memosConnectionMessage
+                CalDavConnectionStatus.ERROR -> MaterialTheme.colorScheme.error to state.memosConnectionMessage
+                else -> MaterialTheme.colorScheme.onSurfaceVariant to ""
+            }
+            Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = vm::testMemosConnection,
+                modifier = Modifier.weight(1f),
+                enabled = state.memosConnectionStatus != CalDavConnectionStatus.TESTING,
+            ) { Text("Test") }
+            Button(onClick = vm::saveMemos, modifier = Modifier.weight(1f)) { Text("Save") }
+        }
+    }
+}
+
 // ─── Appearance section ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -580,30 +636,81 @@ private fun AppearanceSection(state: SettingsUiState, vm: SettingsViewModel) {
 
 @Composable
 private fun NavigationSection(state: SettingsUiState, vm: SettingsViewModel) {
+    val visible = state.visibleScreens
+    val hidden  = ALL_SCREENS.filter { it !in visible }
+
+    fun iconFor(screen: String) = when (screen) {
+        "Dashboard" -> Icons.Outlined.Dashboard
+        "Inbox"     -> Icons.Outlined.Inbox
+        "Events"    -> Icons.Outlined.CalendarMonth
+        "Tasks"     -> Icons.Outlined.CheckBox
+        "Notes"     -> Icons.AutoMirrored.Outlined.Notes
+        "Issues"    -> Icons.Outlined.BugReport
+        "Views"     -> Icons.Outlined.ViewColumn
+        "Capture"   -> Icons.Outlined.CameraAlt
+        else        -> Icons.Outlined.MoreHoriz
+    }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-        ALL_SCREENS.forEach { screen ->
-            val icon = when (screen) {
-                "Dashboard" -> Icons.Outlined.Dashboard
-                "Inbox" -> Icons.Outlined.Inbox
-                "Events" -> Icons.Outlined.CalendarMonth
-                "Tasks" -> Icons.Outlined.CheckBox
-                "Notes" -> Icons.AutoMirrored.Outlined.Notes
-                "Issues" -> Icons.Outlined.BugReport
-                "Views" -> Icons.Outlined.ViewColumn
-                else -> Icons.Outlined.MoreHoriz
-            }
-            val isVisible = screen in state.visibleScreens
+        // ── Visible screens (ordered, with reorder buttons) ──────────────────
+        if (visible.isNotEmpty()) {
+            Text(
+                "Visible screens",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
+        visible.forEachIndexed { index, screen ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { vm.toggleVisibleScreen(screen) }
-                    .padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(iconFor(screen), contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(screen, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = isVisible, onCheckedChange = { vm.toggleVisibleScreen(screen) })
+                // Move up
+                IconButton(
+                    onClick = { if (index > 0) vm.moveVisibleScreen(index, index - 1) },
+                    enabled = index > 0,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Move $screen up", modifier = Modifier.size(18.dp))
+                }
+                // Move down
+                IconButton(
+                    onClick = { if (index < visible.lastIndex) vm.moveVisibleScreen(index, index + 1) },
+                    enabled = index < visible.lastIndex,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Move $screen down", modifier = Modifier.size(18.dp))
+                }
+                Switch(checked = true, onCheckedChange = { vm.toggleVisibleScreen(screen) })
+            }
+        }
+
+        // ── Hidden screens ───────────────────────────────────────────────────
+        if (hidden.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Hidden screens",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
+        hidden.forEach { screen ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(iconFor(screen), contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                Text(screen, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(68.dp)) // align with move buttons above
+                Switch(checked = false, onCheckedChange = { vm.toggleVisibleScreen(screen) })
             }
         }
     }

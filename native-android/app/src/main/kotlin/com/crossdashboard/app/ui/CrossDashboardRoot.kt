@@ -7,12 +7,15 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.ThemePreference
+import com.crossdashboard.app.SharePayload
 import com.crossdashboard.app.ui.adaptive.FoldAwareContent
 import com.crossdashboard.app.ui.adaptive.hingeAwarePadding
 import com.crossdashboard.app.ui.component.BiometricLockScreen
 import com.crossdashboard.app.ui.component.PomodoroBar
 import com.crossdashboard.app.ui.component.PomodoroModal
 import com.crossdashboard.app.ui.navigation.AppNavigation
+import com.crossdashboard.app.ui.screen.memos.MemosViewModel
+import com.crossdashboard.app.ui.screen.memos.ShareCaptureSheet
 import com.crossdashboard.app.ui.screen.tasks.PomodoroViewModel
 import com.crossdashboard.app.ui.theme.CrossDashboardTheme
 import com.crossdashboard.app.ui.viewmodel.AppViewModel
@@ -21,9 +24,12 @@ import com.crossdashboard.app.ui.viewmodel.AppViewModel
 fun CrossDashboardRoot(
     pendingAction: String?,
     onActionConsumed: () -> Unit,
+    pendingSharePayload: SharePayload? = null,
+    onShareConsumed: () -> Unit = {},
 ) {
     val appVm: AppViewModel = hiltViewModel()
     val pomodoroVm: PomodoroViewModel = hiltViewModel()
+    val memosVm: MemosViewModel = hiltViewModel()
 
     val theme by appVm.theme.collectAsStateWithLifecycle()
     val visibleScreens by appVm.visibleScreens.collectAsStateWithLifecycle()
@@ -73,6 +79,19 @@ fun CrossDashboardRoot(
             PomodoroModal(viewModel = pomodoroVm)
         } else if (pomodoroState.active) {
             PomodoroBar(viewModel = pomodoroVm)
+        }
+
+        // Share capture overlay — shown when app is opened via system share sheet
+        if (pendingSharePayload != null) {
+            ShareCaptureSheet(
+                sharedText = pendingSharePayload.text,
+                sharedAttachments = pendingSharePayload.attachments,
+                onDismiss = onShareConsumed,
+                onCapture = { content, visibility, attachments ->
+                    memosVm.createMemo(content, visibility, attachments)
+                    onShareConsumed()
+                },
+            )
         }
     }
 }

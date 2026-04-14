@@ -131,3 +131,43 @@ fun IssueEntity.toDomain() = GiteaIssue(
     repository = repository,
     htmlUrl = htmlUrl,
 )
+
+// ─── MemosMemo ────────────────────────────────────────────────────────────────
+
+fun MemosMemo.toEntity() = MemoEntity(
+    name = name,
+    state = state.name,
+    content = content,
+    visibility = visibility.name,
+    tagsJson = json.encodeToString(tags),
+    pinned = pinned,
+    attachmentsJson = json.encodeToString(attachments),
+    propertyHasLink = property.hasLink,
+    propertyHasTaskList = property.hasTaskList,
+    propertyHasIncompleteTasks = property.hasIncompleteTasks,
+    propertyTitle = property.title,
+    snippet = snippet,
+    createTimeEpoch = createTime.toEpochMilli(),
+    displayTimeEpoch = displayTime.toEpochMilli(),
+    updateTimeEpoch = updateTime.toEpochMilli(),
+)
+
+fun MemoEntity.toDomain() = MemosMemo(
+    name = name,
+    state = runCatching { MemoState.valueOf(state) }.getOrDefault(MemoState.NORMAL),
+    content = content,
+    visibility = runCatching { MemoVisibility.valueOf(visibility) }.getOrDefault(MemoVisibility.PRIVATE),
+    tags = runCatching { json.decodeFromString<List<String>>(tagsJson) }.getOrDefault(emptyList()),
+    pinned = pinned,
+    attachments = runCatching { json.decodeFromString<List<MemosAttachment>>(attachmentsJson) }.getOrDefault(emptyList()),
+    property = MemoProperty(
+        hasLink = propertyHasLink,
+        hasTaskList = propertyHasTaskList,
+        hasIncompleteTasks = propertyHasIncompleteTasks,
+        title = propertyTitle,
+    ),
+    snippet = snippet,
+    createTime = Instant.ofEpochMilli(createTimeEpoch),
+    displayTime = Instant.ofEpochMilli(displayTimeEpoch),
+    updateTime = Instant.ofEpochMilli(updateTimeEpoch),
+)

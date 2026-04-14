@@ -112,3 +112,33 @@ interface DailyStatsDao {
 }
 
 enum class StatField { TASKS_COMPLETED, POMODORO_SESSIONS, ISSUES_CLOSED }
+
+@Dao
+interface MemosDao {
+    @Query("SELECT * FROM memos WHERE state = 'NORMAL' ORDER BY displayTimeEpoch DESC")
+    fun observeNormal(): Flow<List<com.crossdashboard.app.data.db.entity.MemoEntity>>
+
+    @Query("SELECT * FROM memos WHERE state = 'ARCHIVED' ORDER BY displayTimeEpoch DESC")
+    fun observeArchived(): Flow<List<com.crossdashboard.app.data.db.entity.MemoEntity>>
+
+    @Query("SELECT * FROM memos ORDER BY displayTimeEpoch DESC")
+    fun observeAll(): Flow<List<com.crossdashboard.app.data.db.entity.MemoEntity>>
+
+    @Query("SELECT * FROM memos WHERE name = :name")
+    suspend fun getByName(name: String): com.crossdashboard.app.data.db.entity.MemoEntity?
+
+    @Query("SELECT * FROM memos WHERE displayTimeEpoch >= :fromEpoch AND displayTimeEpoch <= :toEpoch ORDER BY displayTimeEpoch DESC")
+    fun observeRange(fromEpoch: Long, toEpoch: Long): Flow<List<com.crossdashboard.app.data.db.entity.MemoEntity>>
+
+    @Upsert
+    suspend fun upsertAll(memos: List<com.crossdashboard.app.data.db.entity.MemoEntity>)
+
+    @Upsert
+    suspend fun upsert(memo: com.crossdashboard.app.data.db.entity.MemoEntity)
+
+    @Query("DELETE FROM memos")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM memos WHERE name = :name")
+    suspend fun deleteByName(name: String)
+}

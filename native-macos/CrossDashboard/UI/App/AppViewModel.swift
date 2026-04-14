@@ -33,9 +33,11 @@ final class AppViewModel {
     var selectedEventID: String?
     var selectedNoteID: String?
     var selectedIssueID: Int64?
+    var selectedMemoID: String?
 
+    /// Returns visible screens in the user-defined order stored in preferences.
     var visibleScreens: [Screen] {
-        Screen.allCases.filter { preferences.visibleScreens.contains($0.rawValue) }
+        preferences.visibleScreens.compactMap { Screen(rawValue: $0) }
     }
 
     // ─── Biometric lock ───────────────────────────────────────────────────────
@@ -57,6 +59,19 @@ final class AppViewModel {
     func consumeNewTaskTrigger() {
         newTaskRequested = false
     }
+
+    /// Set by `crossdashboard://capture?text=<encoded>` deep links.
+    /// `MemosView` watches this and opens the compose sheet pre-filled.
+    private(set) var captureInitialText: String? = nil
+
+    func triggerCapture(text: String) {
+        selectedScreen = .memos
+        captureInitialText = text
+    }
+
+    func consumeCaptureTrigger() {
+        captureInitialText = nil
+    }
 }
 
 // ─── Screen enum ─────────────────────────────────────────────────────────────
@@ -69,6 +84,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
     case notes     = "Notes"
     case issues    = "Issues"
     case views     = "Views"
+    case memos     = "Capture"
 
     var id: String { rawValue }
 
@@ -81,6 +97,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .notes:     return "note.text"
         case .issues:    return "exclamationmark.bubble"
         case .views:     return "rectangle.3.group"
+        case .memos:     return "camera.viewfinder"
         }
     }
 

@@ -30,9 +30,19 @@ final class SettingsViewModel {
     var giteaToken: String = ""
     var giteaReposInput: String = ""  // comma-separated
 
+    // ─── Memos ────────────────────────────────────────────────────────────────
+
+    var memosHost: String = ""
+    var memosToken: String = ""
+    var memosConnectionMessage: String? = nil
+    var memosConnectionTesting: Bool = false
+    var memosConnectionSuccess: Bool = false
+
     // ─── Appearance ───────────────────────────────────────────────────────────
 
-    var visibleScreensSet: Set<String> = Set(allScreens)
+    /// Visible screens in display order. Screens not in this list are hidden.
+    var orderedVisibleScreens: [String] = allScreens
+    var hiddenScreens: [String] { allScreens.filter { !orderedVisibleScreens.contains($0) } }
     var kanbanColumnsInput: String = ""
 
     // ─── Task defaults ────────────────────────────────────────────────────────
@@ -102,8 +112,12 @@ final class SettingsViewModel {
             giteaReposInput = repos.joined(separator: ", ")
         }
 
+        // Memos
+        memosHost  = keychain.get(CredentialKey.memosHost)  ?? ""
+        memosToken = keychain.get(CredentialKey.memosToken) ?? ""
+
         // Appearance
-        visibleScreensSet   = Set(prefs.visibleScreens)
+        orderedVisibleScreens = prefs.visibleScreens.isEmpty ? allScreens : prefs.visibleScreens
         kanbanColumnsInput  = prefs.kanbanColumns.joined(separator: ", ")
 
         // Task defaults
@@ -162,8 +176,23 @@ final class SettingsViewModel {
         }
     }
 
+    func toggleVisibleScreen(_ screen: String) {
+        if orderedVisibleScreens.contains(screen) {
+            guard orderedVisibleScreens.count > 1 else { return }
+            orderedVisibleScreens.removeAll { $0 == screen }
+        } else {
+            orderedVisibleScreens.append(screen)
+        }
+        saveAppearance()
+    }
+
+    func moveVisibleScreen(from: IndexSet, to: Int) {
+        orderedVisibleScreens.move(fromOffsets: from, toOffset: to)
+        saveAppearance()
+    }
+
     func saveAppearance() {
-        container.preferences.visibleScreens = allScreens.filter { visibleScreensSet.contains($0) }
+        container.preferences.visibleScreens = orderedVisibleScreens
         let cols = kanbanColumnsInput
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -199,6 +228,31 @@ final class SettingsViewModel {
 
     func saveSecurity() {
         container.preferences.biometricLockEnabled = biometricLockEnabled
+    }
+
+    func saveMemos() {
+        container.keychain.set(CredentialKey.memosHost,  value: memosHost.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        container.keychain.set(CredentialKey.memosToken, value: memosToken)
+    }
+
+    func testMemosConnection() async {
+        guard !memosHost.isEmpty, !memosToken.isEmpty else {
+            memosConnectionMessage = "Host and token are required"
+            memosConnectionSuccess = false
+            return
+        }
+        saveMemos()
+        memosConnectionTesting = true
+        memosConnectionMessage = nil
+        defer { memosConnectionTesting = false }
+        let result = await container.memosClient.listMemos(pageSize: 1)
+        if container.memosClient.baseUrl() != nil {
+            memosConnectionSuccess = true
+            memosConnectionMessage = "Connected — \(result.memos.count) memo(s) found"
+        } else {
+            memosConnectionSuccess = false
+            memosConnectionMessage = "Connection failed — check host and token"
+        }
     }
 
     // ─── Actions ──────────────────────────────────────────────────────────────

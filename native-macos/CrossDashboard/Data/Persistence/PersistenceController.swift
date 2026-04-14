@@ -195,6 +195,67 @@ public final class IssueModel {
 }
 
 @Model
+public final class MemosModel {
+    @Attribute(.unique) public var name: String    // "memos/{id}"
+    public var stateRaw: String
+    public var content: String
+    public var visibilityRaw: String
+    public var tagsJSON: String                    // JSON string[]
+    public var pinned: Bool
+    public var attachmentsJSON: String             // JSON [MemosAttachment]
+    public var propertyHasLink: Bool
+    public var propertyHasTaskList: Bool
+    public var propertyHasIncompleteTasks: Bool
+    public var propertyTitle: String
+    public var snippet: String
+    public var createTimeEpoch: Double
+    public var displayTimeEpoch: Double
+    public var updateTimeEpoch: Double
+
+    public init(from memo: MemosMemo) {
+        name                    = memo.name
+        stateRaw                = memo.state.rawValue
+        content                 = memo.content
+        visibilityRaw           = memo.visibility.rawValue
+        tagsJSON                = (try? String(data: JSONEncoder().encode(memo.tags), encoding: .utf8)) ?? "[]"
+        pinned                  = memo.pinned
+        attachmentsJSON         = (try? String(data: JSONEncoder().encode(memo.attachments), encoding: .utf8)) ?? "[]"
+        propertyHasLink         = memo.property.hasLink
+        propertyHasTaskList     = memo.property.hasTaskList
+        propertyHasIncompleteTasks = memo.property.hasIncompleteTasks
+        propertyTitle           = memo.property.title
+        snippet                 = memo.snippet
+        createTimeEpoch         = memo.createTime.timeIntervalSince1970
+        displayTimeEpoch        = memo.displayTime.timeIntervalSince1970
+        updateTimeEpoch         = memo.updateTime.timeIntervalSince1970
+    }
+
+    public func toDomain() -> MemosMemo {
+        let tags        = (try? JSONDecoder().decode([String].self, from: Data(tagsJSON.utf8))) ?? []
+        let attachments = (try? JSONDecoder().decode([MemosAttachment].self, from: Data(attachmentsJSON.utf8))) ?? []
+        return MemosMemo(
+            name: name,
+            state: MemoState(rawValue: stateRaw) ?? .normal,
+            content: content,
+            visibility: MemoVisibility(rawValue: visibilityRaw) ?? .private,
+            tags: tags,
+            pinned: pinned,
+            attachments: attachments,
+            property: MemoProperty(
+                hasLink: propertyHasLink,
+                hasTaskList: propertyHasTaskList,
+                hasIncompleteTasks: propertyHasIncompleteTasks,
+                title: propertyTitle
+            ),
+            snippet: snippet,
+            createTime:  Date(timeIntervalSince1970: createTimeEpoch),
+            displayTime: Date(timeIntervalSince1970: displayTimeEpoch),
+            updateTime:  Date(timeIntervalSince1970: updateTimeEpoch)
+        )
+    }
+}
+
+@Model
 public final class StatsModel {
     @Attribute(.unique) public var date: String   // "yyyy-MM-dd"
     public var tasksCompleted: Int
@@ -240,6 +301,7 @@ public final class PersistenceController {
         NoteModel.self,
         IssueModel.self,
         StatsModel.self,
+        MemosModel.self,
     ])
 
     /// Returns the SwiftData store URL inside the shared App Group container so

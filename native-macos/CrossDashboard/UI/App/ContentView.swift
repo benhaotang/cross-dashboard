@@ -112,6 +112,8 @@ struct ContentView: View {
             NotesView()
         case .issues:
             IssuesView()
+        case .memos:
+            MemosView()
         case .views:
             EmptyView()
         case nil:
@@ -136,6 +138,8 @@ struct ContentView: View {
             NoteDetailView(noteID: appViewModel.selectedNoteID)
         case .issues:
             IssueDetailView(issueID: appViewModel.selectedIssueID)
+        case .memos:
+            MemoDetailView(memoName: appViewModel.selectedMemoID)
         default:
             ContentUnavailableView(
                 "Select an item",

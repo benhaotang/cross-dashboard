@@ -15,6 +15,9 @@ struct SettingsView: View {
             GiteaSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Gitea", systemImage: "chevron.left.forwardslash.chevron.right") }
 
+            MemosSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Memos", systemImage: "tray.and.arrow.down") }
+
             AppearanceSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Appearance", systemImage: "paintbrush") }
 
@@ -187,14 +190,60 @@ private struct AppearanceSettingsTab: View {
             }
 
             Section("Visible screens") {
-                ForEach(allScreens, id: \.self) { screen in
-                    Toggle(screen, isOn: Binding(
-                        get: { viewModel.visibleScreensSet.contains(screen) },
-                        set: { on in
-                            if on { viewModel.visibleScreensSet.insert(screen) }
-                            else  { viewModel.visibleScreensSet.remove(screen) }
+                Text("Drag to reorder. Toggle to show / hide.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                // ── Visible (drag to reorder) ──────────────────────────────
+                List {
+                    ForEach(viewModel.orderedVisibleScreens, id: \.self) { screen in
+                        HStack(spacing: 8) {
+                            Image(systemName: Screen(rawValue: screen)?.systemImage ?? "circle")
+                                .frame(width: 18)
+                                .foregroundStyle(.secondary)
+                            Text(screen)
+                            Spacer()
+                            Button {
+                                viewModel.toggleVisibleScreen(screen)
+                            } label: {
+                                Image(systemName: "eye.slash.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Hide \(screen)")
                         }
-                    ))
+                        .padding(.vertical, 2)
+                    }
+                    .onMove { viewModel.moveVisibleScreen(from: $0, to: $1) }
+                }
+                .frame(height: max(56, CGFloat(viewModel.orderedVisibleScreens.count) * 38))
+                .listStyle(.plain)
+
+                // ── Hidden (toggle to restore) ─────────────────────────────
+                if !viewModel.hiddenScreens.isEmpty {
+                    Divider()
+                    Text("Hidden screens")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(viewModel.hiddenScreens, id: \.self) { screen in
+                        HStack(spacing: 8) {
+                            Image(systemName: Screen(rawValue: screen)?.systemImage ?? "circle")
+                                .frame(width: 18)
+                                .foregroundStyle(.secondary)
+                            Text(screen)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                viewModel.toggleVisibleScreen(screen)
+                            } label: {
+                                Image(systemName: "eye.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tint)
+                            .accessibilityLabel("Show \(screen)")
+                        }
+                        .padding(.vertical, 2)
+                    }
                 }
             }
 
@@ -299,6 +348,44 @@ private struct NotificationsSettingsTab: View {
             Section {
                 Button("Save Notification Settings") {
                     viewModel.saveNotifications()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// ─── Memos Tab ────────────────────────────────────────────────────────────────
+
+private struct MemosSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Connection") {
+                TextField("Host URL", text: $viewModel.memosHost, prompt: Text("https://memos.example.com"))
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Memos host URL")
+
+                SecureField("Access Token", text: $viewModel.memosToken)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Memos access token")
+
+                if let msg = viewModel.memosConnectionMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(viewModel.memosConnectionSuccess ? Color.green : Color.red)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Test Connection") {
+                        Task { await viewModel.testMemosConnection() }
+                    }
+                    .disabled(viewModel.memosConnectionTesting)
+                    Button("Save") {
+                        viewModel.saveMemos()
+                    }
                 }
             }
         }

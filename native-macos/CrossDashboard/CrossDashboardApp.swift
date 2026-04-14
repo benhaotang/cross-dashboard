@@ -4,6 +4,8 @@ import CrossDashboardKit
 @main
 struct CrossDashboardApp: App {
 
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     @State private var appViewModel = AppViewModel()
     @State private var pomodoroViewModel = PomodoroViewModel.shared
 
@@ -30,7 +32,12 @@ struct CrossDashboardApp: App {
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
+                // Prefer routing crossdashboard:// URLs to the existing window rather than
+                // opening a new one. `preferring` reuses any open window; `allowing` permits
+                // a new window only when the app is not yet running.
+                .handlesExternalEvents(preferring: Set(["crossdashboard"]), allowing: Set(["crossdashboard"]))
         }
+        .handlesExternalEvents(matching: Set(["*"]))
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
@@ -61,10 +68,18 @@ struct CrossDashboardApp: App {
 
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "crossdashboard" else { return }
-        if url.host == "tasks",
-           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-           components.queryItems?.first(where: { $0.name == "action" })?.value == "add" {
-            appViewModel.triggerNewTask()
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        switch url.host {
+        case "tasks":
+            if components?.queryItems?.first(where: { $0.name == "action" })?.value == "add" {
+                appViewModel.triggerNewTask()
+            }
+        case "capture":
+            // crossdashboard://capture?text=<percent-encoded text>
+            let text = components?.queryItems?.first(where: { $0.name == "text" })?.value ?? ""
+            appViewModel.triggerCapture(text: text)
+        default:
+            break
         }
     }
 }

@@ -93,4 +93,6 @@ public enum CredentialKey {
     public static let giteaInstance               = "gitea_instance"
     public static let giteaRepos                  = "gitea_repos"
     public static let pinHash                     = "biometric_pin_hash"
+    public static let memosHost                   = "memos_host"
+    public static let memosToken                  = "memos_token"
 }

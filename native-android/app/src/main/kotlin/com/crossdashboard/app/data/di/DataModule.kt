@@ -31,6 +31,7 @@ object DataModule {
     @Provides fun provideNoteDao(db: AppDatabase): NoteDao = db.noteDao()
     @Provides fun provideIssueDao(db: AppDatabase): IssueDao = db.issueDao()
     @Provides fun provideDailyStatsDao(db: AppDatabase): DailyStatsDao = db.dailyStatsDao()
+    @Provides fun provideMemosDao(db: AppDatabase): MemosDao = db.memosDao()
 
     @Provides
     @Singleton
