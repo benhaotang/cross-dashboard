@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -94,7 +95,17 @@ class MainActivity : ComponentActivity() {
             runCatching {
                 val bytes = contentResolver.openInputStream(uri)?.readBytes() ?: return@runCatching null
                 val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-                val name = uri.lastPathSegment ?: "file"
+                val name = run {
+                    var n = "file"
+                    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                if (idx >= 0) n = cursor.getString(idx)
+                            }
+                        }
+                    n
+                }
                 PendingAttachment(name, mime, bytes)
             }.getOrNull()
         }

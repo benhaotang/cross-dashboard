@@ -63,10 +63,18 @@ struct CrossDashboardApp: App {
 
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "crossdashboard" else { return }
-        if url.host == "tasks",
-           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-           components.queryItems?.first(where: { $0.name == "action" })?.value == "add" {
-            appViewModel.triggerNewTask()
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        switch url.host {
+        case "tasks":
+            if components?.queryItems?.first(where: { $0.name == "action" })?.value == "add" {
+                appViewModel.triggerNewTask()
+            }
+        case "capture":
+            // crossdashboard://capture?text=<percent-encoded text>
+            let text = components?.queryItems?.first(where: { $0.name == "text" })?.value ?? ""
+            appViewModel.triggerCapture(text: text)
+        default:
+            break
         }
     }
 }

@@ -59,6 +59,19 @@ final class AppViewModel {
     func consumeNewTaskTrigger() {
         newTaskRequested = false
     }
+
+    /// Set by `crossdashboard://capture?text=<encoded>` deep links.
+    /// `MemosView` watches this and opens the compose sheet pre-filled.
+    private(set) var captureInitialText: String? = nil
+
+    func triggerCapture(text: String) {
+        selectedScreen = .memos
+        captureInitialText = text
+    }
+
+    func consumeCaptureTrigger() {
+        captureInitialText = nil
+    }
 }
 
 // ─── Screen enum ─────────────────────────────────────────────────────────────

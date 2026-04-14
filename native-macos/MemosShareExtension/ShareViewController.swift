@@ -128,33 +128,108 @@ private struct ShareComposeView: View {
     }
 
     private func loadFile(from provider: NSItemProvider) async -> PendingFile? {
+        let allTypes = provider.registeredTypeIdentifiers
+        print("[ShareExt] loadFile: registeredTypeIdentifiers = \(allTypes)")
+
+        // URL-reference types carry a pointer to a file, not file content.
+        // We need a content type so loadFileRepresentation gives us actual bytes.
+        let urlOnlyTypes: Set<String> = ["public.url", "public.file-url",
+                                         "com.apple.finder.node", "public.vcard"]
+        let contentTypeId = allTypes.first { !urlOnlyTypes.contains($0) }
+        print("[ShareExt] loadFile: selected contentTypeId = \(contentTypeId ?? "nil")")
+
+        // 1. loadFileRepresentation — the correct API for sandboxed extensions.
+        //    macOS copies the file to a temp path the extension CAN read before calling back.
+        if let typeId = contentTypeId {
+            if let file = await loadViaFileRepresentation(provider: provider, typeId: typeId) {
+                return file
+            }
+            print("[ShareExt] loadFile: loadFileRepresentation failed, trying file-url fallback")
+        }
+
+        // 2. Fall back: resolve the security-scoped URL ourselves.
+        if provider.hasItemConformingToTypeIdentifier("public.file-url") {
+            return await loadViaSecurityScopedURL(provider: provider)
+        }
+
+        print("[ShareExt] loadFile: all strategies failed")
+        return nil
+    }
+
+    private func loadViaFileRepresentation(provider: NSItemProvider, typeId: String) async -> PendingFile? {
+        // Capture suggestedName before entering the callback — macOS temp paths use
+        // the UTI description as the filename, not the original file name.
+        let suggestedName = provider.suggestedName
+
+        return await withCheckedContinuation { continuation in
+            provider.loadFileRepresentation(forTypeIdentifier: typeId) { url, error in
+                if let error {
+                    print("[ShareExt] loadFileRepresentation(\(typeId)) error: \(error)")
+                    continuation.resume(returning: nil)
+                    return
+                }
+                guard let url = url else {
+                    print("[ShareExt] loadFileRepresentation(\(typeId)): url is nil")
+                    continuation.resume(returning: nil)
+                    return
+                }
+                print("[ShareExt] loadFileRepresentation(\(typeId)): tmp url = \(url), suggestedName = \(suggestedName ?? "nil")")
+                do {
+                    let data = try Data(contentsOf: url)
+                    let ext = url.pathExtension
+                    let mime = UTType(filenameExtension: ext)?.preferredMIMEType
+                           ?? UTType(typeId)?.preferredMIMEType
+                           ?? "application/octet-stream"
+
+                    // Build filename: prefer the original name from suggestedName.
+                    // suggestedName may or may not already include the extension.
+                    let filename: String
+                    if let suggested = suggestedName, !suggested.isEmpty {
+                        if !ext.isEmpty && !suggested.lowercased().hasSuffix(".\(ext.lowercased())") {
+                            filename = "\(suggested).\(ext)"
+                        } else {
+                            filename = suggested
+                        }
+                    } else {
+                        filename = url.lastPathComponent
+                    }
+
+                    print("[ShareExt] loadFileRepresentation: \(data.count) bytes, mime=\(mime), filename=\(filename)")
+                    continuation.resume(returning: PendingFile(filename: filename, mimeType: mime, data: data))
+                } catch {
+                    print("[ShareExt] loadFileRepresentation: Data(contentsOf:) failed: \(error)")
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    private func loadViaSecurityScopedURL(provider: NSItemProvider) async -> PendingFile? {
         await withCheckedContinuation { continuation in
             provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, error in
-                if let error { print("[ShareExt] loadFile error: \(error)") }
+                if let error { print("[ShareExt] loadItem(file-url) error: \(error)") }
                 let url: URL?
                 if let u = item as? URL { url = u }
                 else if let ns = item as? NSURL { url = ns as URL }
                 else {
-                    print("[ShareExt] loadFile: item is \(type(of: item)) — not a URL")
+                    print("[ShareExt] loadItem(file-url): item type=\(type(of: item)) — not URL")
                     url = nil
                 }
-                guard let fileURL = url else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                print("[ShareExt] loadFile: fileURL = \(fileURL)")
+                guard let fileURL = url else { continuation.resume(returning: nil); return }
+
+                print("[ShareExt] loadItem(file-url): \(fileURL)")
                 let accessing = fileURL.startAccessingSecurityScopedResource()
-                print("[ShareExt] loadFile: startAccessingSecurityScopedResource = \(accessing)")
+                print("[ShareExt] startAccessingSecurityScopedResource = \(accessing)")
                 defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
 
                 do {
                     let data = try Data(contentsOf: fileURL)
                     let ext = fileURL.pathExtension
                     let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
-                    print("[ShareExt] loadFile: read \(data.count) bytes, mime=\(mime)")
+                    print("[ShareExt] security-scoped read: \(data.count) bytes, mime=\(mime)")
                     continuation.resume(returning: PendingFile(filename: fileURL.lastPathComponent, mimeType: mime, data: data))
                 } catch {
-                    print("[ShareExt] loadFile: Data(contentsOf:) failed: \(error)")
+                    print("[ShareExt] security-scoped Data(contentsOf:) failed: \(error)")
                     continuation.resume(returning: nil)
                 }
             }

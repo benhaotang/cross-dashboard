@@ -90,8 +90,8 @@ targets:
             NSPortName: CrossDashboard
             NSSendTypes:
               - public.utf8-plain-text
-              - NSStringPboardType
               - public.url
+              - public.file-url
     entitlements:
       path: CrossDashboard/CrossDashboard.entitlements
       properties:

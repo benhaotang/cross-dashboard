@@ -54,8 +54,8 @@
 			<key>NSSendTypes</key>
 			<array>
 				<string>public.utf8-plain-text</string>
-				<string>NSStringPboardType</string>
 				<string>public.url</string>
+				<string>public.file-url</string>
 			</array>
 		</dict>
 	</array>

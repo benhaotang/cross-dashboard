@@ -1,6 +1,7 @@
 package com.crossdashboard.app.ui.screen.memos
 
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -39,7 +40,16 @@ fun CreateMemoSheet(
         scope.launch {
             val bytes = context.contentResolver.openInputStream(uri)?.readBytes() ?: return@launch
             val type = context.contentResolver.getType(uri) ?: "application/octet-stream"
-            val name = uri.lastPathSegment ?: "file"
+            val name = run {
+                var n = "attachment"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0) n = cursor.getString(idx)
+                    }
+                }
+                n
+            }
             attachments = attachments + PendingAttachment(name, type, bytes)
         }
     }

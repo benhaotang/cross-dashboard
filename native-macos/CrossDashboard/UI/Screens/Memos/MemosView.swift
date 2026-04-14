@@ -8,6 +8,7 @@ struct MemosView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var viewModel = MemosViewModel()
     @State private var showCreateSheet = false
+    @State private var captureInitialText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -120,7 +121,13 @@ struct MemosView: View {
             }
         }
         .sheet(isPresented: $showCreateSheet) {
-            CreateMemoSheetMac(viewModel: viewModel)
+            CreateMemoSheetMac(viewModel: viewModel, initialText: captureInitialText)
+        }
+        .onChange(of: appViewModel.captureInitialText) { _, newText in
+            guard let text = newText else { return }
+            captureInitialText = text
+            showCreateSheet = true
+            appViewModel.consumeCaptureTrigger()
         }
         .onChange(of: viewModel.filteredMemos) { _, memos in
             // Auto-select first memo if none selected
@@ -220,6 +227,7 @@ struct MemoListRow: View {
 struct CreateMemoSheetMac: View {
 
     var viewModel: MemosViewModel
+    var initialText: String = ""
     @Environment(\.dismiss) private var dismiss
     @State private var content = ""
     @State private var visibility: MemoVisibility = .private
@@ -235,6 +243,11 @@ struct CreateMemoSheetMac: View {
                 .font(.body)
                 .frame(minHeight: 160)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                .onAppear {
+                    if content.isEmpty && !initialText.isEmpty {
+                        content = initialText
+                    }
+                }
 
             Picker("Visibility", selection: $visibility) {
                 Text("Private").tag(MemoVisibility.private)
