@@ -4,6 +4,11 @@ This is an experimental client for self-hosting services like CalDAV, [Gitea](ht
 
 90% coded by Cursor (Sonnet 4.6, GPT 5.4 and Kimi K2.5)
 
+|Mac (Swift UI)|Android (Material 3 with large screen support)|
+|:-:|:-:|
+|<img width="615" height="342" alt="Bildschirmfoto 2026-04-15 um 02 13 33" src="https://github.com/user-attachments/assets/d95f2240-5ae0-4d88-af4d-59cdf8111036" />|<img width="547" height="400" alt="Screenshot_20260415-021127_Cross Dashboard Redacted" src="https://github.com/user-attachments/assets/e16a6862-a693-4f42-872e-ea50dcd4b7e6" />|
+
+
 ## Features
 
 - Calendar sync and event management (VEVENT)
