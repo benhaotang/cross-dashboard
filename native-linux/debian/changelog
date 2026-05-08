@@ -1,0 +1,5 @@
+cross-dashboard (1.0.0-1) UNRELEASED; urgency=medium
+
+  * Initial Debian packaging (native-linux Phase 1 bootstrap).
+
+ -- Cross-Dashboard <cross-dashboard@localhost>  Thu, 08 May 2026 12:00:00 +0000

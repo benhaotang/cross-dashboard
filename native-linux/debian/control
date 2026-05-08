@@ -1,0 +1,30 @@
+Source: cross-dashboard
+Section: utils
+Priority: optional
+Maintainer: Cross-Dashboard <cross-dashboard@localhost>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+ meson,
+ ninja-build,
+ pkg-config,
+ g++,
+ libsqlite3-dev,
+ libglib2.0-dev,
+ libgtkmm-3.0-dev,
+ libhandy-1-dev,
+ libsoup-3.0-dev,
+ nlohmann-json3-dev,
+ libsecret-1-dev,
+ libcmark-gfm-dev,
+ libcmark-gfm-extensions-dev,
+ libwebkit2gtk-4.1-dev | libwebkit2gtk-4.0-dev,
+ libnotify-dev,
+ libappindicator3-dev,
+Standards-Version: 4.7.2
+
+Package: cross-dashboard
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Unified calendar, tasks, notes, issues, and Memos capture
+ Native Linux GTK3 port of Cross-Dashboard (CalDAV, Gitea, Memos).

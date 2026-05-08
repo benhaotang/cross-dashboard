@@ -1,0 +1,6 @@
+/* Cross-Dashboard GTK3 — design tokens (light). Safe subset for GtkCssProvider 3.24. */
+@define-color cd_accent #3584e4;
+
+headerbar {
+    border-bottom-color: shade(@theme_bg_color, 0.82);
+}

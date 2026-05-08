@@ -1,0 +1,12 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Type=Application
+Name=Cross-Dashboard
+Comment=Unified calendar, tasks, notes, issues, and capture
+Exec=cross-dashboard %u
+Terminal=false
+Categories=Office;ProjectManagement;Calendar;
+MimeType=text/plain;text/uri-list;
+StartupNotify=true
+Icon=com.crossdashboard.app

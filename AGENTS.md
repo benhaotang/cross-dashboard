@@ -15,7 +15,7 @@ Cross-Dashboard is a unified personal productivity dashboard integrating:
 |---|---|---|---|
 | **Android** | ✅ Complete | `native-android/` | Kotlin + Jetpack Compose |
 | **macOS** | ✅ Complete | `native-macos/` | Swift 6.2 + SwiftUI |
-| **Linux** | Planned | `native-linux/` (TBD) | Compose Multiplatform or GTK |
+| **Linux** | ✅ Complete (`native-linux/`: Phases 1–7) | `native-linux/` | C++23 + GTK3 + libhandy-1 |
 | React Native / Expo | Legacy — phased out | `src/`, `modules/` | TypeScript + Expo SDK 54 |
 
 The RN/Expo codebase (`src/`) is frozen. Do not add new features to the RN code.
@@ -504,7 +504,92 @@ Screen display name is **"Capture"**; internal `Destination` object remains `Des
 - Android: shared element transitions for Events, Notes, Issues, Capture screens (lower priority)
 - macOS: open `CrossDashboard.xcodeproj` in Xcode 16+, build, fix any Swift 6 strict concurrency warnings; bump `MACOSX_DEPLOYMENT_TARGET` to `26.0` when Xcode 26 SDK ships
 - macOS: "Change PIN" flow in Settings → Security
-- Linux native target (TBD)
+- Linux (`native-linux/`): Phases 1–7 per [`native-linux/MIGRATION.md`](native-linux/MIGRATION.md); `meson compile` / Docker (`docker/Dockerfile`, `-j 1`); Flatpak manifest + `.deb` scaffolding.
+
+---
+
+## Native Linux (`native-linux/`)
+
+**Target**: Debian 13 / Ubuntu 22.04 LTS+
+**Language**: C++23
+**UI**: GTK3 3.24 (gtkmm-3.0) + libhandy-1
+**Packaging**: Flatpak (primary) + Debian `.deb`
+
+See [`native-linux/MIGRATION.md`](native-linux/MIGRATION.md) for the full implementation plan, phase-by-phase todos, and gotchas.
+
+### Directory Structure
+
+```
+native-linux/
+├── meson.build
+├── meson_options.txt
+├── com.crossdashboard.app.desktop
+├── com.crossdashboard.app.metainfo.xml
+├── flatpak/
+│   └── com.crossdashboard.app.yml
+├── debian/
+├── data/icons/
+└── src/
+    ├── main.cpp                      # GTK `hdy_init` + `CdApplication`; Phase 1 `phase1_main.cpp` retained for reference (not linked)
+    ├── application.{h,cpp}
+    ├── app_container.{h,cpp}
+    ├── domain/models.h
+    ├── data/
+    │   ├── db/
+    │   ├── network/              # CalDavClient, GiteaClient, MemosClient, NextcloudLoginFlow
+    │   ├── parser/               # ICalParser, TaskInputParser
+    │   ├── repository/
+    │   └── prefs/                # SecretStore (libsecret-1), AppPreferences (GKeyFile)
+    ├── ui/
+    │   ├── app_window.{h,cpp}
+    │   ├── app_viewmodel.{h,cpp}
+    │   ├── screens/              # dashboard/, events/, tasks/, notes/, issues/, inbox/, views/, memos/, settings/
+    │   └── components/
+    └── background/
+        ├── sync_scheduler.{h,cpp}
+        └── notification_scheduler.{h,cpp}
+```
+
+### Tech Stack
+
+| Category | Library |
+|---|---|
+| UI toolkit | GTK3 3.24 (gtkmm-3.0) + libhandy-1 |
+| HTTP / CalDAV | libsoup-3.0 |
+| JSON | nlohmann/json |
+| Local DB | SQLite3 (C API, C++ DAO wrappers) |
+| Credentials | libsecret-1 (Secret Service / KWallet backend) |
+| Non-sensitive prefs | GLib `GKeyFile` (`~/.config/crossdashboard/prefs.ini`) |
+| Markdown + LaTeX | cmark-gfm + `WebKitWebView` (webkit2gtk-4.0) + MathJax |
+| Notifications | libnotify |
+| Pomodoro tray | libappindicator3 (XFCE/KDE/MATE native; GNOME needs extension — see MIGRATION.md) |
+
+### Key Platform Differences from Android
+
+| Android | Linux equivalent |
+|---|---|
+| Android Keystore + Tink | libsecret-1 |
+| Nextcloud SSO (3 options) | Login Flow v2 + Manual only |
+| WorkManager | `g_timeout_add_seconds` + systemd user timer |
+| `AlarmManager` | `g_timeout_add` + libnotify |
+| `NavigationSuiteScaffold` | `HdyLeaflet` + `GtkListBox` sidebar |
+| `NavigableListDetailPaneScaffold` | `HdyLeaflet` / `GtkPaned` |
+| Glance widget | Not implemented |
+| `BiometricPrompt` + PIN | **Not implemented** |
+
+### Implementation Status
+
+**Phase 1** — Project bootstrap + data layer ✅ — Meson (`libsoup-3.0` required), SQLite + WAL + DAOs (inc. `daily_stats` via `stats_dao`), `SecretStore` + `AppPreferences`, `CalDavClient`/`GiteaClient`/`MemosClient`/`NextcloudLoginFlow` (Soup + JSON), `ICalParser` + `TaskInputParser`, aggregated `repositories.{h,cpp}`, `AppContainer`, `phase1_main`, Meson test `parser_smoke_test`.
+
+**Remaining** — Dedicated per-DAO `.cpp`, Gitea DB cache for comments/attachments (beyond Android parity stub), richer unit tests.
+
+**Phase 2** — Core UI & navigation — ✅ Done (`main.cpp`, leaflet shell, Dashboard, Tasks views)
+
+**Phase 3** — Remaining screens — ✅ Done (Events, Notes w/ `HdySearchBar`, Issues w/ comments/attachments, Inbox, Views Kanban DnD, Settings, `ReadMarkdownField`, MathJax bundle)
+**Phase 4** — Background sync & notifications — 🔄 In progress (`background/sync_scheduler.*`, `background/notification_scheduler.*`, `--reschedule-alarms` command-line handler, systemd user unit scaffolding)
+**Phase 5** — Pomodoro timer — ✅ Done (`ui/app_viewmodel.*` timer state/tick loop, `ui/components/pomodoro_bar.*`, `ui/components/pomodoro_modal.*`, `background/pomodoro_status_item.*` tray integration with passive fallback, session log append into task description)
+**Phase 6** — Capture (Memos) screen — ✅ Done (`ui/screens/memos/*` list/detail/dialogs, attachment preview widget, capture deep-link/file prefill wiring, and Docker `meson compile` + `meson test` smoke pass)
+**Phase 7** — Nav reorder, polish, Flatpak + `.deb` packaging — ✅ Done
 
 ---
 
@@ -523,6 +608,16 @@ cd native-macos
 xcodegen generate                # regenerate .xcodeproj after adding/removing Swift files
 open CrossDashboard.xcodeproj    # build + run in Xcode
 
+# Native Linux
+cd native-linux
+meson setup build                # first-time configure
+meson compile -C build           # build
+meson test -C build              # unit tests (`parser_smoke_test`)
+meson install -C build           # install (or: DESTDIR=pkg meson install -C build for staging)
+flatpak-builder --user --install --force-clean build-flatpak flatpak/com.crossdashboard.app.yml
+dpkg-buildpackage -b -us -uc     # build .deb (run from native-linux/)
+docker build -f docker/Dockerfile -t cross-dashboard-linux .   # Debian build smoke (no GUI; requires Docker daemon)
+
 # Legacy RN (frozen — do not add features)
 pnpm install
 pnpm start
@@ -539,6 +634,9 @@ When releasing a new version, update:
 1. `native-android/app/build.gradle.kts` — `versionName` and `versionCode`
 2. `native-android/app/src/main/kotlin/.../ui/screen/settings/SettingsScreen.kt` — version string in About section
 3. `native-macos/CrossDashboard/Info.plist` (or `project.yml` `MARKETING_VERSION`) — `CFBundleShortVersionString`
+4. `native-linux/meson.build` — `version:` field in `project()`
+5. `native-linux/debian/changelog` — new entry with version and date
+6. `native-linux/com.crossdashboard.app.metainfo.xml` — new `<release>` entry
 
 The RN `package.json` / `app.json` version fields are legacy and no longer need to stay in sync.
 
@@ -555,10 +653,21 @@ The RN `package.json` / `app.json` version fields are legacy and no longer need 
 6. Build Compose UI in the appropriate `ui/screen/` directory.
 7. Wire new routes in `Destination.kt` + `AppNavigation.kt` if a new screen.
 
+### Adding a Feature (Linux)
+1. Define/update domain types in `domain/models.h` if new data structures are needed.
+2. Add a DAO class in `data/db/` if persistence is required; add `to_domain()` / `from_domain()` helpers.
+3. Extend `CalDavClient`, `GiteaClient`, or `MemosClient` in `data/network/` for new API calls.
+4. Update the relevant Repository with new methods.
+5. Add a ViewModel class exposing observable state via GObject signals or `std::function` callbacks.
+6. Build GTK3 views in the appropriate `ui/screens/` directory.
+7. Wire new navigation cases in `AppWindow` and `AppViewModel`.
+8. Re-run `meson compile -C build` to verify no compile errors.
+
 ### Credentials
-- Use `SecureStore.set/get/delete` (Android) or `KeychainStore.set/get/delete` (macOS) for all sensitive values. Never pass raw passwords/tokens beyond the point of initial entry.
+- Use `SecureStore.set/get/delete` (Android), `KeychainStore.set/get/delete` (macOS), or `SecretStore::set/get/remove` (Linux) for all sensitive values. Never pass raw passwords/tokens beyond the point of initial entry.
+- On Linux, `SecretStore` uses `libsecret-1` with a `SecretSchema`. The KWallet backend is transparent to the API on KDE.
 - Memos credentials: `CredentialKey.MEMOS_HOST` (base URL, trailing slash stripped at read time) and `CredentialKey.MEMOS_TOKEN` (Bearer token).
-- Gitea repos: `CredentialKey.GITEA_REPOS` is stored as a **JSON-encoded array** (`["owner/repo","owner/repo2"]`) on macOS (written by `SettingsViewModel.saveGitea()`). On Android it is stored as a **comma-separated string**. Always decode both formats when reading: try JSON array first, fall back to comma-split.
+- Gitea repos: `CredentialKey.GITEA_REPOS` is stored as a **JSON-encoded array** (`["owner/repo","owner/repo2"]`) on macOS and Linux, and as a **comma-separated string** on Android. Always decode both formats when reading: try JSON array first, fall back to comma-split.
 
 ### UI (Android)
 - Always support dark and light mode using `MaterialTheme.colorScheme` tokens.
@@ -587,6 +696,14 @@ The RN `package.json` / `app.json` version fields are legacy and no longer need 
 - Every interactive element needs `accessibilityLabel` / `accessibilityValue` / `accessibilityHint` for VoiceOver.
 - For description/body fields in **read-only** detail views, use `ReadMarkdownField` (labelled) or `ReadMarkdownView` (unlabelled) via `swift-markdown-ui`. `$$...$$` may be rendered as display math via `SwiftMath`; inline `$...$` should remain literal text unless the rendering architecture is explicitly changed. Edit forms always use `TextField` / `TextEditor`.
 - Prefer toolbar `ToolbarItem` over FABs; add `keyboardShortcut` for common actions.
+
+### UI (Linux)
+- All colors via GTK3 CSS custom properties — no hardcoded hex. Dark/light toggled via `gtk-application-prefer-dark-theme` GtkSettings key.
+- Navigation via `HdyLeaflet` (adaptive sidebar); detail shown inline as `PropertyPanel` on medium/wide, `GtkDialog` on narrow.
+- Every interactive widget needs an AT-SPI2 accessible name (`gtk_widget_set_tooltip_text` is not sufficient — use `atk_object_set_name`).
+- For read-only description/body fields, use `MarkdownView` (WebKitWebView-backed). `$$...$$` rendered as display math via MathJax; inline `$...$` stays literal. Edit forms always use `GtkEntry` / `GtkTextView`.
+- Use `GtkFileChooserNative` (not `GtkFileChooserDialog`) for file pickers — renders native dialogs on XFCE/KDE/GNOME.
+- Prefer `GtkHeaderBar` / `HdyHeaderBar` toolbar buttons with `GtkShortcutController` keyboard shortcuts over context menus for primary actions.
 
 ### Memos / Capture Screen Gotchas
 - **Proto3 JSON nullability (macOS Swift):** The Memos server omits default-value fields from JSON responses. Any Swift DTO struct used with `JSONDecoder` must declare all fields as `Optional` (`Bool?`, `String?`, `[T]?`). A non-optional `var title: String = ""` in a synthesized `Decodable` struct will throw `keyNotFound` when `"title"` is absent — the default value is ignored by the synthesized `init(from:)`. Always use `var title: String? = nil` and apply `?? ""` in `toDomain()`.

@@ -1,0 +1,6 @@
+option(
+  'enable_flatpak',
+  type: 'boolean',
+  value: false,
+  description: 'Hints for Flatpak-specific paths (bundled assets); normal distro builds leave this off.',
+)
