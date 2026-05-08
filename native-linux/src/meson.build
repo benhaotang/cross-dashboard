@@ -98,6 +98,11 @@ install_data(
   install_dir: get_option('datadir') / 'cross-dashboard' / 'mathjax',
 )
 
+install_subdir(
+  '../data/mathjax/output',
+  install_dir: get_option('datadir') / 'cross-dashboard' / 'mathjax',
+)
+
 parser_test_sources = files(
   '../tests/parser_smoke.cpp',
   'data/parser/ical_parser.cpp',

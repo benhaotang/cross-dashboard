@@ -328,9 +328,19 @@ notebook.cd-settings-notebook tab:checked label {
 .cd-dash-metric-blue {
     color: @cd_accent;
 }
-.cd-dash-level-tasks trough {
+.cd-dash-level-tasks,
+.cd-dash-level-pom {
+    min-height: 14px;
+}
+.cd-dash-level-tasks trough,
+.cd-dash-level-pom trough {
+    background-color: alpha(@theme_fg_color, 0.16);
+    border-radius: 5px;
     min-height: 10px;
-    border-radius: 4px;
+}
+.cd-dash-level-tasks block.empty,
+.cd-dash-level-pom block.empty {
+    background-color: transparent;
 }
 .cd-dash-level-tasks block.filled {
     background-color: #8ff0a4;

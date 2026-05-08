@@ -64,11 +64,43 @@ static std::optional<std::string> due_line(CalDavTask const& task)
 
 } // namespace
 
+bool TasksView::task_matches_filter(CalDavTask const& t, TaskListFilter f)
+{
+    switch (f) {
+    case TaskListFilter::Active:
+        return t.status != TaskStatus::Completed && t.status != TaskStatus::Cancelled;
+    case TaskListFilter::Completed:
+        return t.status == TaskStatus::Completed;
+    case TaskListFilter::All:
+        return true;
+    }
+    return true;
+}
+
+void TasksView::on_filter_changed()
+{
+    if (filter_active_.get_active()) {
+        task_filter_ = TaskListFilter::Active;
+        rebuild();
+    }
+    else if (filter_completed_.get_active()) {
+        task_filter_ = TaskListFilter::Completed;
+        rebuild();
+    }
+    else if (filter_all_.get_active()) {
+        task_filter_ = TaskListFilter::All;
+        rebuild();
+    }
+}
+
 TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
     , vm_(vm)
     , sync_(sync)
+    , filter_active_(filter_group_, "Active")
+    , filter_completed_(filter_group_, "Done")
+    , filter_all_(filter_group_, "All")
     , scroll_{}
 {
     vm_.signal_new_task_requested.connect([this]() { focus_quick_input(); });
@@ -84,6 +116,17 @@ TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
         sync_.sync_once();
         rebuild();
     });
+
+    filter_box_.get_style_context()->add_class("linked");
+    filter_active_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
+    filter_completed_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
+    filter_all_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
+    filter_active_.set_active(true);
+    filter_box_.pack_start(filter_active_, false, false);
+    filter_box_.pack_start(filter_completed_, false, false);
+    filter_box_.pack_start(filter_all_, false, false);
+    toolbar_.pack_start(filter_box_, false, false);
+
     toolbar_.pack_end(refresh_btn_, false, false);
     pack_start(toolbar_, false, false);
 
@@ -195,7 +238,9 @@ void TasksView::rebuild()
     });
 
     std::function<void(CalDavTask const&, int)> visit = [&](CalDavTask const& t, int depth) {
-        list_.append(*make_row(t, depth));
+        bool const show = task_matches_filter(t, task_filter_);
+        if (show)
+            list_.append(*make_row(t, depth));
 
         auto range = children.equal_range(t.uid);
 
@@ -207,7 +252,8 @@ void TasksView::rebuild()
         std::stable_sort(kids.begin(), kids.end(),
             [](CalDavTask const* a, CalDavTask const* b) { return a->summary < b->summary; });
 
-        for (auto* k : kids) visit(*k, depth + 1);
+        int const child_depth = show ? depth + 1 : depth;
+        for (auto* k : kids) visit(*k, child_depth);
     };
 
     for (auto const* rt : roots) visit(*rt, 0);

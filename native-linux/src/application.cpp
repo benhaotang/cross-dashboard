@@ -69,6 +69,14 @@ void route_open_uri(Glib::ustring const& uri_ustr, AppViewModel& vm)
     g_free(dec);
 }
 
+gboolean idle_first_sync_once(gpointer data)
+{
+    auto* sync = static_cast<SyncScheduler*>(data);
+    if (sync)
+        sync->sync_once();
+    return G_SOURCE_REMOVE;
+}
+
 } // namespace
 
 Glib::RefPtr<CdApplication> CdApplication::create()
@@ -115,8 +123,9 @@ void CdApplication::on_activate()
     ensure_init();
     AppSettings const settings = merged_app_preferences(container_->prefs());
     sync_scheduler_->start(settings.widget_sync_interval_minutes * 60);
-    sync_scheduler_->sync_once();
     present_main();
+    // Full sync hits network + parsers; defer so the window can paint first (faster perceived startup).
+    g_idle_add(idle_first_sync_once, sync_scheduler_.get());
 }
 
 void CdApplication::on_open(const Gio::Application::type_vec_files& files, const Glib::ustring& hint)

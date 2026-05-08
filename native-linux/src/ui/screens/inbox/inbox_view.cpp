@@ -101,7 +101,11 @@ void InboxView::populate_rows(std::vector<Row>& out)
     EpochMillis const horizon = now + kWeek;
 
     for (auto const& e : evdao.get_all()) {
-        if (e.start > horizon) continue;
+        if (e.start > horizon)
+            continue;
+        EpochMillis const effective_end = e.end > e.start ? e.end : e.start;
+        if (effective_end <= now)
+            continue;
         Row r{};
         r.data = e;
         r.title = e.summary;
