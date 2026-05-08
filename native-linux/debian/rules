@@ -5,3 +5,7 @@ export DH_VERBOSE = 1
 
 override_dh_auto_configure:
 	dh_auto_configure -- --prefix=/usr
+
+# dh_install expects files under debian/tmp/; dh_auto_install defaults to debian/<pkg>/.
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp
