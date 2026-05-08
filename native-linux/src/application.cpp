@@ -69,7 +69,7 @@ void route_open_uri(Glib::ustring const& uri_ustr, AppViewModel& vm)
     g_free(dec);
 }
 
-gboolean idle_first_sync_once(gpointer data)
+gboolean delayed_first_sync_once(gpointer data)
 {
     auto* sync = static_cast<SyncScheduler*>(data);
     if (sync)
@@ -124,8 +124,9 @@ void CdApplication::on_activate()
     AppSettings const settings = merged_app_preferences(container_->prefs());
     sync_scheduler_->start(settings.widget_sync_interval_minutes * 60);
     present_main();
-    // Full sync hits network + parsers; defer so the window can paint first (faster perceived startup).
-    g_idle_add(idle_first_sync_once, sync_scheduler_.get());
+    // Full sync is heavy (network + parsers) and blocks this thread. Defer several seconds so the UI can
+    // process events; low priority so pending GTK work runs first.
+    g_timeout_add_full(G_PRIORITY_LOW, 2500, delayed_first_sync_once, sync_scheduler_.get(), nullptr);
 }
 
 void CdApplication::on_open(const Gio::Application::type_vec_files& files, const Glib::ustring& hint)

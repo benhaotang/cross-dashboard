@@ -7,6 +7,7 @@
 #include "data/parser/task_input_parser.h"
 #include "data/prefs/prefs.h"
 #include "data/repository/repositories.h"
+#include "task_edit_dialog.h"
 
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -21,6 +22,7 @@
 #include <functional>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -132,6 +134,8 @@ TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
+    list_.set_tooltip_text("Double-click or press Enter on a task to edit");
+    list_.signal_row_activated().connect(sigc::mem_fun(*this, &TasksView::on_row_activated));
 
     scroll_.add(list_);
     pack_start(scroll_, true, true);
@@ -215,8 +219,50 @@ Gtk::ListBoxRow* TasksView::make_row(CalDavTask const& task, int depth)
         }
     });
 
+    g_object_set_data_full(G_OBJECT(row->gobj()), "cd-task-uid", g_strdup(task.uid.c_str()), g_free);
+
     row->add(*hb);
     return row;
+}
+
+void TasksView::on_row_activated(Gtk::ListBoxRow* row)
+{
+    if (!row)
+        return;
+    char const* uid_c =
+        static_cast<char const*>(g_object_get_data(G_OBJECT(row->gobj()), "cd-task-uid"));
+    if (!uid_c || !uid_c[0])
+        return;
+
+    TaskDao d(app_.db());
+    std::optional<CalDavTask> cur = d.get_by_uid(uid_c);
+    if (!cur)
+        return;
+
+    Gtk::Window* transient = dynamic_cast<Gtk::Window*>(get_toplevel());
+    if (!transient)
+        return;
+
+    TaskEditDialog dlg(*transient, *cur);
+    int const r = dlg.run();
+    if (r != Gtk::RESPONSE_OK)
+        return;
+
+    if (std::optional<CalDavTask> upd = dlg.result_if_ok(); upd) {
+        upd->last_modified = millis_now_wall();
+        try {
+            app_.tasks().update(*upd);
+            rebuild();
+        }
+        catch (std::exception const& err) {
+            Gtk::MessageDialog ed(*transient, err.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+            ed.run();
+        }
+    }
+    else {
+        Gtk::MessageDialog wd(*transient, "Summary cannot be empty.", false, Gtk::MESSAGE_WARNING, Gtk::BUTTONS_CLOSE);
+        wd.run();
+    }
 }
 
 void TasksView::rebuild()

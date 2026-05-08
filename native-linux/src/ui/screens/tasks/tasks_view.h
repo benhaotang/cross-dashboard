@@ -43,6 +43,7 @@ private:
 
     void on_quick_submit(Glib::ustring const&);
     void on_filter_changed();
+    void on_row_activated(Gtk::ListBoxRow* row);
     bool task_matches_filter(CalDavTask const&, TaskListFilter);
 
     Gtk::ListBoxRow* make_row(CalDavTask const& task, int depth);

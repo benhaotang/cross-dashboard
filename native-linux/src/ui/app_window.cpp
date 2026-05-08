@@ -117,6 +117,8 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     build_stack_pages();
     build_sidebar();
 
+    sync_.signal_sync_completed.connect(sigc::mem_fun(*this, &AppWindow::refresh_current_screen));
+
     GtkListBoxRow* row0 = gtk_list_box_get_row_at_index(GTK_LIST_BOX(sidebar_list_), 0);
     if (row0) {
         gtk_list_box_select_row(GTK_LIST_BOX(sidebar_list_), row0);
@@ -260,6 +262,30 @@ void AppWindow::focus_search_on_current_screen()
         memos_->focus_search();
 }
 
+void AppWindow::refresh_current_screen()
+{
+    if (current_screen_key_.empty())
+        return;
+
+    char const* key = current_screen_key_.c_str();
+    if (g_strcmp0(key, "Dashboard") == 0 && dash_)
+        dash_->refresh();
+    else if (g_strcmp0(key, "Tasks") == 0 && tasks_)
+        tasks_->rebuild();
+    else if (g_strcmp0(key, "Events") == 0 && events_)
+        events_->refresh();
+    else if (g_strcmp0(key, "Notes") == 0 && notes_)
+        notes_->rebuild();
+    else if (g_strcmp0(key, "Issues") == 0 && issues_)
+        issues_->rebuild();
+    else if (g_strcmp0(key, "Inbox") == 0 && inbox_)
+        inbox_->rebuild();
+    else if (g_strcmp0(key, "Views") == 0 && views_)
+        views_->rebuild();
+    else if (g_strcmp0(key, "Capture") == 0 && memos_)
+        memos_->rebuild();
+}
+
 void AppWindow::build_stack_pages()
 {
     AppSettings const cfg = merged_app_preferences(app_.prefs());
@@ -374,22 +400,7 @@ void AppWindow::on_screen_row(GtkListBoxRow* row)
     stack_.set_visible_child(Glib::ustring{key});
     hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), key);
 
-    if (g_strcmp0(key, "Dashboard") == 0 && dash_)
-        dash_->refresh();
-    else if (g_strcmp0(key, "Tasks") == 0 && tasks_)
-        tasks_->rebuild();
-    else if (g_strcmp0(key, "Events") == 0 && events_)
-        events_->refresh();
-    else if (g_strcmp0(key, "Notes") == 0 && notes_)
-        notes_->rebuild();
-    else if (g_strcmp0(key, "Issues") == 0 && issues_)
-        issues_->rebuild();
-    else if (g_strcmp0(key, "Inbox") == 0 && inbox_)
-        inbox_->rebuild();
-    else if (g_strcmp0(key, "Views") == 0 && views_)
-        views_->rebuild();
-    else if (g_strcmp0(key, "Capture") == 0 && memos_)
-        memos_->rebuild();
+    refresh_current_screen();
 }
 
 void AppWindow::on_new_task_shortcut()

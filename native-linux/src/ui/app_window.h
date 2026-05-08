@@ -47,6 +47,8 @@ private:
     bool on_key_press_event(GdkEventKey* event) override;
     void load_theme_css();
     void focus_search_on_current_screen();
+    /** Reloads visible screen from local DB (after sync, tab change, etc.). */
+    void refresh_current_screen();
 
     GtkWidget* paned_{};
     GtkWidget* root_overlay_{};

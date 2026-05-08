@@ -81,6 +81,7 @@ void SyncScheduler::sync_once()
     }
 
     notifications_.reschedule_all();
+    signal_sync_completed.emit();
 }
 
 bool SyncScheduler::ensure_systemd_units(int interval_seconds)

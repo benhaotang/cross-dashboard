@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sigc++/signal.h>
+
 #include <cstdint>
 
 namespace cd {
@@ -18,6 +20,9 @@ public:
     void start(int interval_seconds);
     void stop();
     void sync_once();
+
+    /** Fired on the GTK main thread after each `sync_once()` completes (success or catch). */
+    sigc::signal<void()> signal_sync_completed;
 
 private:
     bool ensure_systemd_units(int interval_seconds);

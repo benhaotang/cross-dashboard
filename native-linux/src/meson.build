@@ -45,6 +45,7 @@ sources = files(
   'ui/components/pomodoro_modal.cpp',
   'ui/screens/dashboard/dashboard_view.cpp',
   'ui/screens/tasks/tasks_view.cpp',
+  'ui/screens/tasks/task_edit_dialog.cpp',
   'ui/screens/tasks/quick_input_bar.cpp',
   'ui/components/read_markdown_field.cpp',
   'ui/components/memo_auth_image.cpp',
