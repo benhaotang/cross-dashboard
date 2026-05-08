@@ -1,4 +1,6 @@
-# Native GTK/Debian package (native-linux/). Builds .deb for amd64 and aarch64.
+# Native GTK .deb for Debian 13 (Trixie) only — amd64 and aarch64 both build inside
+# debian:trixie-slim (linux/amd64 vs linux/arm64 image per runner) so ${shlibs:Depends}
+# matches Debian 13, not Ubuntu host runners.
 # Triggers: published release (attach .deb) or manual workflow_dispatch (artifacts only).
 # Legacy filename kept so existing repo links to this workflow remain valid.
 
@@ -56,19 +58,28 @@ jobs:
           FULL="${{ steps.ver.outputs.upstream }}-1"
           sed -i "1s|.*|cross-dashboard (${FULL}) unstable; urgency=medium|" debian/changelog
 
-      - name: Install build dependencies
+      # Both matrix jobs (amd64 + aarch64) use this step: Docker selects the Trixie image for
+      # the runner CPU; Ubuntu is only the CI host, not the link environment.
+      - name: Build binary .deb (Debian 13 / Trixie)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            debhelper build-essential fakeroot \
-            meson ninja-build pkg-config g++ \
-            libsqlite3-dev libglib2.0-dev libgtkmm-3.0-dev libhandy-1-dev libsoup-3.0-dev \
-            nlohmann-json3-dev libsecret-1-dev libcmark-gfm-dev libcmark-gfm-extensions-dev \
-            libwebkit2gtk-4.1-dev libnotify-dev libappindicator3-dev
-
-      - name: Build binary .deb
-        working-directory: native-linux
-        run: dpkg-buildpackage -b -us -uc
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src:rw" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie-slim \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends \
+                build-essential fakeroot debhelper \
+                meson ninja-build pkg-config g++ \
+                libsqlite3-dev libglib2.0-dev libgtkmm-3.0-dev libhandy-1-dev libsoup-3.0-dev \
+                nlohmann-json3-dev libsecret-1-dev libcmark-gfm-dev libcmark-gfm-extensions-dev \
+                libnotify-dev libappindicator3-dev \
+                libwebkit2gtk-4.1-dev libcairo2-dev libpango1.0-dev libatk1.0-dev \
+                libgdk-pixbuf-2.0-dev libgtk-3-dev
+              cd /src/native-linux
+              dpkg-buildpackage -b -us -uc
+            '
 
       - name: Stage .deb for upload
         id: deb
