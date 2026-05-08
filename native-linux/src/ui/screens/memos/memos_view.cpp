@@ -60,14 +60,30 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm)
             refresh_visible_rows();
         }
     });
-    search_.set_placeholder_text("Search capture...");
+    search_.set_placeholder_text("Search capture…");
     search_.signal_changed().connect([this] { refresh_visible_rows(); });
+
+    // New capture: icon-only button
+    new_btn_.set_label("");
+    new_btn_.set_image_from_icon_name("document-new-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    new_btn_.set_tooltip_text("New capture");
+    new_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(new_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(new_btn_.gobj())))
+        atk_object_set_name(a, "New capture");
     new_btn_.signal_clicked().connect([this] { open_create_dialog({}); });
 
-    toolbar_.pack_start(normal_btn_, false, false);
-    toolbar_.pack_start(archived_btn_, false, false);
+    // Toolbar: [Normal][Archived linked] | [search expanding] | [+]
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+
+    auto* state_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(state_box->gobj())), "linked");
+    state_box->pack_start(normal_btn_, false, false);
+    state_box->pack_start(archived_btn_, false, false);
+    toolbar_.pack_start(*state_box, false, false);
+
     toolbar_.pack_start(search_, true, true);
-    toolbar_.pack_start(new_btn_, false, false);
+    toolbar_.pack_end(new_btn_, false, false);
     pack_start(toolbar_, false, false);
 
     tags_.set_selection_mode(Gtk::SELECTION_NONE);

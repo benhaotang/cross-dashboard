@@ -1,6 +1,120 @@
-/* Cross-Dashboard GTK3 — design tokens (dark). */
-@define-color cd_accent #62a0ea;
+/* Cross-Dashboard GTK3 — dark theme. */
 
+@define-color cd_accent      #62a0ea;
+@define-color cd_accent_dim  alpha(#62a0ea, 0.18);
+@define-color cd_sidebar_bg  #242424;
+@define-color cd_sidebar_sep #3a3a3a;
+@define-color cd_row_hover   alpha(#ffffff, 0.07);
+@define-color cd_row_active  alpha(#ffffff, 0.12);
+
+/* ── Window chrome ─────────────────────────────────────────────────────── */
 headerbar {
-    border-bottom-color: shade(@theme_bg_color, 1.18);
+    border-bottom-color: @cd_sidebar_sep;
+    background: linear-gradient(to bottom, #303030, #2a2a2a);
+}
+
+/* ── Sidebar rail ──────────────────────────────────────────────────────── */
+.cd-sidebar {
+    background-color: @cd_sidebar_bg;
+    border-right: 1px solid @cd_sidebar_sep;
+    min-width: 192px;
+}
+
+.cd-sidebar-title {
+    padding: 16px 12px 10px 14px;
+    font-size: 0.68rem;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    color: alpha(@theme_fg_color, 0.35);
+}
+
+/* ── Nav list ──────────────────────────────────────────────────────────── */
+.cd-nav-list {
+    background-color: transparent;
+    border: none;
+    padding: 4px 0;
+}
+
+.cd-nav-list > row {
+    border-radius: 8px;
+    margin: 1px 6px;
+    padding: 0;
+    background-color: transparent;
+    transition: background-color 100ms ease;
+}
+
+.cd-nav-list > row:hover {
+    background-color: @cd_row_hover;
+}
+
+.cd-nav-list > row:active {
+    background-color: @cd_row_active;
+}
+
+.cd-nav-list > row:selected,
+.cd-nav-list > row:selected:hover {
+    background-color: @cd_accent;
+    color: #1a1a1a;
+}
+
+.cd-nav-list > row:selected label,
+.cd-nav-list > row:selected image {
+    color: #1a1a1a;
+}
+
+.cd-nav-icon {
+    opacity: 0.65;
+}
+
+.cd-nav-list > row:selected .cd-nav-icon {
+    opacity: 1.0;
+}
+
+/* ── Toolbar chrome ────────────────────────────────────────────────────── */
+.cd-toolbar {
+    padding: 6px 8px;
+    border-bottom: 1px solid @cd_sidebar_sep;
+    background-color: transparent;
+}
+
+/* Linked button groups */
+.linked > button,
+.linked > togglebutton,
+.linked > radiobutton {
+    border-radius: 0;
+}
+.linked > button:first-child,
+.linked > togglebutton:first-child,
+.linked > radiobutton:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+.linked > button:last-child,
+.linked > togglebutton:last-child,
+.linked > radiobutton:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* ── Action icon buttons ──────────────────────────────────────────────── */
+.cd-icon-btn {
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 6px;
+}
+
+/* ── List rows ────────────────────────────────────────────────────────── */
+list > row {
+    padding: 6px 10px;
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.06);
+}
+
+list > row:selected {
+    background-color: @cd_accent_dim;
+    color: @theme_fg_color;
+}
+
+list > row:hover {
+    background-color: @cd_row_hover;
 }

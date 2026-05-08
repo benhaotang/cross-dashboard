@@ -31,10 +31,23 @@ std::optional<std::string> detect_url(std::string const& text)
 
 } // namespace
 
+namespace {
+// Helper: configure a button as an icon-only flat action button
+void setup_icon_btn(Gtk::Button& btn, const char* icon_name, const char* tooltip, const char* ax_name)
+{
+    btn.set_image_from_icon_name(icon_name, Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    btn.set_tooltip_text(tooltip);
+    btn.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(btn.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(btn.gobj())))
+        atk_object_set_name(a, ax_name);
+}
+} // anonymous namespace
+
 MemoDetailView::MemoDetailView(AppContainer& app)
-    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 8)
+    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0)
     , app_(app)
-    , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 6)
+    , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 2)
     , title_("")
     , meta_("")
     , comments_title_("Comments")
@@ -43,6 +56,18 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     title_.set_line_wrap(true);
     title_.set_selectable(true);
     meta_.set_halign(Gtk::ALIGN_START);
+
+    // Configure all action buttons as icon-only
+    setup_icon_btn(extract_tasks_btn_, "emblem-default-symbolic",   "Extract tasks",       "Extract tasks");
+    setup_icon_btn(create_event_btn_,  "appointment-new-symbolic",  "Create event",        "Create event");
+    setup_icon_btn(comment_issue_btn_, "insert-text-symbolic",      "Comment on issue",    "Comment on issue");
+    setup_icon_btn(open_url_btn_,      "web-browser-symbolic",      "Open URL",            "Open URL");
+    setup_icon_btn(copy_link_btn_,     "edit-copy-symbolic",        "Copy link",           "Copy link");
+    setup_icon_btn(edit_btn_,          "document-edit-symbolic",    "Edit memo",           "Edit memo");
+    setup_icon_btn(archive_btn_,       "mail-mark-read-symbolic",   "Archive",             "Archive");
+    setup_icon_btn(restore_btn_,       "document-revert-symbolic",  "Restore",             "Restore");
+    setup_icon_btn(delete_btn_,        "user-trash-symbolic",       "Delete permanently",  "Delete permanently");
+    setup_icon_btn(comment_send_btn_,  "mail-send-symbolic",        "Post comment",        "Post comment");
 
     extract_tasks_btn_.signal_clicked().connect([this] {
         if (on_extract_tasks) on_extract_tasks();
@@ -147,15 +172,34 @@ MemoDetailView::MemoDetailView(AppContainer& app)
         }
     });
 
+    // Toolbar layout: [create group | sep | link group | sep | memo ops group (right)]
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+
+    // Group 1: content-creation actions
     toolbar_.pack_start(extract_tasks_btn_, false, false);
-    toolbar_.pack_start(create_event_btn_, false, false);
+    toolbar_.pack_start(create_event_btn_,  false, false);
     toolbar_.pack_start(comment_issue_btn_, false, false);
-    toolbar_.pack_start(open_url_btn_, false, false);
+
+    auto* sep1 = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_VERTICAL));
+    sep1->set_margin_start(4);
+    sep1->set_margin_end(4);
+    toolbar_.pack_start(*sep1, false, false);
+
+    // Group 2: link actions
+    toolbar_.pack_start(open_url_btn_,  false, false);
     toolbar_.pack_start(copy_link_btn_, false, false);
-    toolbar_.pack_start(edit_btn_, false, false);
-    toolbar_.pack_start(archive_btn_, false, false);
-    toolbar_.pack_start(restore_btn_, false, false);
-    toolbar_.pack_start(delete_btn_, false, false);
+
+    // Group 3: memo state actions — right aligned
+    toolbar_.pack_end(delete_btn_,   false, false);
+    toolbar_.pack_end(restore_btn_,  false, false);
+    toolbar_.pack_end(archive_btn_,  false, false);
+
+    auto* sep2 = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_VERTICAL));
+    sep2->set_margin_start(4);
+    sep2->set_margin_end(4);
+    toolbar_.pack_end(*sep2, false, false);
+
+    toolbar_.pack_end(edit_btn_, false, false);
 
     auto* md = Gtk::manage(new MarkdownView());
     markdown_ = md;
@@ -170,14 +214,27 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     comment_entry_.set_placeholder_text("Add comment…");
     composer_.pack_start(comment_entry_, true, true);
     composer_.pack_start(comment_send_btn_, false, false);
+    composer_.set_margin_top(4);
+    composer_.set_margin_bottom(4);
+    composer_.set_margin_start(8);
+    composer_.set_margin_end(8);
+
+    title_.set_margin_top(8);
+    title_.set_margin_start(10);
+    title_.set_margin_end(10);
+    meta_.set_margin_start(10);
+    meta_.set_margin_end(10);
+    meta_.set_margin_bottom(4);
 
     pack_start(toolbar_, false, false);
+    auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
+    pack_start(*sep, false, false);
     pack_start(title_, false, false);
     pack_start(meta_, false, false);
-    pack_start(body_scroll_, false, false);
+    pack_start(body_scroll_, true, true);
     pack_start(attachments_, false, false);
     pack_start(comments_title_, false, false);
-    pack_start(comments_, true, true);
+    pack_start(comments_, false, false);
     pack_start(composer_, false, false);
 }
 

@@ -81,7 +81,20 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     // "fold-threshold-width" GObject property on some distributions (e.g. Debian 13).
 
     sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_style_context_add_class(gtk_widget_get_style_context(sidebar_box_), "cd-sidebar");
+
+    // Brand label at top of sidebar
+    GtkWidget* brand_label = gtk_label_new("CROSS-DASHBOARD");
+    gtk_label_set_xalign(GTK_LABEL(brand_label), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(brand_label), "cd-sidebar-title");
+    gtk_box_pack_start(GTK_BOX(sidebar_box_), brand_label, FALSE, FALSE, 0);
+
+    GtkWidget* sidebar_sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_box_pack_start(GTK_BOX(sidebar_box_), sidebar_sep, FALSE, FALSE, 0);
+
     sidebar_list_ = gtk_list_box_new();
+    gtk_list_box_set_selection_mode(GTK_LIST_BOX(sidebar_list_), GTK_SELECTION_SINGLE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(sidebar_list_), "cd-nav-list");
     gtk_box_pack_start(GTK_BOX(sidebar_box_), sidebar_list_, TRUE, TRUE, 0);
 
     main_outer_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -112,7 +125,8 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), back_btn_);
     hdy_header_bar_pack_end(HDY_HEADER_BAR(header_bar_), pomodoro_btn);
 
-    gtk_box_pack_start(GTK_BOX(main_outer_), header_bar_, FALSE, FALSE, 0);
+    // Use header_bar_ as the window titlebar — eliminates the duplicate OS titlebar.
+    gtk_window_set_titlebar(GTK_WINDOW(gobj()), header_bar_);
     gtk_box_pack_start(GTK_BOX(main_outer_), GTK_WIDGET(stack_.gobj()), TRUE, TRUE, 0);
 
     hdy_leaflet_insert_child_after(HDY_LEAFLET(leaflet_), sidebar_box_, nullptr);
@@ -159,6 +173,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     }
 
     on_leaflet_folded();
+    gtk_widget_show_all(header_bar_);
     show_all_children();
     apply_theme();
 }
@@ -351,18 +366,45 @@ void AppWindow::build_stack_pages()
 
 void AppWindow::build_sidebar()
 {
+    auto screen_icon = [](std::string const& name) -> const char* {
+        if (name == "Dashboard") return "go-home-symbolic";
+        if (name == "Inbox")     return "mail-unread-symbolic";
+        if (name == "Events")    return "x-office-calendar-symbolic";
+        if (name == "Tasks")     return "emblem-default-symbolic";
+        if (name == "Notes")     return "document-edit-symbolic";
+        if (name == "Issues")    return "emblem-important-symbolic";
+        if (name == "Views")     return "view-list-symbolic";
+        if (name == "Capture")   return "camera-photo-symbolic";
+        if (name == "Settings")  return "preferences-system-symbolic";
+        return "applications-other-symbolic";
+    };
+
     AppSettings const cfg = merged_app_preferences(app_.prefs());
     for (std::string const& screen : cfg.visible_screens) {
         GtkWidget* row = gtk_list_box_row_new();
+        gtk_style_context_add_class(gtk_widget_get_style_context(row), "cd-nav-row");
+
+        GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+        gtk_widget_set_margin_start(hbox, 10);
+        gtk_widget_set_margin_end(hbox, 10);
+        gtk_widget_set_margin_top(hbox, 7);
+        gtk_widget_set_margin_bottom(hbox, 7);
+
+        GtkWidget* icon = gtk_image_new_from_icon_name(screen_icon(screen), GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_style_context_add_class(gtk_widget_get_style_context(icon), "cd-nav-icon");
+
         GtkWidget* lab = gtk_label_new(screen.c_str());
         gtk_widget_set_halign(lab, GTK_ALIGN_START);
-        gtk_container_add(GTK_CONTAINER(row), lab);
+        gtk_widget_set_hexpand(lab, TRUE);
+
+        gtk_box_pack_start(GTK_BOX(hbox), icon, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(hbox), lab, TRUE, TRUE, 0);
+        gtk_container_add(GTK_CONTAINER(row), hbox);
+
         g_object_set_data_full(G_OBJECT(row), "cd-screen", g_strdup(screen.c_str()), g_free);
-        {
-            std::string const ax = "Screen: " + screen;
-            if (AtkObject* a = gtk_widget_get_accessible(row))
-                atk_object_set_name(a, ax.c_str());
-        }
+        if (AtkObject* a = gtk_widget_get_accessible(row))
+            atk_object_set_name(a, ("Screen: " + screen).c_str());
+
         gtk_widget_show_all(row);
         gtk_container_add(GTK_CONTAINER(sidebar_list_), row);
     }

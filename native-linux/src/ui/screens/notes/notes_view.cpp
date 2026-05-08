@@ -59,19 +59,33 @@ std::string pick_note_calendar(AppContainer& app)
 } // namespace
 
 NotesView::NotesView(AppContainer& app)
-    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
+    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0)
     , app_(app)
-    , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 8)
+    , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 6)
     , search_{}
-    , btn_grid_{"Grid"}
-    , btn_list_{"List"}
+    , btn_grid_{}
+    , btn_list_{}
     , mode_{}
     , flow_{}
     , list_{}
-    , detail_(Gtk::ORIENTATION_VERTICAL, 8)
+    , detail_(Gtk::ORIENTATION_VERTICAL, 0)
 {
-    auto* new_btn = Gtk::manage(new Gtk::Button("New note"));
+    // New note: icon-only button
+    auto* new_btn = Gtk::manage(new Gtk::Button());
+    new_btn->set_image_from_icon_name("document-new-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    new_btn->set_tooltip_text("New note (Ctrl+N)");
+    new_btn->set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(new_btn->gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(new_btn->gobj())))
+        atk_object_set_name(a, "New note");
 
+    // Grid/list toggle buttons with icons
+    btn_grid_.set_image_from_icon_name("view-grid-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    btn_grid_.set_always_show_image(true);
+    btn_grid_.set_tooltip_text("Grid view");
+    btn_list_.set_image_from_icon_name("view-list-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    btn_list_.set_always_show_image(true);
+    btn_list_.set_tooltip_text("List view");
     btn_grid_.set_mode(true);
     btn_list_.set_mode(true);
     btn_grid_.signal_toggled().connect([this] {
@@ -89,7 +103,10 @@ NotesView::NotesView(AppContainer& app)
     btn_grid_.set_active(true);
 
     search_.signal_changed().connect([this] { apply_filter(search_.get_text()); });
+    search_.set_placeholder_text("Search notes…");
 
+    // Toolbar: [+ new] [search expanding] | [grid][list]
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
     toolbar_.pack_start(*new_btn, false, false);
 
     GtkWidget* hbar = GTK_WIDGET(hdy_search_bar_new());
@@ -97,8 +114,13 @@ NotesView::NotesView(AppContainer& app)
     hdy_search_bar_connect_entry(HDY_SEARCH_BAR(hbar), GTK_ENTRY(search_.gobj()));
     gtk_box_pack_start(GTK_BOX(toolbar_.gobj()), hbar, TRUE, TRUE, 0);
 
-    toolbar_.pack_start(btn_grid_, false, false);
-    toolbar_.pack_start(btn_list_, false, false);
+    // Linked view-toggle group
+    auto* view_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(view_box->gobj())), "linked");
+    view_box->pack_start(btn_grid_, false, false);
+    view_box->pack_start(btn_list_, false, false);
+    toolbar_.pack_end(*view_box, false, false);
+
     pack_start(toolbar_, false, false);
 
     Gtk::ScrolledWindow* sc_flow = Gtk::manage(new Gtk::ScrolledWindow());
@@ -122,10 +144,22 @@ NotesView::NotesView(AppContainer& app)
     body->set_field_label("Body");
     body->set_markdown("");
 
-    auto* edit_btn = Gtk::manage(new Gtk::Button("Edit"));
+    // Detail header: right-aligned Edit icon button
+    auto* detail_hdr = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(detail_hdr->gobj())), "cd-toolbar");
+    auto* edit_btn = Gtk::manage(new Gtk::Button());
+    edit_btn->set_image_from_icon_name("document-edit-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    edit_btn->set_tooltip_text("Edit note");
+    edit_btn->set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(edit_btn->gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(edit_btn->gobj())))
+        atk_object_set_name(a, "Edit note");
     edit_btn->signal_clicked().connect(sigc::mem_fun(*this, &NotesView::on_edit_note));
+    detail_hdr->pack_end(*edit_btn, false, false);
 
-    detail_.pack_start(*edit_btn, false, false);
+    detail_.pack_start(*detail_hdr, false, false);
+    auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
+    detail_.pack_start(*sep, false, false);
     detail_.pack_start(*body, true, true);
 
     Gtk::Paned* paned = Gtk::manage(new Gtk::Paned(Gtk::ORIENTATION_HORIZONTAL));

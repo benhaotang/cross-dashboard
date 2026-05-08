@@ -40,15 +40,15 @@ private:
     AppContainer& app_;
     std::optional<MemosMemo> memo_;
     Gtk::Box toolbar_;
-    Gtk::Button extract_tasks_btn_{"Extract Tasks"};
-    Gtk::Button create_event_btn_{"Create Event"};
-    Gtk::Button comment_issue_btn_{"Comment on Issue"};
-    Gtk::Button open_url_btn_{"Open URL"};
-    Gtk::Button copy_link_btn_{"Copy Link"};
-    Gtk::Button edit_btn_{"Edit"};
-    Gtk::Button archive_btn_{"Archive"};
-    Gtk::Button restore_btn_{"Restore"};
-    Gtk::Button delete_btn_{"Delete"};
+    Gtk::Button extract_tasks_btn_{};
+    Gtk::Button create_event_btn_{};
+    Gtk::Button comment_issue_btn_{};
+    Gtk::Button open_url_btn_{};
+    Gtk::Button copy_link_btn_{};
+    Gtk::Button edit_btn_{};
+    Gtk::Button archive_btn_{};
+    Gtk::Button restore_btn_{};
+    Gtk::Button delete_btn_{};
     Gtk::Label title_;
     Gtk::Label meta_;
     Gtk::ScrolledWindow body_scroll_;
@@ -59,7 +59,7 @@ private:
 
     Gtk::Box composer_{Gtk::ORIENTATION_HORIZONTAL, 6};
     Gtk::Entry comment_entry_;
-    Gtk::Button comment_send_btn_{"Send"};
+    Gtk::Button comment_send_btn_{};
 };
 
 } // namespace cd

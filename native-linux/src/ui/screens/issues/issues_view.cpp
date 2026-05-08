@@ -63,15 +63,21 @@ IssuesView::IssuesView(AppContainer& app)
     state_combo_.set_active(0);
     state_combo_.signal_changed().connect(sigc::mem_fun(*this, &IssuesView::on_filter_changed));
 
+    // New issue: icon + label button
+    new_issue_btn_.set_image_from_icon_name("list-add-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     new_issue_btn_.set_label("New issue");
+    new_issue_btn_.set_always_show_image(true);
     new_issue_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_new_issue));
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(new_issue_btn_.gobj())))
+        atk_object_set_name(a, "New issue");
 
     toggle_state_btn_.set_label("Close issue");
     toggle_state_btn_.set_sensitive(false);
     toggle_state_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_toggle_issue_state));
 
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
     toolbar_.pack_start(state_combo_, false, false);
-    toolbar_.pack_start(new_issue_btn_, false, false);
+    toolbar_.pack_end(new_issue_btn_, false, false);
     pack_start(toolbar_, false, false);
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
@@ -96,15 +102,31 @@ IssuesView::IssuesView(AppContainer& app)
     comments_list_.set_selection_mode(Gtk::SELECTION_NONE);
     comment_entry_.set_placeholder_text("Write a comment…");
 
+    attach_file_btn_.set_image_from_icon_name("mail-attachment-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    attach_file_btn_.set_label("Attach…");
+    attach_file_btn_.set_always_show_image(true);
     attach_file_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_attach_with_comment));
+
+    send_comment_btn_.set_image_from_icon_name("mail-send-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    send_comment_btn_.set_label("Comment");
+    send_comment_btn_.set_always_show_image(true);
     send_comment_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_send_comment));
 
     composer_.pack_start(comment_entry_, true, true);
     composer_.pack_start(attach_file_btn_, false, false);
     composer_.pack_start(send_comment_btn_, false, false);
 
-    detail_inner_.pack_start(detail_meta_, false, false);
-    detail_inner_.pack_start(toggle_state_btn_, false, false);
+    // Detail header row: meta + toggle-state action right-aligned
+    auto* detail_hdr = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 8));
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(detail_hdr->gobj())), "cd-toolbar");
+    toggle_state_btn_.set_image_from_icon_name("emblem-default-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    toggle_state_btn_.set_always_show_image(true);
+    detail_hdr->pack_start(detail_meta_, true, true);
+    detail_hdr->pack_end(toggle_state_btn_, false, false);
+
+    detail_inner_.pack_start(*detail_hdr, false, false);
+    auto* detail_sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
+    detail_inner_.pack_start(*detail_sep, false, false);
     detail_inner_.pack_start(*rm, true, true);
     detail_inner_.pack_start(att_heading_, false, false);
     detail_inner_.pack_start(attachments_box_, false, false);

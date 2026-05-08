@@ -39,6 +39,9 @@ EventsView::EventsView(AppContainer& app)
     , detail_when_("")
 {
     rb_day_.set_active(true);
+    // Style filter as a linked segmented control
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(filter_box_.gobj())), "cd-toolbar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(filter_box_.gobj())), "linked");
     filter_box_.pack_start(rb_day_, false, false);
     filter_box_.pack_start(rb_week_, false, false);
     filter_box_.pack_start(rb_month_, false, false);
