@@ -26,7 +26,7 @@ This is an experimental client for self-hosting services like CalDAV, [Gitea](ht
 |---|---|---|---|
 | **Android** | ✅ Complete | `native-android/` | Kotlin + Jetpack Compose |
 | **macOS** | ✅ Complete | `native-macos/` | Swift 6.2 + SwiftUI |
-| **Linux** | Planned | `native-linux/` (TBD) | GTK |
+| **Linux** | ✅ Complete | `native-linux/` | GTK3 + libhandy-1 |
 
 ## URL Scheme
 
