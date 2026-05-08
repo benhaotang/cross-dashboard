@@ -343,7 +343,8 @@ std::optional<MemosMemo> MemoRepository::create_memo(
 
 void MemoRepository::delete_memo(std::string const& memo_name, bool force)
 {
-    client_.delete_memo(memo_name, force);
+    if (!client_.delete_memo(memo_name, force))
+        return;
     dao_.delete_by_name(memo_name);
 }
 

@@ -8,6 +8,13 @@ namespace cd {
 
 namespace {
 
+void fmt_time(int seconds, char* out, std::size_t out_size)
+{
+    int const mm = seconds / 60;
+    int const ss = seconds % 60;
+    std::snprintf(out, out_size, "%02d:%02d", mm, ss);
+}
+
 } // namespace
 
 PomodoroStatusItem::PomodoroStatusItem(AppViewModel& vm)
@@ -76,7 +83,7 @@ void PomodoroStatusItem::set_label(PomodoroState const& state)
         return;
     }
     char buf[16]{};
-    fmt_mm_ss(state.seconds_left, buf, sizeof(buf));
+    fmt_time(state.seconds_left, buf, sizeof(buf));
     app_indicator_set_label(indicator_, buf, "");
 #else
     (void)state;
