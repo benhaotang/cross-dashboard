@@ -28,6 +28,8 @@ This is an experimental client for self-hosting services like CalDAV, [Gitea](ht
 | **macOS** | ✅ Complete | `native-macos/` | Swift 6.2 + SwiftUI |
 | **Linux** | ✅ Complete | `native-linux/` | GTK3 + libhandy-1 |
 
+There is no React Native, Expo, or Electron shell in this repo; only the native trees above are maintained.
+
 ## URL Scheme
 
 On macOS, you can quickly capture text to Memos by using the URL scheme:

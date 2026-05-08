@@ -146,7 +146,7 @@ class CalDavClient @Inject constructor(
             ?: throw IOException("No href for task ${task.uid}")
 
         val ical = ICalParser.serializeTask(task)
-        // Unconditional PUT — no If-Match — matching the RN behaviour and avoiding
+        // Unconditional PUT — no If-Match — avoids
         // 412 Precondition Failed when the cached ETag is stale.
         put(url, ical, etag = null)
     }

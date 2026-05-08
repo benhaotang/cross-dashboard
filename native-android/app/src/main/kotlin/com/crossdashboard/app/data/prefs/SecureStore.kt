@@ -113,7 +113,7 @@ class SecureStore @Inject constructor(
     }
 }
 
-// Credential key constants — mirrors RN keyring.ts
+// Credential key constants — same logical keys across Android, macOS, and Linux stores
 object CredentialKey {
     const val CALDAV_SERVER = "caldav_server"
     const val CALDAV_USERNAME = "caldav_username"

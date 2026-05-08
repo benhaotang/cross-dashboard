@@ -16,9 +16,8 @@ Cross-Dashboard is a unified personal productivity dashboard integrating:
 | **Android** | ✅ Complete | `native-android/` | Kotlin + Jetpack Compose |
 | **macOS** | ✅ Complete | `native-macos/` | Swift 6.2 + SwiftUI |
 | **Linux** | ✅ Complete (`native-linux/`: Phases 1–7) | `native-linux/` | C++23 + GTK3 + libhandy-1 |
-| React Native / Expo | Legacy — phased out | `src/`, `modules/` | TypeScript + Expo SDK 54 |
 
-The RN/Expo codebase (`src/`) is frozen. Do not add new features to the RN code.
+All shipping code lives under `native-android/`, `native-macos/`, and `native-linux/`. There is no JavaScript/React shell in this repository.
 
 ---
 
@@ -202,7 +201,7 @@ Three-column `NavigationSplitView`: sidebar (screen list) → content (list view
 ### Credentials & Settings
 - **`SecureStore`** (`data/prefs/SecureStore.kt`): AES-256-GCM key in Android Keystore (hardware-backed on API 36). Encrypts all credential values before writing to a plain `SharedPreferences` file excluded from Auto Backup.
 - **`AppPreferences`** (`data/prefs/AppPreferences.kt`): Preferences DataStore for non-sensitive settings (theme, visible screens, kanban columns, pomodoro, notifications, sync interval, biometric lock).
-- `CredentialKey` constants mirror the RN `keyring.ts` keys for conceptual continuity.
+- `CredentialKey` constants use stable string keys shared across Android, macOS, and Linux.
 
 ### Network
 - `CalDavClient` uses raw OkHttp 5 — no Retrofit. CalDAV uses non-standard HTTP methods (`PROPFIND`, `REPORT`, `MKCALENDAR`) that require direct `Request.Builder` usage.
@@ -330,7 +329,7 @@ The **Capture** screen (`Destination.Memos` / `Screen.memos`) integrates with a 
 
 ## Domain Models (Kotlin)
 
-All domain types live in `domain/model/Models.kt`. They are direct ports of the TypeScript interfaces from the legacy `src/types/index.ts`:
+All domain types live in `domain/model/Models.kt`:
 
 ```kotlin
 data class CalDavTask(
@@ -393,7 +392,7 @@ data class MemosAttachment(
 
 ## Task Quick Input Syntax
 
-`TaskInputParser.kt` is a port of the legacy `taskParser.ts`:
+`TaskInputParser.kt` implements quick-input syntax (same rules on all platforms):
 
 ```
 !! meet friends #social tonight    → priority=medium, tag=social, due=today 21:00
@@ -617,13 +616,6 @@ meson install -C build           # install (or: DESTDIR=pkg meson install -C bui
 flatpak-builder --user --install --force-clean build-flatpak flatpak/com.crossdashboard.app.yml
 dpkg-buildpackage -b -us -uc     # build .deb (run from native-linux/)
 docker build -f docker/Dockerfile -t cross-dashboard-linux .   # Debian build smoke (no GUI; requires Docker daemon)
-
-# Legacy RN (frozen — do not add features)
-pnpm install
-pnpm start
-pnpm android
-pnpm web
-pnpm typecheck
 ```
 
 ---
@@ -637,8 +629,6 @@ When releasing a new version, update:
 4. `native-linux/meson.build` — `version:` field in `project()`
 5. `native-linux/debian/changelog` — new entry with version and date
 6. `native-linux/com.crossdashboard.app.metainfo.xml` — new `<release>` entry
-
-The RN `package.json` / `app.json` version fields are legacy and no longer need to stay in sync.
 
 ---
 
