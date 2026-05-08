@@ -74,12 +74,11 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     add_events(Gdk::KEY_PRESS_MASK);
     set_can_focus(true);
 
-    apply_theme();
-
     root_overlay_ = gtk_overlay_new();
     leaflet_ = GTK_WIDGET(hdy_leaflet_new());
     hdy_leaflet_set_transition_type(HDY_LEAFLET(leaflet_), HDY_LEAFLET_TRANSITION_TYPE_OVER);
-    g_object_set(G_OBJECT(leaflet_), "fold-threshold-width", 720, nullptr);
+    // Fold threshold is derived from child min sizes in current libhandy; no
+    // "fold-threshold-width" GObject property on some distributions (e.g. Debian 13).
 
     sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     sidebar_list_ = gtk_list_box_new();
@@ -87,8 +86,8 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     main_outer_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     header_bar_ = GTK_WIDGET(hdy_header_bar_new());
-    gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header_bar_), TRUE);
-    gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar_), "Cross-Dashboard");
+    hdy_header_bar_set_show_close_button(HDY_HEADER_BAR(header_bar_), TRUE);
+    hdy_header_bar_set_title(HDY_HEADER_BAR(header_bar_), "Cross-Dashboard");
 
     hamburger_btn_ = gtk_toggle_button_new();
     {
@@ -109,9 +108,9 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     if (AtkObject* a = gtk_widget_get_accessible(pomodoro_btn))
         atk_object_set_name(a, "Open Pomodoro timer");
 
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar_), hamburger_btn_);
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar_), back_btn_);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header_bar_), pomodoro_btn);
+    hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), hamburger_btn_);
+    hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), back_btn_);
+    hdy_header_bar_pack_end(HDY_HEADER_BAR(header_bar_), pomodoro_btn);
 
     gtk_box_pack_start(GTK_BOX(main_outer_), header_bar_, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(main_outer_), GTK_WIDGET(stack_.gobj()), TRUE, TRUE, 0);
@@ -141,7 +140,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     vm_.signal_capture_initial_text.connect([this](std::string const&) {
         current_screen_key_ = "Capture";
         stack_.set_visible_child(Glib::ustring{"Capture"});
-        gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar_), "Capture");
+        hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), "Capture");
         if (memos_)
             memos_->rebuild();
     });
@@ -161,6 +160,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     on_leaflet_folded();
     show_all_children();
+    apply_theme();
 }
 
 void AppWindow::load_theme_css()
@@ -168,9 +168,25 @@ void AppWindow::load_theme_css()
     static GtkCssProvider* provider = nullptr;
     if (!provider) {
         provider = gtk_css_provider_new();
-        gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
-            GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+    static bool provider_registered = false;
+    if (!provider_registered) {
+        GdkScreen* screen = nullptr;
+        if (gtk_widget_get_realized(GTK_WIDGET(gobj())))
+            screen = gtk_widget_get_screen(GTK_WIDGET(gobj()));
+        if (!screen) {
+            GdkDisplay* disp = gdk_display_get_default();
+            if (disp)
+                screen = gdk_display_get_default_screen(disp);
+        }
+        if (screen)
+            gtk_style_context_add_provider_for_screen(screen, GTK_STYLE_PROVIDER(provider),
+                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        else
+            gtk_style_context_add_provider(gtk_widget_get_style_context(GTK_WIDGET(gobj())),
+                GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
         g_object_unref(provider);
+        provider_registered = true;
     }
     AppSettings const s = merged_app_preferences(app_.prefs());
     bool const dark = (s.theme == ThemePreference::Dark);
@@ -364,7 +380,7 @@ void AppWindow::on_screen_row(GtkListBoxRow* row)
     current_screen_key_ = key;
 
     stack_.set_visible_child(Glib::ustring{key});
-    gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar_), key);
+    hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), key);
 
     if (g_strcmp0(key, "Dashboard") == 0 && dash_)
         dash_->refresh();
@@ -403,7 +419,7 @@ void AppWindow::on_new_task_shortcut()
 {
     current_screen_key_ = "Tasks";
     stack_.set_visible_child(Glib::ustring{"Tasks"});
-    gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar_), "Tasks");
+    hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), "Tasks");
     if (tasks_)
         tasks_->focus_quick_input();
 }
