@@ -1,8 +1,10 @@
 #pragma once
 
 #include <gtkmm/box.h>
+#include <gtkmm/button.h>
 #include <gtkmm/flowbox.h>
 #include <gtkmm/listbox.h>
+#include <gtkmm/scrolledwindow.h>
 #include <gtkmm/searchentry.h>
 #include <gtkmm/stack.h>
 #include <gtkmm/togglebutton.h>
@@ -18,11 +20,12 @@ namespace cd {
 
 class AppContainer;
 class ReadMarkdownField;
+class SyncScheduler;
 
 /** VJOURNAL list: grid/list toggle, search; create/edit via dialogs. */
 class NotesView final : public Gtk::Box {
 public:
-    explicit NotesView(AppContainer&);
+    NotesView(AppContainer&, SyncScheduler&);
 
     void rebuild();
     void focus_search();
@@ -34,13 +37,16 @@ private:
     void on_edit_note();
 
     AppContainer& app_;
+    SyncScheduler& sync_;
     Gtk::Box toolbar_;
+    Gtk::Button refresh_btn_{};
     Gtk::SearchEntry search_;
     Gtk::ToggleButton btn_grid_;
     Gtk::ToggleButton btn_list_;
     Gtk::Stack mode_;
     Gtk::FlowBox flow_;
     Gtk::ListBox list_;
+    Gtk::ScrolledWindow detail_scroll_{};
     Gtk::Box detail_;
     ReadMarkdownField* body_field_{};
 

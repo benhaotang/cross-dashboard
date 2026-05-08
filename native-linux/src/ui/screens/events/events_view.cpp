@@ -2,6 +2,7 @@
 
 #include "app_container.h"
 #include "components/markdown_view.h"
+#include "background/sync_scheduler.h"
 #include "data/db/event_dao.h"
 
 #include <glib.h>
@@ -23,9 +24,10 @@ EpochMillis day_start_ms(GDateTime* day_local_midnight)
 
 } // namespace
 
-EventsView::EventsView(AppContainer& app)
+EventsView::EventsView(AppContainer& app, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
+    , sync_(sync)
     , paned_(Gtk::ORIENTATION_HORIZONTAL)
     , filter_box_(Gtk::ORIENTATION_HORIZONTAL, 8)
     , rb_group_{}
@@ -34,6 +36,7 @@ EventsView::EventsView(AppContainer& app)
     , rb_month_{rb_group_, Glib::ustring("Month")}
     , scroll_{}
     , list_{}
+    , detail_scroll_{}
     , detail_(Gtk::ORIENTATION_VERTICAL, 8)
     , detail_title_("")
     , detail_when_("")
@@ -45,6 +48,17 @@ EventsView::EventsView(AppContainer& app)
     filter_box_.pack_start(rb_day_, false, false);
     filter_box_.pack_start(rb_week_, false, false);
     filter_box_.pack_start(rb_month_, false, false);
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh events");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh events");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        refresh();
+    });
+    filter_box_.pack_end(refresh_btn_, false, false);
     pack_start(filter_box_, false, false);
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
@@ -59,14 +73,16 @@ EventsView::EventsView(AppContainer& app)
 
     auto* md = Gtk::manage(new MarkdownView());
     detail_body_ = md;
-    md->set_min_content_height(160);
 
     detail_.pack_start(detail_title_, false, false);
     detail_.pack_start(detail_when_, false, false);
-    detail_.pack_start(*md, true, true);
+    detail_.pack_start(*md, false, false);
+
+    detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    detail_scroll_.add(detail_);
 
     paned_.pack1(scroll_, true, false);
-    paned_.pack2(detail_, true, false);
+    paned_.pack2(detail_scroll_, true, false);
     paned_.set_position(360);
     pack_start(paned_, true, true);
 

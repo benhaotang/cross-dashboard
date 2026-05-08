@@ -1,6 +1,7 @@
 #include "settings_view.h"
 
 #include "app_container.h"
+#include "background/sync_scheduler.h"
 #include "data/network/nextcloud_login_flow.h"
 #include "data/prefs/prefs.h"
 #include "data/repository/repo_utils.h"
@@ -55,9 +56,11 @@ void pack_section_title(Gtk::Box& col, char const* title)
 #define CD_APP_VERSION "dev"
 #endif
 
-SettingsView::SettingsView(AppContainer& app, ThemeApplyFn on_theme_applied, NavChangedFn on_nav_changed)
+SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn on_theme_applied,
+    NavChangedFn on_nav_changed)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 10)
     , app_(app)
+    , sync_(sync)
     , on_theme_(std::move(on_theme_applied))
     , on_nav_(std::move(on_nav_changed))
     , theme_rb_group_{}
@@ -73,6 +76,17 @@ SettingsView::SettingsView(AppContainer& app, ThemeApplyFn on_theme_applied, Nav
     set_margin_end(8);
     set_margin_top(8);
     set_margin_bottom(8);
+
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(top_bar_.gobj())), "cd-toolbar");
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync all data from server");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync all data from server");
+    refresh_btn_.signal_clicked().connect([this] { sync_.sync_once(); });
+    top_bar_.pack_end(refresh_btn_, false, false);
+    pack_start(top_bar_, false, false);
 
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(tabs_.gobj())), "cd-settings-notebook");
 

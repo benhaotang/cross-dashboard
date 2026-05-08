@@ -2,6 +2,7 @@
 
 #include "app_container.h"
 #include "app_viewmodel.h"
+#include "background/sync_scheduler.h"
 #include "data/db/task_dao.h"
 #include "data/parser/task_input_parser.h"
 #include "data/prefs/prefs.h"
@@ -63,13 +64,28 @@ static std::optional<std::string> due_line(CalDavTask const& task)
 
 } // namespace
 
-TasksView::TasksView(AppContainer& app, AppViewModel& vm)
+TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
     , vm_(vm)
+    , sync_(sync)
     , scroll_{}
 {
     vm_.signal_new_task_requested.connect([this]() { focus_quick_input(); });
+
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh tasks");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh tasks");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        rebuild();
+    });
+    toolbar_.pack_end(refresh_btn_, false, false);
+    pack_start(toolbar_, false, false);
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);

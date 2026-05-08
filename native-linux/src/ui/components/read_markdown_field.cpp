@@ -14,11 +14,16 @@ ReadMarkdownField::ReadMarkdownField()
     title_.set_halign(Gtk::ALIGN_START);
     title_.set_use_markup(true);
     pack_start(title_, false, false);
-    pack_start(body_, true, true);
+    pack_start(body_, false, false);
 }
 
 void ReadMarkdownField::set_field_label(std::string const& small_caps_title)
 {
+    if (small_caps_title.empty()) {
+        title_.hide();
+        return;
+    }
+    title_.show();
     gchar* esc = g_markup_escape_text(small_caps_title.c_str(), -1);
     Glib::ustring inner = esc ? esc : "";
     if (esc) g_free(esc);

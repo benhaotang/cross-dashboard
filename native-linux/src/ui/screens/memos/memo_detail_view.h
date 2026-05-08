@@ -51,7 +51,8 @@ private:
     Gtk::Button delete_btn_{};
     Gtk::Label title_;
     Gtk::Label meta_;
-    Gtk::ScrolledWindow body_scroll_;
+    Gtk::ScrolledWindow content_scroll_;
+    Gtk::Box content_column_{Gtk::ORIENTATION_VERTICAL, 6};
     MarkdownView* markdown_{};
     Gtk::FlowBox attachments_;
     Gtk::Label comments_title_;

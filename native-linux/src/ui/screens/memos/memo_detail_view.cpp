@@ -3,6 +3,7 @@
 #include "app_container.h"
 #include "components/markdown_view.h"
 #include "components/memo_auth_image.h"
+#include "components/read_markdown_field.h"
 #include "create_memo_dialog.h"
 
 #include "data/repository/repositories.h"
@@ -57,6 +58,8 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     title_.set_line_wrap(true);
     title_.set_selectable(true);
     meta_.set_halign(Gtk::ALIGN_START);
+    title_.set_margin_top(8);
+    meta_.set_margin_bottom(6);
 
     // Configure all action buttons as icon-only
     setup_icon_btn(extract_tasks_btn_, "emblem-default-symbolic",   "Extract tasks",       "Extract tasks");
@@ -204,13 +207,18 @@ MemoDetailView::MemoDetailView(AppContainer& app)
 
     auto* md = Gtk::manage(new MarkdownView());
     markdown_ = md;
-    body_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
-    body_scroll_.set_min_content_height(180);
-    body_scroll_.add(*md);
-
-    attachments_.set_selection_mode(Gtk::SELECTION_NONE);
-    attachments_.set_max_children_per_line(5);
-    comments_.set_selection_mode(Gtk::SELECTION_NONE);
+    content_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    content_column_.set_margin_start(8);
+    content_column_.set_margin_end(8);
+    content_column_.pack_start(title_, false, false);
+    content_column_.pack_start(meta_, false, false);
+    content_column_.pack_start(*md, false, false);
+    content_column_.pack_start(attachments_, false, false);
+    comments_title_.set_markup("<b>Comments</b>");
+    comments_title_.set_halign(Gtk::ALIGN_START);
+    content_column_.pack_start(comments_title_, false, false);
+    content_column_.pack_start(comments_, false, false);
+    content_scroll_.add(content_column_);
 
     comment_entry_.set_placeholder_text("Add comment…");
     composer_.pack_start(comment_entry_, true, true);
@@ -220,22 +228,10 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     composer_.set_margin_start(8);
     composer_.set_margin_end(8);
 
-    title_.set_margin_top(8);
-    title_.set_margin_start(10);
-    title_.set_margin_end(10);
-    meta_.set_margin_start(10);
-    meta_.set_margin_end(10);
-    meta_.set_margin_bottom(4);
-
     pack_start(toolbar_, false, false);
     auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
     pack_start(*sep, false, false);
-    pack_start(title_, false, false);
-    pack_start(meta_, false, false);
-    pack_start(body_scroll_, true, true);
-    pack_start(attachments_, false, false);
-    pack_start(comments_title_, false, false);
-    pack_start(comments_, false, false);
+    pack_start(content_scroll_, true, true);
     pack_start(composer_, false, false);
 }
 
@@ -305,10 +301,10 @@ void MemoDetailView::rebuild()
         auto comment_list = app_.memos_client().list_memo_comments(memo.name);
         for (auto const& c : comment_list) {
             auto* row = Gtk::manage(new Gtk::ListBoxRow());
-            auto* label = Gtk::manage(new Gtk::Label(c.content));
-            label->set_halign(Gtk::ALIGN_START);
-            label->set_line_wrap(true);
-            row->add(*label);
+            auto* crm = Gtk::manage(new ReadMarkdownField());
+            crm->set_field_label("");
+            crm->set_markdown(c.content.empty() ? "_" : c.content);
+            row->add(*crm);
             comments_.append(*row);
         }
     }

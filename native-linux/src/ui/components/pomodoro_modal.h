@@ -16,7 +16,7 @@ public:
 
 private:
     void update(PomodoroState const& state);
-    static void response_cb(GtkDialog* dialog, gint response, gpointer user_data);
+    static gboolean delete_event_cb(GtkWidget* dlg, GdkEventAny* event, gpointer user_data);
     static void start_focus_cb(GtkButton*, gpointer user_data);
     static void start_short_break_cb(GtkButton*, gpointer user_data);
     static void start_long_break_cb(GtkButton*, gpointer user_data);
@@ -28,6 +28,9 @@ private:
     GtkWidget* phase_label_{};
     GtkWidget* time_label_{};
     GtkWidget* session_label_{};
+    GtkWidget* task_label_{};
+    GtkWidget* idle_section_{};
+    GtkWidget* active_section_{};
     GtkWidget* pause_btn_{};
     AppViewModel& vm_;
 };

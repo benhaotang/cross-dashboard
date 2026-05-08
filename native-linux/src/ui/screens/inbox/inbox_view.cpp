@@ -1,13 +1,13 @@
 #include "inbox_view.h"
 
 #include "app_container.h"
+#include "background/sync_scheduler.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
 #include "data/db/task_dao.h"
 
 #include <glib.h>
-
-#include <algorithm>
+#include <gtk/gtk.h>
 #include <chrono>
 #include <cstdio>
 #include <regex>
@@ -53,13 +53,28 @@ std::string fmt_time(int total_minutes)
 
 } // namespace
 
-InboxView::InboxView(AppContainer& app)
+InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
+    , sync_(sync)
     , scroll_{}
     , list_{}
     , total_line_("")
 {
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh inbox");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh inbox");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        rebuild();
+    });
+    toolbar_.pack_end(refresh_btn_, false, false);
+    pack_start(toolbar_, false, false);
+
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
     scroll_.add(list_);

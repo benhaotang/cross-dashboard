@@ -1,6 +1,7 @@
 #include "issues_view.h"
 
 #include "app_container.h"
+#include "background/sync_scheduler.h"
 #include "components/attachment_row.h"
 #include "components/read_markdown_field.h"
 #include "data/db/issue_dao.h"
@@ -40,13 +41,15 @@ std::vector<std::uint8_t> read_file_bytes(std::string const& path)
 
 namespace cd {
 
-IssuesView::IssuesView(AppContainer& app)
+IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
+    , sync_(sync)
     , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 8)
     , paned_(Gtk::ORIENTATION_HORIZONTAL)
     , scroll_{}
     , list_{}
+    , detail_outer_(Gtk::ORIENTATION_VERTICAL, 0)
     , detail_scroll_{}
     , detail_inner_(Gtk::ORIENTATION_VERTICAL, 8)
     , detail_meta_("")
@@ -78,11 +81,23 @@ IssuesView::IssuesView(AppContainer& app)
 
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
     toolbar_.pack_start(state_combo_, false, false);
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh issues");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh issues");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        rebuild();
+    });
     toolbar_.pack_end(new_issue_btn_, false, false);
+    toolbar_.pack_end(refresh_btn_, false, false);
     pack_start(toolbar_, false, false);
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(list_.gobj())), "cd-card-list");
     scroll_.add(list_);
 
     detail_meta_.set_halign(Gtk::ALIGN_START);
@@ -128,18 +143,20 @@ IssuesView::IssuesView(AppContainer& app)
     detail_inner_.pack_start(*detail_hdr, false, false);
     auto* detail_sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
     detail_inner_.pack_start(*detail_sep, false, false);
-    detail_inner_.pack_start(*rm, true, true);
+    detail_inner_.pack_start(*rm, false, false);
     detail_inner_.pack_start(att_heading_, false, false);
     detail_inner_.pack_start(attachments_box_, false, false);
     detail_inner_.pack_start(com_heading_, false, false);
     detail_inner_.pack_start(comments_list_, false, false);
-    detail_inner_.pack_start(composer_, false, false);
 
     detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     detail_scroll_.add(detail_inner_);
 
+    detail_outer_.pack_start(detail_scroll_, true, true);
+    detail_outer_.pack_start(composer_, false, false);
+
     paned_.pack1(scroll_, true, false);
-    paned_.pack2(detail_scroll_, true, false);
+    paned_.pack2(detail_outer_, true, false);
     paned_.set_position(340);
     pack_start(paned_, true, true);
 
@@ -178,16 +195,32 @@ void IssuesView::rebuild()
     auto issues = dao.get_by_state(state_filter_);
 
     std::stable_sort(issues.begin(), issues.end(),
-        [](auto const& a, auto const& b) { return a.title < b.title; });
+        [](auto const& a, auto const& b) { return a.updated_at > b.updated_at; });
 
     for (auto const& iss : issues) {
-        auto* row = Gtk::manage(new Gtk::ListBoxRow);
-        auto* lab = Gtk::manage(new Gtk::Label());
-        lab->set_halign(Gtk::ALIGN_START);
-        std::string line = iss.repository + "#" + std::to_string(iss.number) + " · " + iss.title;
-        lab->set_text(line);
-        lab->set_tooltip_text(line);
-        row->add(*lab);
+        auto* row = Gtk::manage(new Gtk::ListBoxRow());
+        auto* card = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 5));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(card->gobj())), "cd-list-card");
+
+        auto* tlab = Gtk::manage(new Gtk::Label());
+        tlab->set_halign(Gtk::ALIGN_START);
+        tlab->set_line_wrap(true);
+        tlab->set_line_wrap_mode(Pango::WRAP_WORD_CHAR);
+        gchar* et = g_markup_escape_text(iss.title.c_str(), -1);
+        tlab->set_markup(std::string("<b><span size=\"large\">") + et + "</span></b>");
+        g_free(et);
+
+        std::string const meta = "#" + std::to_string(iss.number) + " · " + iss.repository;
+        auto* mlab = Gtk::manage(new Gtk::Label());
+        mlab->set_halign(Gtk::ALIGN_START);
+        gchar* em = g_markup_escape_text(meta.c_str(), -1);
+        mlab->set_markup(std::string("<small><span alpha=\"55%\">") + em + "</span></small>");
+        g_free(em);
+
+        card->pack_start(*tlab, false, false);
+        card->pack_start(*mlab, false, false);
+        row->add(*card);
+        row->set_tooltip_text(iss.title + "\n" + meta);
         list_.append(*row);
         list_ids_.push_back(iss.id);
     }
@@ -228,14 +261,10 @@ void IssuesView::load_detail_from_network()
 
             vb->pack_start(*who, false, false);
 
-            auto* csc = Gtk::manage(new Gtk::ScrolledWindow());
-            csc->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
-            csc->set_min_content_height(80);
             auto* crm = Gtk::manage(new ReadMarkdownField());
-            crm->set_field_label(" ");
+            crm->set_field_label("");
             crm->set_markdown(c.body.empty() ? "_" : c.body);
-            csc->add(*crm);
-            vb->pack_start(*csc, false, false);
+            vb->pack_start(*crm, false, false);
 
             auto cats = app_.gitea().fetch_comment_attachments(iss.repository, c.id);
             for (auto const& a : cats) vb->pack_start(*Gtk::manage(new AttachmentRow(a)), false, false);

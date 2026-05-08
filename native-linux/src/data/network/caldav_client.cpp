@@ -122,7 +122,7 @@ std::optional<std::string> CalDavClient::extract_xml_value(std::string const& xm
 {
     try {
         std::regex pattern(
-            std::string(R"(<[^:]*:?)") + tag + R"([^>]*>(.*?)</[^:]*:?)" + tag + ">",
+            std::string(R"(<[^:]*:?)") + tag + R"([^>]*>([\s\S]*?)</[^:]*:?)" + tag + ">",
             std::regex::icase | std::regex::ECMAScript);
         std::smatch m;
         if (std::regex_search(xml_block, m, pattern) && m.size() > 1) {
@@ -162,7 +162,7 @@ std::vector<CalDavCalendar> CalDavClient::parse_calendars_from_propfind(std::str
     (void)base;
     std::vector<CalDavCalendar> out;
     try {
-        std::regex response_re(R"(<[^:]*:?response\b[^>]*>(.*?)</[^:]*:?response>)",
+        std::regex response_re(R"(<[^:]*:?response\b[^>]*>([\s\S]*?)</[^:]*:?response>)",
             std::regex::icase | std::regex::ECMAScript);
         auto resp_begin =
             std::sregex_iterator(xml.begin(), xml.end(), response_re);
@@ -217,10 +217,10 @@ CalDavClient::extract_calendar_resources(std::string const& multi_status_xml)
 {
     std::vector<std::tuple<std::optional<std::string>, std::optional<std::string>, std::string>> out;
     try {
-        std::regex response_re(R"(<[^:]*:?response\b[^>]*>(.*?)</[^:]*:?response>)",
+        std::regex response_re(R"(<[^:]*:?response\b[^>]*>([\s\S]*?)</[^:]*:?response>)",
             std::regex::icase | std::regex::ECMAScript);
         std::regex caldata_re(
-            R"(<[^:]*:?calendar-data[^>]*>(.*?)</[^:]*:?calendar-data>)", std::regex::icase | std::regex::ECMAScript);
+            R"(<[^:]*:?calendar-data[^>]*>([\s\S]*?)</[^:]*:?calendar-data>)", std::regex::icase | std::regex::ECMAScript);
         auto it = std::sregex_iterator(multi_status_xml.begin(), multi_status_xml.end(), response_re);
         auto end = std::sregex_iterator();
         for (; it != end; ++it) {

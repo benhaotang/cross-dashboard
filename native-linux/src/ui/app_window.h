@@ -25,7 +25,7 @@ class ViewsView;
 class PomodoroBar;
 class PomodoroModal;
 
-/** Leaflet shell with sidebar list + header + screen stack (libhandy C API for leaflet). */
+/** Main window: resizable GtkPaned sidebar + HdyHeaderBar + screen stack. */
 class AppWindow final : public Gtk::ApplicationWindow {
 public:
     AppWindow(AppContainer&, AppViewModel&, SyncScheduler&);
@@ -33,12 +33,9 @@ public:
     AppWindow& operator=(AppWindow const&) = delete;
 
     void on_screen_row(GtkListBoxRow* row);
-    void on_leaflet_folded();
 
-    [[nodiscard]] GtkWidget* leaflet_widget() const { return leaflet_; }
     [[nodiscard]] GtkWidget* sidebar_box_widget() const { return sidebar_box_; }
     [[nodiscard]] GtkWidget* main_outer_widget() const { return main_outer_; }
-    [[nodiscard]] GtkWidget* hamburger_widget() const { return hamburger_btn_; }
 
 private:
     void apply_theme();
@@ -51,14 +48,12 @@ private:
     void load_theme_css();
     void focus_search_on_current_screen();
 
-    GtkWidget* leaflet_{};
+    GtkWidget* paned_{};
     GtkWidget* root_overlay_{};
     GtkWidget* sidebar_box_{};
     GtkWidget* sidebar_list_{};
     GtkWidget* main_outer_{};
     GtkWidget* header_bar_{};
-    GtkWidget* hamburger_btn_{};
-    GtkWidget* back_btn_{};
 
     Gtk::Stack stack_;
 

@@ -19,11 +19,12 @@ namespace cd {
 
 class AppContainer;
 class ReadMarkdownField;
+class SyncScheduler;
 
 /** Issue list, detail, Gitea comments, issue/comment attachments, create-issue dialog. */
 class IssuesView final : public Gtk::Box {
 public:
-    explicit IssuesView(AppContainer&);
+    IssuesView(AppContainer&, SyncScheduler&);
 
     void rebuild();
 
@@ -38,8 +39,10 @@ private:
     void on_toggle_issue_state();
 
     AppContainer& app_;
+    SyncScheduler& sync_;
 
     Gtk::Box toolbar_;
+    Gtk::Button refresh_btn_{};
     Gtk::ComboBoxText state_combo_;
     Gtk::Button new_issue_btn_;
     Gtk::Button toggle_state_btn_;
@@ -48,6 +51,7 @@ private:
     Gtk::ScrolledWindow scroll_;
     Gtk::ListBox list_;
 
+    Gtk::Box detail_outer_;
     Gtk::ScrolledWindow detail_scroll_;
     Gtk::Box detail_inner_;
     Gtk::Label detail_meta_;

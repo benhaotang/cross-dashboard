@@ -3,6 +3,7 @@
 #include "domain/models.h"
 
 #include <gtkmm/box.h>
+#include <gtkmm/button.h>
 #include <gtkmm/grid.h>
 #include <gtkmm/notebook.h>
 #include <gtkmm/scrolledwindow.h>
@@ -13,11 +14,12 @@
 namespace cd {
 
 class AppContainer;
+class SyncScheduler;
 
 /** Kanban (per Android: category tags per column) + Covey quadrants (`kCoveyQuadrantTags`). */
 class ViewsView final : public Gtk::Box {
 public:
-    explicit ViewsView(AppContainer&);
+    ViewsView(AppContainer&, SyncScheduler&);
 
     void rebuild();
 
@@ -35,6 +37,9 @@ private:
     void run_assign_dialog(CalDavTask const& task, bool covey_mode);
 
     AppContainer& app_;
+    SyncScheduler& sync_;
+    Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
+    Gtk::Button refresh_btn_{};
     Gtk::Notebook tabs_{};
     Gtk::ScrolledWindow kanban_scroll_{};
     Gtk::Box kanban_board_{Gtk::ORIENTATION_HORIZONTAL, 8};

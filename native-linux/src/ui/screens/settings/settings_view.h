@@ -22,6 +22,7 @@ namespace cd {
 
 class AppContainer;
 struct NcLoginCredentials;
+class SyncScheduler;
 
 /** Preferences-style form; persists via `AppPreferences` / `SecretStore` where wired. */
 class SettingsView final : public Gtk::Box {
@@ -29,7 +30,7 @@ public:
     using ThemeApplyFn = std::function<void()>;
     using NavChangedFn = std::function<void()>;
 
-    SettingsView(AppContainer&, ThemeApplyFn on_theme_applied, NavChangedFn on_nav_changed);
+    SettingsView(AppContainer&, SyncScheduler&, ThemeApplyFn on_theme_applied, NavChangedFn on_nav_changed);
 
 private:
     void save_theme();
@@ -55,6 +56,7 @@ private:
     void populate_calendar_checks(std::vector<CalDavCalendar> cals);
 
     AppContainer& app_;
+    SyncScheduler& sync_;
     ThemeApplyFn on_theme_;
     NavChangedFn on_nav_;
 
@@ -93,6 +95,8 @@ private:
     Gtk::Entry kanban_columns_csv_;
     Gtk::Button save_kanban_btn_{"Save Kanban column tags"};
 
+    Gtk::Box top_bar_{Gtk::ORIENTATION_HORIZONTAL, 8};
+    Gtk::Button refresh_btn_{};
     Gtk::Notebook tabs_{};
 };
 

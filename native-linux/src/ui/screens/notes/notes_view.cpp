@@ -2,6 +2,7 @@
 
 #include "app_container.h"
 #include "components/read_markdown_field.h"
+#include "background/sync_scheduler.h"
 #include "data/db/note_dao.h"
 #include "data/prefs/prefs.h"
 #include "data/repository/repositories.h"
@@ -59,9 +60,10 @@ std::string pick_note_calendar(AppContainer& app)
 
 } // namespace
 
-NotesView::NotesView(AppContainer& app)
+NotesView::NotesView(AppContainer& app, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0)
     , app_(app)
+    , sync_(sync)
     , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 6)
     , search_{}
     , btn_grid_{}
@@ -120,6 +122,17 @@ NotesView::NotesView(AppContainer& app)
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(view_box->gobj())), "linked");
     view_box->pack_start(btn_grid_, false, false);
     view_box->pack_start(btn_list_, false, false);
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh notes");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh notes");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        rebuild();
+    });
+    toolbar_.pack_end(refresh_btn_, false, false);
     toolbar_.pack_end(*view_box, false, false);
 
     pack_start(toolbar_, false, false);
@@ -161,13 +174,16 @@ NotesView::NotesView(AppContainer& app)
     detail_.pack_start(*detail_hdr, false, false);
     auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
     detail_.pack_start(*sep, false, false);
-    detail_.pack_start(*body, true, true);
+    detail_.pack_start(*body, false, false);
+
+    detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    detail_scroll_.add(detail_);
 
     Gtk::Paned* paned = Gtk::manage(new Gtk::Paned(Gtk::ORIENTATION_HORIZONTAL));
     Gtk::Box* left = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL));
     left->pack_start(mode_, true, true);
     paned->pack1(*left, true, false);
-    paned->pack2(detail_, true, false);
+    paned->pack2(detail_scroll_, true, false);
     paned->set_position(360);
     pack_start(*paned, true, true);
 

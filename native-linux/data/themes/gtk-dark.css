@@ -16,8 +16,8 @@ headerbar {
 /* ── Sidebar rail ──────────────────────────────────────────────────────── */
 .cd-sidebar {
     background-color: @cd_sidebar_bg;
-    border-right: 1px solid @cd_sidebar_sep;
-    min-width: 192px;
+    border-right: none;
+    min-width: 160px;
 }
 
 .cd-sidebar-title {
@@ -28,11 +28,19 @@ headerbar {
     color: alpha(@theme_fg_color, 0.35);
 }
 
+.cd-main-paned > separator {
+    background: @cd_sidebar_sep;
+    min-width: 1px;
+}
+.cd-main-paned > separator:hover {
+    background: @cd_accent;
+}
+
 /* ── Nav list ──────────────────────────────────────────────────────────── */
 .cd-nav-list {
     background-color: transparent;
     border: none;
-    padding: 4px 0;
+    padding: 10px 0 4px;
 }
 
 .cd-nav-list > row {
@@ -177,6 +185,52 @@ list > row:hover {
     background-color: @cd_row_hover;
 }
 
+list.cd-card-list {
+    background-color: transparent;
+}
+list.cd-card-list > row {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+}
+list.cd-card-list > row:hover {
+    background: transparent;
+}
+list.cd-card-list > row:selected,
+list.cd-card-list > row:selected:hover {
+    background: transparent;
+    color: inherit;
+}
+list.cd-card-list row:selected .cd-list-card {
+    border-color: @cd_accent;
+    box-shadow: 0 0 0 1px alpha(@cd_accent, 0.35);
+}
+.cd-list-card {
+    padding: 10px 12px;
+    margin: 2px 0;
+    border-radius: 8px;
+    border: 1px solid alpha(@theme_fg_color, 0.12);
+    background-color: @theme_bg_color;
+}
+.cd-list-card:hover {
+    background-color: shade(@theme_bg_color, 1.04);
+}
+
+flowbox.cd-memo-tags-flow {
+    padding: 2px 0;
+}
+button.cd-memo-tag-chip {
+    padding: 4px 11px;
+    border-radius: 14px;
+}
+button.cd-memo-tag-chip:checked {
+    background-image: none;
+    background-color: alpha(@cd_accent, 0.22);
+    color: @cd_accent;
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px alpha(@cd_accent, 0.45);
+}
+
 /* Settings: notebook tabs */
 notebook.cd-settings-notebook header {
     background-color: @cd_sidebar_bg;
@@ -189,4 +243,108 @@ notebook.cd-settings-notebook tab {
 notebook.cd-settings-notebook tab:checked label {
     font-weight: 600;
     color: @cd_accent;
+}
+
+.cd-pomodoro-dialog headerbar {
+    border-bottom-color: @cd_sidebar_sep;
+}
+.cd-pomodoro-dialog .cd-pomodoro-phase {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: alpha(@theme_fg_color, 0.6);
+}
+.cd-pomodoro-dialog .cd-pomodoro-time {
+    font-size: 2.35rem;
+    font-weight: 300;
+    font-feature-settings: "tnum";
+    color: @theme_fg_color;
+    margin-top: 4px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-session {
+    font-size: 0.92rem;
+    color: alpha(@theme_fg_color, 0.5);
+}
+.cd-pomodoro-dialog .cd-pomodoro-task {
+    font-size: 0.95rem;
+    color: alpha(@theme_fg_color, 0.72);
+}
+.cd-pomodoro-dialog .cd-pomodoro-section-label {
+    color: alpha(@theme_fg_color, 0.4);
+}
+.cd-pomodoro-dialog .cd-pomodoro-sep {
+    margin-top: 12px;
+}
+.cd-pomodoro-dialog .linked .cd-pomodoro-linked-quiet {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-transport {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-transport label {
+    font-weight: 600;
+}
+
+/* ── Dashboard (cards + weekly activity) ──────────────────────────────── */
+.cd-dash-frame > border {
+    border-radius: 8px;
+}
+.cd-dash-frame {
+    border-radius: 8px;
+}
+.cd-dash-frame label {
+    font-weight: 600;
+}
+.cd-dash-section-hint {
+    font-size: 0.85rem;
+    color: alpha(@theme_fg_color, 0.5);
+}
+.cd-dash-empty {
+    font-size: 0.92rem;
+    color: alpha(@theme_fg_color, 0.4);
+}
+.cd-dash-pill {
+    background-color: alpha(@theme_fg_color, 0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 88px;
+}
+.cd-dash-pill-caption {
+    font-size: 0.78rem;
+    color: alpha(@theme_fg_color, 0.5);
+}
+.cd-dash-day-lab {
+    font-size: 0.72rem;
+    color: alpha(@theme_fg_color, 0.5);
+}
+.cd-dash-metric-green {
+    color: #8ff0a4;
+}
+.cd-dash-metric-orange {
+    color: #ffbe6f;
+}
+.cd-dash-metric-blue {
+    color: @cd_accent;
+}
+.cd-dash-level-tasks trough {
+    min-height: 10px;
+    border-radius: 4px;
+}
+.cd-dash-level-tasks block.filled {
+    background-color: #8ff0a4;
+    border-radius: 4px;
+}
+.cd-dash-level-pom trough {
+    min-height: 10px;
+    border-radius: 4px;
+}
+.cd-dash-level-pom block.filled {
+    background-color: #ffbe6f;
+    border-radius: 4px;
+}
+.cd-dash-issues-title {
+    font-weight: 600;
+    font-size: 1rem;
 }

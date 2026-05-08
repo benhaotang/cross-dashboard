@@ -7,11 +7,16 @@
 #include "create_memo_dialog.h"
 #include "extract_tasks_dialog.h"
 #include "memo_detail_view.h"
+#include "background/sync_scheduler.h"
 #include "data/db/memo_dao.h"
+#include "domain/models.h"
 
+#include <glib.h>
 #include <gtk/gtk.h>
+
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <set>
 
 namespace cd {
@@ -38,13 +43,59 @@ std::optional<std::string> detect_url(std::string const& text)
     return text.substr(p, end == std::string::npos ? std::string::npos : end - p);
 }
 
+std::string memo_preview_text(MemosMemo const& m)
+{
+    std::string raw = !m.snippet.empty() ? m.snippet : m.content;
+    std::string line;
+    for (char c : raw) {
+        if (c == '\n' || c == '\r') {
+            if (!line.empty())
+                break;
+            continue;
+        }
+        if (c == '\t')
+            c = ' ';
+        line += c;
+        if (line.size() >= 140)
+            break;
+    }
+    while (!line.empty() && line.back() == ' ')
+        line.pop_back();
+    if (line.size() >= 140) {
+        line.resize(137);
+        line += "...";
+    }
+    if (line.empty())
+        line = "(Empty capture)";
+    return line;
+}
+
+std::string memo_created_str(EpochMillis ms)
+{
+    if (ms <= 0)
+        return "";
+    GDateTime* dt =
+        g_date_time_new_from_unix_local(static_cast<gint64>(ms / 1000));
+    if (!dt)
+        return "";
+    gchar* s = g_date_time_format(dt, "%b %e, %Y · %H:%M");
+    g_date_time_unref(dt);
+    if (!s)
+        return "";
+    std::string out{s};
+    g_free(s);
+    return out;
+}
+
 } // namespace
 
-MemosView::MemosView(AppContainer& app, AppViewModel& vm)
+MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 8)
     , app_(app)
     , vm_(vm)
+    , sync_(sync)
     , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 8)
+    , tag_bar_(Gtk::ORIENTATION_HORIZONTAL, 6)
     , paned_(Gtk::ORIENTATION_HORIZONTAL)
 {
     normal_btn_.set_active(true);
@@ -83,14 +134,46 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm)
     toolbar_.pack_start(*state_box, false, false);
 
     toolbar_.pack_start(search_, true, true);
+    refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    refresh_btn_.set_tooltip_text("Sync from server and refresh captures");
+    refresh_btn_.set_relief(Gtk::RELIEF_NONE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(refresh_btn_.gobj())), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(refresh_btn_.gobj())))
+        atk_object_set_name(a, "Sync and refresh captures");
+    refresh_btn_.signal_clicked().connect([this] {
+        sync_.sync_once();
+        rebuild();
+    });
     toolbar_.pack_end(new_btn_, false, false);
+    toolbar_.pack_end(refresh_btn_, false, false);
     pack_start(toolbar_, false, false);
 
     tags_.set_selection_mode(Gtk::SELECTION_NONE);
-    tags_.set_max_children_per_line(10);
-    pack_start(tags_, false, false);
+    tags_.set_max_children_per_line(18);
+    tags_.set_hexpand(true);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(tags_.gobj())), "cd-memo-tags-flow");
+
+    clear_tag_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_tag_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_tag_filters_btn_.set_tooltip_text("Clear tag filters");
+    clear_tag_filters_btn_.set_visible(false);
+    gtk_style_context_add_class(
+        gtk_widget_get_style_context(GTK_WIDGET(clear_tag_filters_btn_.gobj())), "cd-icon-btn");
+    clear_tag_filters_btn_.signal_clicked().connect([this] {
+        if (selected_tags_.empty())
+            return;
+        selected_tags_.clear();
+        refresh_visible_rows();
+    });
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(clear_tag_filters_btn_.gobj())))
+        atk_object_set_name(a, "Clear tag filters");
+
+    tag_bar_.pack_start(tags_, true, true);
+    tag_bar_.pack_end(clear_tag_filters_btn_, false, false);
+    pack_start(tag_bar_, false, false);
 
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(list_.gobj())), "cd-card-list");
     list_.signal_row_selected().connect([this](Gtk::ListBoxRow* row) {
         if (!row) {
             selected_name_.reset();
@@ -195,31 +278,65 @@ void MemosView::focus_search()
     search_.grab_focus();
 }
 
-void MemosView::rebuild_tag_chips()
+void MemosView::sync_clear_tag_filters_ui()
 {
+    bool const any = !selected_tags_.empty();
+    clear_tag_filters_btn_.set_visible(any);
+    clear_tag_filters_btn_.set_sensitive(any);
+}
+
+void MemosView::rebuild_tag_chips(std::vector<MemosMemo> const& memos_for_tag_universe)
+{
+    struct Lock {
+        bool& ref;
+        explicit Lock(bool& b)
+            : ref(b)
+        {
+            ref = true;
+        }
+        ~Lock() { ref = false; }
+    } guard(updating_tag_chips_);
+
     for (Gtk::Widget* w : tags_.get_children())
         tags_.remove(*w);
+
     std::set<std::string> all_tags;
-    for (auto const& m : rows_) {
+    for (auto const& m : memos_for_tag_universe) {
         for (auto const& t : m.tags)
             all_tags.insert(t);
     }
+
+    selected_tags_.erase(
+        std::remove_if(selected_tags_.begin(), selected_tags_.end(),
+            [&all_tags](std::string const& t) { return all_tags.find(t) == all_tags.end(); }),
+        selected_tags_.end());
+
     for (auto const& tag : all_tags) {
         auto* child = Gtk::manage(new Gtk::FlowBoxChild());
         auto* btn = Gtk::manage(new Gtk::ToggleButton(tag));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(btn->gobj())), "cd-memo-tag-chip");
+        bool const sel =
+            std::find(selected_tags_.begin(), selected_tags_.end(), tag) != selected_tags_.end();
+        btn->set_active(sel);
         btn->signal_toggled().connect([this, btn, tag] {
+            if (updating_tag_chips_)
+                return;
             if (btn->get_active()) {
-                selected_tags_.push_back(tag);
+                if (std::find(selected_tags_.begin(), selected_tags_.end(), tag) == selected_tags_.end())
+                    selected_tags_.push_back(tag);
             }
             else {
-                selected_tags_.erase(std::remove(selected_tags_.begin(), selected_tags_.end(), tag), selected_tags_.end());
+                selected_tags_.erase(
+                    std::remove(selected_tags_.begin(), selected_tags_.end(), tag), selected_tags_.end());
             }
+            sync_clear_tag_filters_ui();
             refresh_visible_rows();
         });
         child->add(*btn);
         tags_.add(*child);
     }
     tags_.show_all();
+    sync_clear_tag_filters_ui();
 }
 
 void MemosView::refresh_visible_rows()
@@ -228,11 +345,20 @@ void MemosView::refresh_visible_rows()
         list_.remove(*w);
     rows_.clear();
 
-    MemoState target = archived_btn_.get_active() ? MemoState::Archived : MemoState::Normal;
-    std::string query = search_.get_text();
+    MemoState const target = archived_btn_.get_active() ? MemoState::Archived : MemoState::Normal;
+    std::string const query = search_.get_text();
     MemoDao dao(app_.db());
-    auto all = dao.get_by_state(target);
+    auto const all = dao.get_by_state(target);
+
+    std::vector<MemosMemo> candidates;
+    candidates.reserve(all.size());
     for (auto const& memo : all) {
+        if (!contains_ci(memo.content + " " + memo.snippet + " " + memo.property.title, query))
+            continue;
+        candidates.push_back(memo);
+    }
+
+    for (auto const& memo : candidates) {
         bool tag_ok = true;
         for (auto const& tag : selected_tags_) {
             if (std::find(memo.tags.begin(), memo.tags.end(), tag) == memo.tags.end()) {
@@ -242,17 +368,37 @@ void MemosView::refresh_visible_rows()
         }
         if (!tag_ok)
             continue;
-        if (!contains_ci(memo.content + " " + memo.snippet + " " + memo.property.title, query))
-            continue;
         rows_.push_back(memo);
     }
 
     for (auto const& memo : rows_) {
         auto* row = Gtk::manage(new Gtk::ListBoxRow());
-        auto* box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 6));
-        auto* title = Gtk::manage(new Gtk::Label(memo.property.title.empty() ? memo.name : memo.property.title));
-        title->set_halign(Gtk::ALIGN_START);
-        title->set_ellipsize(Pango::ELLIPSIZE_END);
+        auto* card = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 8));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(card->gobj())), "cd-list-card");
+
+        auto* text_col = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
+        std::string const prev = memo_preview_text(memo);
+        gchar* ep = g_markup_escape_text(prev.c_str(), -1);
+        auto* prev_lab = Gtk::manage(new Gtk::Label());
+        prev_lab->set_halign(Gtk::ALIGN_START);
+        prev_lab->set_line_wrap(true);
+        prev_lab->set_line_wrap_mode(Pango::WRAP_WORD_CHAR);
+        prev_lab->set_markup(std::string(ep));
+        g_free(ep);
+
+        auto* date_lab = Gtk::manage(new Gtk::Label());
+        date_lab->set_halign(Gtk::ALIGN_START);
+        std::string const ds = memo_created_str(memo.create_time);
+        if (!ds.empty()) {
+            gchar* ed = g_markup_escape_text(ds.c_str(), -1);
+            date_lab->set_markup(std::string("<small><span alpha=\"55%\">") + ed + "</span></small>");
+            g_free(ed);
+        }
+
+        text_col->pack_start(*prev_lab, false, false);
+        if (!ds.empty())
+            text_col->pack_start(*date_lab, false, false);
+
         auto* badge = Gtk::manage(new Gtk::Image());
         std::string icon = "changes-prevent-symbolic";
         if (memo.visibility == MemoVisibility::Public)
@@ -260,13 +406,15 @@ void MemosView::refresh_visible_rows()
         else if (memo.visibility == MemoVisibility::Protected)
             icon = "changes-allow-symbolic";
         badge->set_from_icon_name(icon, Gtk::ICON_SIZE_MENU);
-        box->pack_start(*title, true, true);
-        box->pack_start(*badge, false, false);
-        row->add(*box);
+
+        card->pack_start(*text_col, true, true);
+        card->pack_start(*badge, false, false);
+        row->add(*card);
+        row->set_tooltip_text(prev + (ds.empty() ? "" : "\n" + ds));
         list_.append(*row);
     }
     list_.show_all();
-    rebuild_tag_chips();
+    rebuild_tag_chips(candidates);
 
     if (selected_name_.has_value())
         select_by_name(*selected_name_);

@@ -33,32 +33,9 @@ namespace cd {
 
 namespace {
 
-extern "C" void app_window_leaflet_folded_cb(GObject* obj, GParamSpec*, gpointer user)
-{
-    (void)obj;
-    static_cast<AppWindow*>(user)->on_leaflet_folded();
-}
-
 extern "C" void app_window_sidebar_row_cb(GtkListBox*, GtkListBoxRow* row, gpointer user)
 {
     static_cast<AppWindow*>(user)->on_screen_row(row);
-}
-
-extern "C" void app_window_hamburger_cb(GtkToggleButton* btn, gpointer user)
-{
-    auto* self = static_cast<AppWindow*>(user);
-    gboolean const on = gtk_toggle_button_get_active(btn);
-    if (on)
-        hdy_leaflet_set_visible_child(HDY_LEAFLET(self->leaflet_widget()), self->sidebar_box_widget());
-    else
-        hdy_leaflet_set_visible_child(HDY_LEAFLET(self->leaflet_widget()), self->main_outer_widget());
-}
-
-extern "C" void app_window_back_cb(GtkButton*, gpointer user)
-{
-    auto* w = static_cast<AppWindow*>(user);
-    hdy_leaflet_set_visible_child(HDY_LEAFLET(w->leaflet_widget()), w->sidebar_box_widget());
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w->hamburger_widget()), TRUE);
 }
 
 } // namespace
@@ -75,22 +52,14 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     set_can_focus(true);
 
     root_overlay_ = gtk_overlay_new();
-    leaflet_ = GTK_WIDGET(hdy_leaflet_new());
-    hdy_leaflet_set_transition_type(HDY_LEAFLET(leaflet_), HDY_LEAFLET_TRANSITION_TYPE_OVER);
-    // Fold threshold is derived from child min sizes in current libhandy; no
-    // "fold-threshold-width" GObject property on some distributions (e.g. Debian 13).
+    paned_ = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_paned_set_wide_handle(GTK_PANED(paned_), TRUE);
+    gtk_style_context_add_class(gtk_widget_get_style_context(paned_), "cd-main-paned");
+    if (AtkObject* a = gtk_widget_get_accessible(paned_))
+        atk_object_set_name(a, "Resize sidebar");
 
     sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_style_context_add_class(gtk_widget_get_style_context(sidebar_box_), "cd-sidebar");
-
-    // Brand label at top of sidebar
-    GtkWidget* brand_label = gtk_label_new("CROSS-DASHBOARD");
-    gtk_label_set_xalign(GTK_LABEL(brand_label), 0.0f);
-    gtk_style_context_add_class(gtk_widget_get_style_context(brand_label), "cd-sidebar-title");
-    gtk_box_pack_start(GTK_BOX(sidebar_box_), brand_label, FALSE, FALSE, 0);
-
-    GtkWidget* sidebar_sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_box_pack_start(GTK_BOX(sidebar_box_), sidebar_sep, FALSE, FALSE, 0);
 
     sidebar_list_ = gtk_list_box_new();
     gtk_list_box_set_selection_mode(GTK_LIST_BOX(sidebar_list_), GTK_SELECTION_SINGLE);
@@ -102,48 +71,30 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     hdy_header_bar_set_show_close_button(HDY_HEADER_BAR(header_bar_), TRUE);
     hdy_header_bar_set_title(HDY_HEADER_BAR(header_bar_), "Cross-Dashboard");
 
-    hamburger_btn_ = gtk_toggle_button_new();
-    {
-        GtkWidget* himg = gtk_image_new_from_icon_name("open-menu-symbolic", GTK_ICON_SIZE_BUTTON);
-        gtk_container_add(GTK_CONTAINER(hamburger_btn_), himg);
-    }
-    gtk_widget_set_tooltip_text(hamburger_btn_, "Show navigation sidebar");
-    if (AtkObject* a = gtk_widget_get_accessible(hamburger_btn_))
-        atk_object_set_name(a, "Show navigation sidebar");
-
-    back_btn_ = gtk_button_new_from_icon_name("go-previous-symbolic", GTK_ICON_SIZE_BUTTON);
-    gtk_widget_set_tooltip_text(back_btn_, "Back to navigation sidebar");
-    if (AtkObject* a = gtk_widget_get_accessible(back_btn_))
-        atk_object_set_name(a, "Back to navigation sidebar");
-
     GtkWidget* pomodoro_btn = gtk_button_new_with_label("Pomodoro");
     gtk_widget_set_tooltip_text(pomodoro_btn, "Open Pomodoro timer");
     if (AtkObject* a = gtk_widget_get_accessible(pomodoro_btn))
         atk_object_set_name(a, "Open Pomodoro timer");
 
-    hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), hamburger_btn_);
-    hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), back_btn_);
     hdy_header_bar_pack_end(HDY_HEADER_BAR(header_bar_), pomodoro_btn);
 
     // Use header_bar_ as the window titlebar — eliminates the duplicate OS titlebar.
     gtk_window_set_titlebar(GTK_WINDOW(gobj()), header_bar_);
     gtk_box_pack_start(GTK_BOX(main_outer_), GTK_WIDGET(stack_.gobj()), TRUE, TRUE, 0);
 
-    hdy_leaflet_insert_child_after(HDY_LEAFLET(leaflet_), sidebar_box_, nullptr);
-    hdy_leaflet_insert_child_after(HDY_LEAFLET(leaflet_), main_outer_, sidebar_box_);
+    gtk_paned_pack1(GTK_PANED(paned_), sidebar_box_, FALSE, FALSE);
+    gtk_paned_pack2(GTK_PANED(paned_), main_outer_, TRUE, TRUE);
+    gtk_paned_set_position(GTK_PANED(paned_), 240);
 
     pomodoro_bar_ = std::make_unique<PomodoroBar>(vm_);
     pomodoro_modal_ = std::make_unique<PomodoroModal>(vm_);
 
-    gtk_container_add(GTK_CONTAINER(root_overlay_), leaflet_);
+    gtk_container_add(GTK_CONTAINER(root_overlay_), paned_);
     gtk_overlay_add_overlay(GTK_OVERLAY(root_overlay_), pomodoro_bar_->widget());
     gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(root_overlay_), pomodoro_bar_->widget(), FALSE);
     gtk_container_add(GTK_CONTAINER(gobj()), root_overlay_);
 
-    g_signal_connect(leaflet_, "notify::folded", G_CALLBACK(app_window_leaflet_folded_cb), this);
     g_signal_connect(sidebar_list_, "row-selected", G_CALLBACK(app_window_sidebar_row_cb), this);
-    g_signal_connect(hamburger_btn_, "toggled", G_CALLBACK(app_window_hamburger_cb), this);
-    g_signal_connect(back_btn_, "clicked", G_CALLBACK(app_window_back_cb), this);
     g_signal_connect(pomodoro_btn, "clicked",
         G_CALLBACK(+[](GtkButton*, gpointer user) {
             static_cast<AppWindow*>(user)->vm_.set_pomodoro_modal_visible(true);
@@ -172,7 +123,6 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
         on_screen_row(row0);
     }
 
-    on_leaflet_folded();
     gtk_widget_show_all(header_bar_);
     show_all_children();
     apply_theme();
@@ -316,41 +266,41 @@ void AppWindow::build_stack_pages()
 
     for (std::string const& screen : cfg.visible_screens) {
         if (screen == "Dashboard") {
-            dash_ = Gtk::manage(new DashboardView(app_));
+            dash_ = Gtk::manage(new DashboardView(app_, sync_));
             stack_.add(*dash_, Glib::ustring(screen));
         }
         else if (screen == "Tasks") {
-            tasks_ = Gtk::manage(new TasksView(app_, vm_));
+            tasks_ = Gtk::manage(new TasksView(app_, vm_, sync_));
             stack_.add(*tasks_, Glib::ustring(screen));
         }
         else if (screen == "Events") {
-            events_ = Gtk::manage(new EventsView(app_));
+            events_ = Gtk::manage(new EventsView(app_, sync_));
             stack_.add(*events_, Glib::ustring(screen));
         }
         else if (screen == "Notes") {
-            notes_ = Gtk::manage(new NotesView(app_));
+            notes_ = Gtk::manage(new NotesView(app_, sync_));
             stack_.add(*notes_, Glib::ustring(screen));
         }
         else if (screen == "Issues") {
-            issues_ = Gtk::manage(new IssuesView(app_));
+            issues_ = Gtk::manage(new IssuesView(app_, sync_));
             stack_.add(*issues_, Glib::ustring(screen));
         }
         else if (screen == "Inbox") {
-            inbox_ = Gtk::manage(new InboxView(app_));
+            inbox_ = Gtk::manage(new InboxView(app_, sync_));
             stack_.add(*inbox_, Glib::ustring(screen));
         }
         else if (screen == "Views") {
-            views_ = Gtk::manage(new ViewsView(app_));
+            views_ = Gtk::manage(new ViewsView(app_, sync_));
             stack_.add(*views_, Glib::ustring(screen));
         }
         else if (screen == "Settings") {
-            settings_ = Gtk::manage(new SettingsView(app_,
+            settings_ = Gtk::manage(new SettingsView(app_, sync_,
                 [this] { apply_theme(); },
                 [this] { schedule_rebuild_navigation(); }));
             stack_.add(*settings_, Glib::ustring(screen));
         }
         else if (screen == "Capture") {
-            memos_ = Gtk::manage(new MemosView(app_, vm_));
+            memos_ = Gtk::manage(new MemosView(app_, vm_, sync_));
             stack_.add(*memos_, Glib::ustring(screen));
         }
         else {
@@ -440,21 +390,6 @@ void AppWindow::on_screen_row(GtkListBoxRow* row)
         views_->rebuild();
     else if (g_strcmp0(key, "Capture") == 0 && memos_)
         memos_->rebuild();
-
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hamburger_btn_), FALSE);
-
-    gboolean folded = FALSE;
-    g_object_get(G_OBJECT(leaflet_), "folded", &folded, nullptr);
-    if (folded)
-        hdy_leaflet_set_visible_child(HDY_LEAFLET(leaflet_), main_outer_);
-}
-
-void AppWindow::on_leaflet_folded()
-{
-    gboolean folded = FALSE;
-    g_object_get(G_OBJECT(leaflet_), "folded", &folded, nullptr);
-    gtk_widget_set_visible(back_btn_, folded);
-    gtk_widget_set_visible(hamburger_btn_, folded);
 }
 
 void AppWindow::on_new_task_shortcut()
