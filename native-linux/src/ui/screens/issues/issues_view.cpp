@@ -17,6 +17,7 @@
 #include <gtkmm/dialog.h>
 #include <gtkmm/label.h>
 #include <gtkmm/messagedialog.h>
+#include <gtkmm/separator.h>
 #include <gtkmm/textview.h>
 
 namespace {

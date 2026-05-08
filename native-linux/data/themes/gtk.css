@@ -106,6 +106,64 @@ headerbar {
     border-radius: 6px;
 }
 
+/* ── Kanban board ──────────────────────────────────────────────────────── */
+.cd-kanban-col {
+    background-color: @cd_sidebar_bg;
+    border: 1px solid @cd_sidebar_sep;
+    border-radius: 8px;
+    margin: 0 4px;
+}
+
+.cd-kanban-col-hdr {
+    padding: 9px 10px;
+    border-radius: 8px 8px 0 0;
+}
+
+.cd-count-badge {
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border-radius: 99px;
+    background-color: @cd_accent_dim;
+    color: @cd_accent;
+    font-weight: bold;
+}
+
+.cd-kanban-list {
+    background-color: transparent;
+}
+
+.cd-kanban-card {
+    border-radius: 6px;
+    margin: 4px 6px;
+    padding: 7px 8px;
+    background-color: @theme_bg_color;
+    border: 1px solid alpha(@theme_fg_color, 0.08);
+}
+
+.cd-kanban-card:hover {
+    background-color: shade(@theme_bg_color, 0.97);
+}
+
+/* ── Covey quadrants ───────────────────────────────────────────────────── */
+.cd-covey-quad {
+    border-radius: 8px;
+    border: 1px solid @cd_sidebar_sep;
+}
+
+.cd-covey-do    { border-color: alpha(#e01b24, 0.4); background-color: alpha(#e01b24, 0.04); }
+.cd-covey-delay { border-color: alpha(#3584e4, 0.4); background-color: alpha(#3584e4, 0.04); }
+.cd-covey-delegate  { border-color: alpha(#e66100, 0.4); background-color: alpha(#e66100, 0.04); }
+.cd-covey-eliminate { border-color: alpha(#9a9996, 0.5); background-color: alpha(#9a9996, 0.04); }
+
+.cd-covey-do    .cd-covey-title { color: #c01c28; }
+.cd-covey-delay .cd-covey-title { color: #1c71d8; }
+.cd-covey-delegate  .cd-covey-title { color: #c64600; }
+.cd-covey-eliminate .cd-covey-title { color: #77767b; }
+
+.cd-covey-list {
+    background-color: transparent;
+}
+
 /* ── List rows (event/task/note/issue list items) ─────────────────────── */
 list > row {
     padding: 6px 10px;
@@ -119,4 +177,18 @@ list > row:selected {
 
 list > row:hover {
     background-color: @cd_row_hover;
+}
+
+/* Settings: notebook tabs (grouped like macOS Settings). */
+notebook.cd-settings-notebook header {
+    background-color: @cd_sidebar_bg;
+    border-bottom: 1px solid @cd_sidebar_sep;
+}
+notebook.cd-settings-notebook tab {
+    padding: 7px 14px;
+    min-height: 28px;
+}
+notebook.cd-settings-notebook tab:checked label {
+    font-weight: 600;
+    color: @cd_accent;
 }

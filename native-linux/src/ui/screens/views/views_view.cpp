@@ -11,6 +11,7 @@
 #include <gtkmm/comboboxtext.h>
 #include <gtkmm/label.h>
 #include <gtkmm/listbox.h>
+#include <gtkmm/separator.h>
 
 #include <algorithm>
 #include <cctype>
@@ -110,26 +111,46 @@ extern "C" void views_covey_drag_recv(GtkWidget* widget, GdkDragContext*, gint, 
 } // namespace
 
 ViewsView::ViewsView(AppContainer& app)
-    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
+    : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0)
     , app_(app)
 {
+    // Kanban: horizontally scrollable board
     kanban_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    kanban_board_.set_spacing(8);
+    kanban_board_.set_margin_start(12);
+    kanban_board_.set_margin_end(12);
+    kanban_board_.set_margin_top(12);
+    kanban_board_.set_margin_bottom(12);
     kanban_scroll_.add(kanban_board_);
+    kanban_scroll_.set_vexpand(true);
     tabs_.append_page(kanban_scroll_, "Kanban");
 
+    // Covey: unassigned strip + 2×2 grid filling the full area
     {
         auto* unlab = Gtk::manage(new Gtk::Label());
-        unlab->set_markup("<b>Unassigned (Covey)</b>");
+        unlab->set_markup("<small><b>UNASSIGNED</b></small>");
         unlab->set_halign(Gtk::ALIGN_START);
+        unlab->set_margin_start(10);
+        unlab->set_margin_top(8);
+        unlab->set_margin_bottom(4);
         covey_unassigned_box_.pack_start(*unlab, false, false);
     }
     covey_unassigned_box_.pack_start(covey_unassigned_slot_, false, false);
+    covey_unassigned_box_.set_margin_bottom(6);
 
-    covey_grid_.set_column_spacing(8);
-    covey_grid_.set_row_spacing(8);
+    covey_grid_.set_column_spacing(10);
+    covey_grid_.set_row_spacing(10);
     covey_grid_.set_column_homogeneous(true);
     covey_grid_.set_row_homogeneous(true);
+    covey_grid_.set_hexpand(true);
+    covey_grid_.set_vexpand(true);
+    covey_grid_.set_margin_start(10);
+    covey_grid_.set_margin_end(10);
+    covey_grid_.set_margin_top(6);
+    covey_grid_.set_margin_bottom(10);
 
+    covey_outer_.set_vexpand(true);
+    covey_outer_.set_hexpand(true);
     covey_outer_.pack_start(covey_unassigned_box_, false, false);
     covey_outer_.pack_start(covey_grid_, true, true);
     tabs_.append_page(covey_outer_, "Covey");
@@ -260,13 +281,41 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
     std::vector<std::string> const& cols = cfg.kanban_columns;
 
     auto make_column = [&](std::string const& title, int col_code, std::vector<CalDavTask> const& tasks_in_col) {
-        auto* col_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
-        auto* title_l = Gtk::manage(new Gtk::Label(title));
+        // Outer column container — styled card
+        auto* col_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(col_box->gobj())), "cd-kanban-col");
+        gtk_widget_set_size_request(GTK_WIDGET(col_box->gobj()), 220, -1);
+        col_box->set_vexpand(true);
+
+        // Column header: title + count badge
+        auto* hdr = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 6));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(hdr->gobj())), "cd-kanban-col-hdr");
+
+        std::string cap_title = title;
+        if (!cap_title.empty())
+            cap_title.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(cap_title.front())));
+        auto* title_l = Gtk::manage(new Gtk::Label());
+        title_l->set_markup(("<b>" + cap_title + "</b>").c_str());
         title_l->set_halign(Gtk::ALIGN_START);
+        title_l->set_hexpand(true);
+
+        auto* badge = Gtk::manage(new Gtk::Label(std::to_string(tasks_in_col.size()).c_str()));
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(badge->gobj())), "cd-count-badge");
+
+        hdr->pack_start(*title_l, true, true);
+        hdr->pack_start(*badge, false, false);
+        col_box->pack_start(*hdr, false, false);
+
+        auto* hdr_sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
+        col_box->pack_start(*hdr_sep, false, false);
+
+        // Card list
         auto* sc = Gtk::manage(new Gtk::ScrolledWindow());
         sc->set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+        sc->set_vexpand(true);
         auto* lb = Gtk::manage(new Gtk::ListBox());
         lb->set_selection_mode(Gtk::SELECTION_NONE);
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(lb->gobj())), "cd-kanban-list");
         GtkWidget* lw = GTK_WIDGET(lb->gobj());
         g_object_set_data(G_OBJECT(lw), "cd-kanban-col", GINT_TO_POINTER(col_code));
         gtk_drag_dest_set(lw, GTK_DEST_DEFAULT_ALL, drag_targets, G_N_ELEMENTS(drag_targets), GDK_ACTION_MOVE);
@@ -274,25 +323,54 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
 
         for (auto const& task : tasks_in_col) {
             auto* row = Gtk::manage(new Gtk::ListBoxRow);
-            auto* hb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 4));
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(row->gobj())), "cd-kanban-card");
+
+            auto* card = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 3));
             auto* lab = Gtk::manage(new Gtk::Label(task.summary));
             lab->set_halign(Gtk::ALIGN_START);
             lab->set_line_wrap(true);
+            lab->set_xalign(0.0f);
+
             auto* btn = Gtk::manage(new Gtk::Button());
-            btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
-            btn->set_tooltip_text("Assign tag");
+            btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_MENU);
+            btn->set_tooltip_text("Assign column");
+            btn->set_relief(Gtk::RELIEF_NONE);
             btn->signal_clicked().connect([this, task] { run_assign_dialog(task, false); });
-            hb->pack_start(*lab, true, true);
-            hb->pack_start(*btn, false, false);
-            row->add(*hb);
+
+            auto* row_hb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 4));
+            row_hb->pack_start(*lab, true, true);
+            row_hb->pack_start(*btn, false, false);
+            card->pack_start(*row_hb, false, false);
+
+            // Priority indicator
+            if (task.priority > 0) {
+                auto* prio = Gtk::manage(new Gtk::Label());
+                std::string ptext = task.priority <= 4 ? "High" : task.priority == 5 ? "Medium" : "Low";
+                prio->set_markup(("<small>" + ptext + " priority</small>").c_str());
+                prio->set_halign(Gtk::ALIGN_START);
+                gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(prio->gobj())), "dim-label");
+                card->pack_start(*prio, false, false);
+            }
+
+            row->add(*card);
             lb->append(*row);
             GtkWidget* rw = GTK_WIDGET(row->gobj());
             g_object_set_data_full(G_OBJECT(rw), "cd-task-uid", g_strdup(task.uid.c_str()), g_free);
             gtk_drag_source_set(rw, GDK_BUTTON1_MASK, drag_targets, G_N_ELEMENTS(drag_targets), GDK_ACTION_MOVE);
             g_signal_connect(rw, "drag-data-get", G_CALLBACK(views_drag_data_get), nullptr);
         }
+
+        if (tasks_in_col.empty()) {
+            auto* empty_row = Gtk::manage(new Gtk::ListBoxRow());
+            auto* empty_lab = Gtk::manage(new Gtk::Label("No tasks"));
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(empty_lab->gobj())), "dim-label");
+            empty_lab->set_margin_top(16);
+            empty_lab->set_margin_bottom(16);
+            empty_row->add(*empty_lab);
+            lb->append(*empty_row);
+        }
+
         sc->add(*lb);
-        col_box->pack_start(*title_l, false, false);
         col_box->pack_start(*sc, true, true);
         kanban_board_.pack_start(*col_box, false, false);
         lb->show_all();
@@ -320,7 +398,6 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
 void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
 {
     for (Gtk::Widget* w : covey_unassigned_slot_.get_children()) covey_unassigned_slot_.remove(*w);
-
     for (Gtk::Widget* w : covey_grid_.get_children()) covey_grid_.remove(*w);
 
     auto ctags = covey_tag_strings();
@@ -331,23 +408,24 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
 
     if (!unassigned.empty()) {
         auto* sc = Gtk::manage(new Gtk::ScrolledWindow());
-        sc->set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
-        sc->set_min_content_height(90);
+        sc->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+        sc->set_min_content_height(64);
+        sc->set_max_content_height(96);
         auto* lb = Gtk::manage(new Gtk::ListBox());
         lb->set_selection_mode(Gtk::SELECTION_NONE);
         GtkWidget* lwg = GTK_WIDGET(lb->gobj());
         g_object_set_data(G_OBJECT(lwg), "cd-covey-q", GINT_TO_POINTER(-1));
-        gtk_drag_dest_set(
-            lwg, GTK_DEST_DEFAULT_ALL, drag_targets, G_N_ELEMENTS(drag_targets), GDK_ACTION_MOVE);
+        gtk_drag_dest_set(lwg, GTK_DEST_DEFAULT_ALL, drag_targets, G_N_ELEMENTS(drag_targets), GDK_ACTION_MOVE);
         g_signal_connect(lwg, "drag-data-received", G_CALLBACK(views_covey_drag_recv), this);
-
         for (auto const& t : unassigned) {
             auto* row = Gtk::manage(new Gtk::ListBoxRow);
             auto* hb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 4));
             auto* lab = Gtk::manage(new Gtk::Label(t.summary));
             lab->set_halign(Gtk::ALIGN_START);
+            lab->set_hexpand(true);
             auto* btn = Gtk::manage(new Gtk::Button());
-            btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+            btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_MENU);
+            btn->set_relief(Gtk::RELIEF_NONE);
             btn->signal_clicked().connect([this, t] { run_assign_dialog(t, true); });
             hb->pack_start(*lab, true, true);
             hb->pack_start(*btn, false, false);
@@ -362,32 +440,80 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
         covey_unassigned_slot_.pack_start(*sc, false, false);
     }
 
-    char const* covey_titles[] = {"Do · Urgent & important", "Delay · Not urgent & important",
-        "Delegate · Urgent & not important", "Eliminate · Not urgent & not important"};
+    // Quadrant metadata: label, subtitle, CSS class
+    struct QuadrantMeta {
+        const char* label;
+        const char* subtitle;
+        const char* css_class;
+    };
+    static constexpr QuadrantMeta meta[4] = {
+        {"Do First",  "Important & Urgent",         "cd-covey-do"},
+        {"Schedule",  "Important & Not Urgent",      "cd-covey-delay"},
+        {"Delegate",  "Not Important & Urgent",      "cd-covey-delegate"},
+        {"Eliminate", "Not Important & Not Urgent",  "cd-covey-eliminate"},
+    };
 
     for (int q = 0; q < 4; ++q) {
-        auto* vb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
-        auto* title = Gtk::manage(new Gtk::Label(covey_titles[q]));
-        title->set_line_wrap(true);
-        title->set_halign(Gtk::ALIGN_START);
+        auto* vb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0));
+        vb->set_hexpand(true);
+        vb->set_vexpand(true);
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(vb->gobj())), "cd-covey-quad");
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(vb->gobj())), meta[q].css_class);
+
+        // Header: label (bold, colored) + subtitle (small, muted)
+        auto* hdr = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 2));
+        hdr->set_margin_start(10);
+        hdr->set_margin_end(10);
+        hdr->set_margin_top(8);
+        hdr->set_margin_bottom(6);
+
+        auto* qlabel = Gtk::manage(new Gtk::Label());
+        qlabel->set_markup(("<b>" + std::string(meta[q].label) + "</b>").c_str());
+        qlabel->set_halign(Gtk::ALIGN_START);
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(qlabel->gobj())), "cd-covey-title");
+
+        auto* qsub = Gtk::manage(new Gtk::Label());
+        qsub->set_markup(("<small>" + std::string(meta[q].subtitle) + "</small>").c_str());
+        qsub->set_halign(Gtk::ALIGN_START);
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(qsub->gobj())), "dim-label");
+
+        hdr->pack_start(*qlabel, false, false);
+        hdr->pack_start(*qsub, false, false);
+        vb->pack_start(*hdr, false, false);
+
+        auto* hdr_sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
+        vb->pack_start(*hdr_sep, false, false);
+
+        // Task list in scrolled window
         auto* sc = Gtk::manage(new Gtk::ScrolledWindow());
         sc->set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+        sc->set_vexpand(true);
         auto* lb = Gtk::manage(new Gtk::ListBox());
         lb->set_selection_mode(Gtk::SELECTION_NONE);
+        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(lb->gobj())), "cd-covey-list");
         GtkWidget* lw = GTK_WIDGET(lb->gobj());
         g_object_set_data(G_OBJECT(lw), "cd-covey-q", GINT_TO_POINTER(q));
         gtk_drag_dest_set(lw, GTK_DEST_DEFAULT_ALL, drag_targets, G_N_ELEMENTS(drag_targets), GDK_ACTION_MOVE);
         g_signal_connect(lw, "drag-data-received", G_CALLBACK(views_covey_drag_recv), this);
 
         std::string const qtag{kCoveyQuadrantTags[static_cast<std::size_t>(q)]};
+        bool has_tasks = false;
         for (auto const& task : open_tasks) {
             if (has_any_ci(task.categories, {qtag})) {
+                has_tasks = true;
                 auto* row = Gtk::manage(new Gtk::ListBoxRow);
                 auto* hb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 4));
+                hb->set_margin_start(8);
+                hb->set_margin_end(4);
+                hb->set_margin_top(4);
+                hb->set_margin_bottom(4);
                 auto* lab = Gtk::manage(new Gtk::Label(task.summary));
                 lab->set_halign(Gtk::ALIGN_START);
+                lab->set_hexpand(true);
+                lab->set_line_wrap(true);
                 auto* btn = Gtk::manage(new Gtk::Button());
-                btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+                btn->set_image_from_icon_name("document-properties-symbolic", Gtk::ICON_SIZE_MENU);
+                btn->set_relief(Gtk::RELIEF_NONE);
                 btn->signal_clicked().connect([this, task] { run_assign_dialog(task, true); });
                 hb->pack_start(*lab, true, true);
                 hb->pack_start(*btn, false, false);
@@ -399,13 +525,20 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
                 g_signal_connect(rw, "drag-data-get", G_CALLBACK(views_drag_data_get), nullptr);
             }
         }
+        if (!has_tasks) {
+            auto* empty_row = Gtk::manage(new Gtk::ListBoxRow());
+            auto* empty_lab = Gtk::manage(new Gtk::Label("No tasks"));
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(empty_lab->gobj())), "dim-label");
+            empty_lab->set_margin_top(12);
+            empty_lab->set_margin_bottom(12);
+            empty_row->add(*empty_lab);
+            lb->append(*empty_row);
+        }
 
         sc->add(*lb);
-        vb->pack_start(*title, false, false);
         vb->pack_start(*sc, true, true);
-        int col = q % 2;
-        int row = q / 2;
-        covey_grid_.attach(*vb, col, row, 1, 1);
+
+        covey_grid_.attach(*vb, q % 2, q / 2, 1, 1);
     }
 
     covey_unassigned_slot_.show_all();

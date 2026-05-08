@@ -22,6 +22,7 @@ extern "C" {
 #include <gtkmm/entry.h>
 #include <gtkmm/image.h>
 #include <gtkmm/paned.h>
+#include <gtkmm/separator.h>
 #include <gtkmm/messagedialog.h>
 #include <gtkmm/scrolledwindow.h>
 #include <gtkmm/textview.h>

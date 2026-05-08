@@ -9,6 +9,7 @@
 #include <gtkmm/entry.h>
 #include <gtkmm/grid.h>
 #include <gtkmm/label.h>
+#include <gtkmm/notebook.h>
 #include <gtkmm/radiobutton.h>
 #include <gtkmm/scrolledwindow.h>
 #include <gtkmm/spinbutton.h>
@@ -91,6 +92,8 @@ private:
 
     Gtk::Entry kanban_columns_csv_;
     Gtk::Button save_kanban_btn_{"Save Kanban column tags"};
+
+    Gtk::Notebook tabs_{};
 };
 
 } // namespace cd

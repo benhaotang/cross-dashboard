@@ -10,6 +10,7 @@
 #include <exception>
 
 #include <gtkmm/messagedialog.h>
+#include <gtkmm/separator.h>
 #include <gtkmm/window.h>
 
 #include <gtk/gtk.h>
