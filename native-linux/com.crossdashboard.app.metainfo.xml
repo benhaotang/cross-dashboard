@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.crossdashboard.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>Cross-Dashboard</name>
+  <summary>Unified personal productivity dashboard</summary>
+  <url type="homepage">https://github.com/cross-dashboard/cross-dashboard</url>
+  <description>
+    <p>
+      Calendar (CalDAV), tasks, notes, Gitea issues, and Memos capture in one GTK/Linux app.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.crossdashboard.app.desktop</launchable>
+  <releases>
+    <release version="1.0.0" date="2026-05-08"/>
+  </releases>
+  <developer_name>Cross-Dashboard</developer_name>
+  <content_rating type="oars-1.1"/>
+</component>

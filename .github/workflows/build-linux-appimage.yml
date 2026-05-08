@@ -1,59 +1,115 @@
-name: Build Linux AppImage
+# Native GTK .deb for Debian 13 (Trixie) only — amd64 and aarch64 both build inside
+# debian:trixie-slim (linux/amd64 vs linux/arm64 image per runner) so ${shlibs:Depends}
+# matches Debian 13, not Ubuntu host runners.
+# Triggers: published release (attach .deb) or manual workflow_dispatch (artifacts only).
+# Legacy filename kept so existing repo links to this workflow remain valid.
+
+name: Build Linux Native (DEB)
 
 on:
-  #release:
-  #  types: [published]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Upstream deb version (e.g. 1.8.0). Defaults to 0.0.0~git<short>.'
+        required: false
+        default: ''
 
 jobs:
   build:
-    name: Build AppImage (${{ matrix.arch }})
-    runs-on: ubuntu-latest
+    name: Native Linux .deb (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
 
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # deb_arch is the dpkg suffix (e.g. *_arm64.deb), distinct from marketing "aarch64".
           - arch: amd64
-            electron_arch: x64
+            deb_arch: amd64
+            runner: ubuntu-24.04
           - arch: aarch64
-            electron_arch: arm64
+            deb_arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            U="${{ github.event.release.tag_name }}"
+            U="${U#v}"
+          elif [ -n "${{ inputs.version_name }}" ]; then
+            U="${{ inputs.version_name }}"
+          else
+            U="0.0.0~git$(git rev-parse --short HEAD)"
+          fi
+          echo "upstream=$U" >> "$GITHUB_OUTPUT"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
+      - name: Set Debian changelog version
+        working-directory: native-linux
+        run: |
+          FULL="${{ steps.ver.outputs.upstream }}-1"
+          sed -i "1s|.*|cross-dashboard (${FULL}) unstable; urgency=medium|" debian/changelog
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Both matrix jobs (amd64 + aarch64) use this step: Docker selects the Trixie image for
+      # the runner CPU; Ubuntu is only the CI host, not the link environment.
+      - name: Build binary .deb (Debian 13 / Trixie)
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src:rw" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie-slim \
+            bash -c '
+              set -euo pipefail
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends \
+                build-essential fakeroot debhelper \
+                meson ninja-build pkg-config g++ \
+                libsqlite3-dev libglib2.0-dev libgtkmm-3.0-dev libhandy-1-dev libsoup-3.0-dev \
+                nlohmann-json3-dev libsecret-1-dev libcmark-gfm-dev libcmark-gfm-extensions-dev \
+                libnotify-dev libappindicator3-dev \
+                libwebkit2gtk-4.1-dev libcairo2-dev libpango1.0-dev libatk1.0-dev \
+                libgdk-pixbuf-2.0-dev libgtk-3-dev
+              cd /src/native-linux
+              dpkg-buildpackage -b -us -uc
+            '
 
-      - name: Build web export
-        run: pnpm exec expo export --platform web
+      - name: Stage .deb for upload
+        id: deb
+        run: |
+          set -euo pipefail
+          UP="${{ steps.ver.outputs.upstream }}"
+          ROOT="${GITHUB_WORKSPACE}"
+          DARCH="${{ matrix.deb_arch }}"
+          shopt -s nullglob
+          # dpkg-buildpackage writes .deb files to the parent of the source tree (repo root).
+          mapfile -t DEBS < <(ls -1 "${ROOT}/cross-dashboard"_*_"${DARCH}".deb 2>/dev/null || true)
+          if [ "${#DEBS[@]}" -eq 0 ]; then
+            echo "::error::No cross-dashboard_*_${DARCH}.deb in ${ROOT}"
+            ls -la "${ROOT}" || true
+            exit 1
+          fi
+          mkdir -p out
+          LABEL="${{ matrix.arch }}"
+          cp "${DEBS[0]}" "out/cross-dashboard-${UP}-${LABEL}.deb"
+          echo "path=out/cross-dashboard-${UP}-${LABEL}.deb" >> "$GITHUB_OUTPUT"
 
-      - name: Bundle Electron main process
-        run: pnpm electron:bundle
-
-      - name: Build AppImage (${{ matrix.arch }})
-        run: pnpm exec electron-builder --linux AppImage --${{ matrix.electron_arch }} --publish never
-
-      - name: Upload AppImage artifact
+      - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cross-dashboard-linux-${{ matrix.arch }}
-          path: dist-electron/*.AppImage
+          name: cross-dashboard-linux-${{ matrix.arch }}-${{ steps.ver.outputs.upstream }}
+          path: ${{ steps.deb.outputs.path }}
+          retention-days: 30
 
-      - name: Attach AppImage to release
+      - name: Attach .deb to GitHub release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist-electron/*.AppImage
+          files: ${{ steps.deb.outputs.path }}

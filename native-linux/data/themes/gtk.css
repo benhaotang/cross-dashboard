@@ -1,0 +1,365 @@
+/* Cross-Dashboard GTK3 — light theme.
+   Design direction: Refined Utilitarian — clean sidebar rail, minimal chrome,
+   accent-driven selection. */
+
+@define-color cd_accent      #3584e4;
+@define-color cd_accent_dim  alpha(#3584e4, 0.15);
+@define-color cd_sidebar_bg  #f2f2f2;
+@define-color cd_sidebar_sep #d8d8d8;
+@define-color cd_row_hover   alpha(#000000, 0.06);
+@define-color cd_row_active  alpha(#000000, 0.10);
+
+/* ── Window chrome ─────────────────────────────────────────────────────── */
+headerbar {
+    border-bottom-color: @cd_sidebar_sep;
+    background: linear-gradient(to bottom, #ffffff, #f6f6f6);
+}
+
+/* ── Sidebar rail ──────────────────────────────────────────────────────── */
+.cd-sidebar {
+    background-color: @cd_sidebar_bg;
+    border-right: none;
+    min-width: 160px;
+}
+
+.cd-sidebar-title {
+    padding: 16px 12px 10px 14px;
+    font-size: 0.68rem;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    color: alpha(@theme_fg_color, 0.4);
+}
+
+/* Main horizontal split (draggable sidebar width) */
+.cd-main-paned > separator {
+    background: @cd_sidebar_sep;
+    min-width: 1px;
+}
+.cd-main-paned > separator:hover {
+    background: @cd_accent;
+}
+
+.cd-nav-list {
+    background-color: transparent;
+    border: none;
+    padding: 10px 0 4px;
+}
+
+.cd-nav-list > row {
+    border-radius: 8px;
+    margin: 1px 6px;
+    padding: 0;
+    background-color: transparent;
+    transition: background-color 100ms ease;
+}
+
+.cd-nav-list > row:hover {
+    background-color: @cd_row_hover;
+}
+
+.cd-nav-list > row:active {
+    background-color: @cd_row_active;
+}
+
+.cd-nav-list > row:selected,
+.cd-nav-list > row:selected:hover {
+    background-color: @cd_accent;
+    color: white;
+}
+
+.cd-nav-list > row:selected label,
+.cd-nav-list > row:selected image {
+    color: white;
+}
+
+.cd-nav-icon {
+    opacity: 0.7;
+}
+
+.cd-nav-list > row:selected .cd-nav-icon {
+    opacity: 1.0;
+}
+
+/* ── Toolbar chrome ────────────────────────────────────────────────────── */
+.cd-toolbar {
+    padding: 6px 8px;
+    border-bottom: 1px solid @cd_sidebar_sep;
+    background-color: transparent;
+}
+
+/* Linked button groups (segmented controls for filter rows) */
+.linked > button,
+.linked > togglebutton,
+.linked > radiobutton {
+    border-radius: 0;
+}
+.linked > button:first-child,
+.linked > togglebutton:first-child,
+.linked > radiobutton:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+.linked > button:last-child,
+.linked > togglebutton:last-child,
+.linked > radiobutton:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* ── Action icon buttons (icon-only, flat) ────────────────────────────── */
+.cd-icon-btn {
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 6px;
+}
+
+/* ── Kanban board ──────────────────────────────────────────────────────── */
+.cd-kanban-col {
+    background-color: @cd_sidebar_bg;
+    border: 1px solid @cd_sidebar_sep;
+    border-radius: 8px;
+    margin: 0 4px;
+}
+
+.cd-kanban-col-hdr {
+    padding: 9px 10px;
+    border-radius: 8px 8px 0 0;
+}
+
+.cd-count-badge {
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border-radius: 99px;
+    background-color: @cd_accent_dim;
+    color: @cd_accent;
+    font-weight: bold;
+}
+
+.cd-kanban-list {
+    background-color: transparent;
+}
+
+.cd-kanban-card {
+    border-radius: 6px;
+    margin: 4px 6px;
+    padding: 7px 8px;
+    background-color: @theme_bg_color;
+    border: 1px solid alpha(@theme_fg_color, 0.08);
+}
+
+.cd-kanban-card:hover {
+    background-color: shade(@theme_bg_color, 0.97);
+}
+
+/* ── Covey quadrants ───────────────────────────────────────────────────── */
+.cd-covey-quad {
+    border-radius: 8px;
+    border: 1px solid @cd_sidebar_sep;
+}
+
+.cd-covey-do    { border-color: alpha(#e01b24, 0.4); background-color: alpha(#e01b24, 0.04); }
+.cd-covey-delay { border-color: alpha(#3584e4, 0.4); background-color: alpha(#3584e4, 0.04); }
+.cd-covey-delegate  { border-color: alpha(#e66100, 0.4); background-color: alpha(#e66100, 0.04); }
+.cd-covey-eliminate { border-color: alpha(#9a9996, 0.5); background-color: alpha(#9a9996, 0.04); }
+
+.cd-covey-do    .cd-covey-title { color: #c01c28; }
+.cd-covey-delay .cd-covey-title { color: #1c71d8; }
+.cd-covey-delegate  .cd-covey-title { color: #c64600; }
+.cd-covey-eliminate .cd-covey-title { color: #77767b; }
+
+.cd-covey-list {
+    background-color: transparent;
+}
+
+/* ── List rows (event/task/note/issue list items) ─────────────────────── */
+list > row {
+    padding: 6px 10px;
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.06);
+}
+
+list > row:selected {
+    background-color: @cd_accent_dim;
+    color: @theme_fg_color;
+}
+
+list > row:hover {
+    background-color: @cd_row_hover;
+}
+
+/* Card-style rows (Capture, Issues side lists) */
+list.cd-card-list {
+    background-color: transparent;
+}
+list.cd-card-list > row {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+}
+list.cd-card-list > row:hover {
+    background: transparent;
+}
+list.cd-card-list > row:selected,
+list.cd-card-list > row:selected:hover {
+    background: transparent;
+    color: inherit;
+}
+list.cd-card-list row:selected .cd-list-card {
+    border-color: @cd_accent;
+    box-shadow: 0 0 0 1px alpha(@cd_accent, 0.35);
+}
+.cd-list-card {
+    padding: 10px 12px;
+    margin: 2px 0;
+    border-radius: 8px;
+    border: 1px solid alpha(@theme_fg_color, 0.1);
+    background-color: @theme_bg_color;
+}
+.cd-list-card:hover {
+    background-color: shade(@theme_bg_color, 0.98);
+}
+
+/* Capture: tag filter chips (toggle reflects selected filters) */
+flowbox.cd-memo-tags-flow {
+    padding: 2px 0;
+}
+button.cd-memo-tag-chip {
+    padding: 4px 11px;
+    border-radius: 14px;
+}
+button.cd-memo-tag-chip:checked {
+    background-image: none;
+    background-color: alpha(@cd_accent, 0.2);
+    color: @cd_accent;
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px alpha(@cd_accent, 0.4);
+}
+
+/* Settings: notebook tabs (grouped like macOS Settings). */
+notebook.cd-settings-notebook header {
+    background-color: @cd_sidebar_bg;
+    border-bottom: 1px solid @cd_sidebar_sep;
+}
+notebook.cd-settings-notebook tab {
+    padding: 7px 14px;
+    min-height: 28px;
+}
+notebook.cd-settings-notebook tab:checked label {
+    font-weight: 600;
+    color: @cd_accent;
+}
+
+/* Pomodoro modal — clear hierarchy, accent primary */
+.cd-pomodoro-dialog headerbar {
+    border-bottom-color: @cd_sidebar_sep;
+}
+.cd-pomodoro-dialog .cd-pomodoro-phase {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: alpha(@theme_fg_color, 0.65);
+}
+.cd-pomodoro-dialog .cd-pomodoro-time {
+    font-size: 2.35rem;
+    font-weight: 300;
+    font-feature-settings: "tnum";
+    color: @theme_fg_color;
+    margin-top: 4px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-session {
+    font-size: 0.92rem;
+    color: alpha(@theme_fg_color, 0.55);
+}
+.cd-pomodoro-dialog .cd-pomodoro-task {
+    font-size: 0.95rem;
+    color: alpha(@theme_fg_color, 0.75);
+}
+.cd-pomodoro-dialog .cd-pomodoro-section-label {
+    color: alpha(@theme_fg_color, 0.45);
+}
+.cd-pomodoro-dialog .cd-pomodoro-sep {
+    margin-top: 12px;
+}
+.cd-pomodoro-dialog .linked .cd-pomodoro-linked-quiet {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-transport {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.cd-pomodoro-dialog .cd-pomodoro-transport label {
+    font-weight: 600;
+}
+
+/* ── Dashboard (cards + weekly activity) ──────────────────────────────── */
+.cd-dash-frame > border {
+    border-radius: 8px;
+}
+.cd-dash-frame {
+    border-radius: 8px;
+}
+.cd-dash-frame label {
+    font-weight: 600;
+}
+.cd-dash-section-hint {
+    font-size: 0.85rem;
+    color: alpha(@theme_fg_color, 0.55);
+}
+.cd-dash-empty {
+    font-size: 0.92rem;
+    color: alpha(@theme_fg_color, 0.45);
+}
+.cd-dash-pill {
+    background-color: alpha(@theme_fg_color, 0.06);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 88px;
+}
+.cd-dash-pill-caption {
+    font-size: 0.78rem;
+    color: alpha(@theme_fg_color, 0.55);
+}
+.cd-dash-day-lab {
+    font-size: 0.72rem;
+    color: alpha(@theme_fg_color, 0.55);
+}
+.cd-dash-metric-green {
+    color: #2ec27e;
+}
+.cd-dash-metric-orange {
+    color: #e66100;
+}
+.cd-dash-metric-blue {
+    color: @cd_accent;
+}
+.cd-dash-level-tasks,
+.cd-dash-level-pom {
+    min-height: 14px;
+}
+.cd-dash-level-tasks trough,
+.cd-dash-level-pom trough {
+    background-color: alpha(@theme_fg_color, 0.14);
+    border-radius: 5px;
+    min-height: 10px;
+}
+.cd-dash-level-tasks block.empty,
+.cd-dash-level-pom block.empty {
+    background-color: transparent;
+}
+.cd-dash-level-tasks block.filled {
+    background-color: #2ec27e;
+    border-radius: 4px;
+}
+.cd-dash-level-pom trough {
+    min-height: 10px;
+    border-radius: 4px;
+}
+.cd-dash-level-pom block.filled {
+    background-color: #e66100;
+    border-radius: 4px;
+}
+.cd-dash-issues-title {
+    font-weight: 600;
+    font-size: 1rem;
+}

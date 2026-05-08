@@ -1,0 +1,26 @@
+id: com.crossdashboard.app
+# Runtime 46 — matches Meson WebKit/cmark stack on current Flatpak GNOME SDK.
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: cross-dashboard
+
+finish-args:
+  - --share=network
+  - --filesystem=xdg-config
+  - --filesystem=xdg-data
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd6
+  - --device=dri
+
+modules:
+  - name: cross-dashboard
+    buildsystem: meson
+    config-opts:
+      - --prefix=/app
+    sources:
+      - type: dir
+        path: ..
+    cleanup:
+      - /include
+      - '*.a'
