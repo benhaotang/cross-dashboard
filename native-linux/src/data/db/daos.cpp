@@ -315,6 +315,20 @@ void EventDao::upsert_all(std::vector<CalendarEvent> const& rows)
     sqlite3_finalize(st);
 }
 
+void EventDao::replace_all(std::vector<CalendarEvent> const& rows)
+{
+    exec_sql_cd(db_.raw(), "BEGIN IMMEDIATE;");
+    try {
+        delete_all();
+        upsert_all(rows);
+        exec_sql_cd(db_.raw(), "COMMIT;");
+    }
+    catch (...) {
+        try { exec_sql_cd(db_.raw(), "ROLLBACK;"); } catch (...) {}
+        throw;
+    }
+}
+
 void EventDao::delete_all()
 {
     char* err{};
@@ -464,6 +478,20 @@ void TaskDao::upsert_all(std::vector<CalDavTask> const& rows)
     sqlite3_finalize(st);
 }
 
+void TaskDao::replace_all(std::vector<CalDavTask> const& rows)
+{
+    exec_sql_cd(db_.raw(), "BEGIN IMMEDIATE;");
+    try {
+        delete_all();
+        upsert_all(rows);
+        exec_sql_cd(db_.raw(), "COMMIT;");
+    }
+    catch (...) {
+        try { exec_sql_cd(db_.raw(), "ROLLBACK;"); } catch (...) {}
+        throw;
+    }
+}
+
 void TaskDao::delete_all()
 {
     char* err{};
@@ -560,6 +588,20 @@ void NoteDao::upsert_all(std::vector<Note> const& rows)
         sqlite3_clear_bindings(st);
     }
     sqlite3_finalize(st);
+}
+
+void NoteDao::replace_all(std::vector<Note> const& rows)
+{
+    exec_sql_cd(db_.raw(), "BEGIN IMMEDIATE;");
+    try {
+        delete_all();
+        upsert_all(rows);
+        exec_sql_cd(db_.raw(), "COMMIT;");
+    }
+    catch (...) {
+        try { exec_sql_cd(db_.raw(), "ROLLBACK;"); } catch (...) {}
+        throw;
+    }
 }
 
 void NoteDao::delete_all()
@@ -685,6 +727,20 @@ void IssueDao::upsert_all(std::vector<GiteaIssue> const& rows)
     sqlite3_finalize(st);
 }
 
+void IssueDao::replace_all(std::vector<GiteaIssue> const& rows)
+{
+    exec_sql_cd(db_.raw(), "BEGIN IMMEDIATE;");
+    try {
+        delete_all();
+        upsert_all(rows);
+        exec_sql_cd(db_.raw(), "COMMIT;");
+    }
+    catch (...) {
+        try { exec_sql_cd(db_.raw(), "ROLLBACK;"); } catch (...) {}
+        throw;
+    }
+}
+
 void IssueDao::delete_all()
 {
     exec_sql_cd(db_.raw(),
@@ -803,6 +859,20 @@ void MemoDao::upsert_all(std::vector<MemosMemo> const& rows)
         sqlite3_clear_bindings(st);
     }
     sqlite3_finalize(st);
+}
+
+void MemoDao::replace_all(std::vector<MemosMemo> const& rows)
+{
+    exec_sql_cd(db_.raw(), "BEGIN IMMEDIATE;");
+    try {
+        delete_all();
+        upsert_all(rows);
+        exec_sql_cd(db_.raw(), "COMMIT;");
+    }
+    catch (...) {
+        try { exec_sql_cd(db_.raw(), "ROLLBACK;"); } catch (...) {}
+        throw;
+    }
 }
 
 void MemoDao::delete_all()

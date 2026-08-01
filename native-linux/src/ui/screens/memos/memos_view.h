@@ -42,7 +42,7 @@ private:
     Gtk::ToggleButton normal_btn_{"Normal"};
     Gtk::ToggleButton archived_btn_{"Archived"};
     Gtk::SearchEntry search_;
-    Gtk::Button new_btn_{"New capture"};
+    Gtk::Button new_btn_{};
     Gtk::Box tag_bar_;
     Gtk::FlowBox tags_;
     Gtk::Button clear_tag_filters_btn_{};

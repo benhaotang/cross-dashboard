@@ -16,6 +16,7 @@ public:
     [[nodiscard]] std::optional<Note> get_by_uid(std::string const& uid) const;
     void upsert(Note const& row);
     void upsert_all(std::vector<Note> const& rows);
+    void replace_all(std::vector<Note> const& rows);
     void delete_all();
     void delete_by_uid(std::string const& uid);
 

@@ -6,7 +6,11 @@ extern "C" {
 #include <glib.h>
 #include <gtk/gtk.h>
 #if CD_HAVE_APPINDICATOR
+#if CD_APPINDICATOR_AYATANA
+#include <libayatana-appindicator/app-indicator.h>
+#else
 #include <libappindicator/app-indicator.h>
+#endif
 #endif
 }
 

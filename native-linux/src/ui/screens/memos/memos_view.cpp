@@ -116,7 +116,7 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     // New capture: icon-only button
     new_btn_.set_label("");
-    new_btn_.set_image_from_icon_name("document-new-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    new_btn_.set_image_from_icon_name("list-add-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     new_btn_.set_tooltip_text("New capture");
     new_btn_.set_relief(Gtk::RELIEF_NONE);
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(new_btn_.gobj())), "cd-icon-btn");

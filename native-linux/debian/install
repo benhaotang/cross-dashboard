@@ -1,5 +1,10 @@
 usr/bin/cross-dashboard
+usr/bin/cross-dashboard-cli
+usr/libexec/cross-dashboard-service
+usr/lib/systemd/user/crossdashboard.service
 usr/share/applications/com.crossdashboard.app.desktop
+usr/share/dbus-1/services/com.crossdashboard.Service.service
 usr/share/metainfo/com.crossdashboard.app.metainfo.xml
+usr/share/man/man1/cross-dashboard-cli.1
 usr/share/cross-dashboard
 usr/share/icons/hicolor/scalable/apps/com.crossdashboard.app.svg

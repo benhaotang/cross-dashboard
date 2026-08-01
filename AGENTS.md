@@ -563,6 +563,16 @@ native-linux/
 | Notifications | libnotify |
 | Pomodoro tray | libappindicator3 (XFCE/KDE/MATE native; GNOME needs extension — see MIGRATION.md) |
 
+### Linux process and navigation coordination
+
+- `cross-dashboard-service` is the sole periodic-sync and event-reminder owner. The GTK frontend and
+  `cross-dashboard-cli sync` request force refreshes over `com.crossdashboard.Service` D-Bus.
+- GUI, CLI, and service repository mutations use the per-user `OperationLock`; SQLite uses WAL, a
+  5-second busy timeout, and transactional `replace_all()` operations so readers never observe the
+  temporary empty state of a cache refresh.
+- The main window uses `HdyLeaflet`: a persistent 240px sidebar when wide and a header-bar toggle plus
+  swipe navigation when folded below the combined sidebar/content minimum width.
+
 ### Key Platform Differences from Android
 
 | Android | Linux equivalent |
@@ -585,10 +595,12 @@ native-linux/
 **Phase 2** — Core UI & navigation — ✅ Done (`main.cpp`, leaflet shell, Dashboard, Tasks views)
 
 **Phase 3** — Remaining screens — ✅ Done (Events, Notes w/ `HdySearchBar`, Issues w/ comments/attachments, Inbox, Views Kanban DnD, Settings, `ReadMarkdownField`, MathJax bundle)
-**Phase 4** — Background sync & notifications — 🔄 In progress (`background/sync_scheduler.*`, `background/notification_scheduler.*`, `--reschedule-alarms` command-line handler, systemd user unit scaffolding)
+**Phase 4** — Background sync & notifications — ✅ Done (`cross-dashboard-service` persistent systemd user service owns scheduled sync and libnotify event reminders; GUI/CLI force refresh over `com.crossdashboard.Service` D-Bus)
 **Phase 5** — Pomodoro timer — ✅ Done (`ui/app_viewmodel.*` timer state/tick loop, `ui/components/pomodoro_bar.*`, `ui/components/pomodoro_modal.*`, `background/pomodoro_status_item.*` tray integration with passive fallback, session log append into task description)
 **Phase 6** — Capture (Memos) screen — ✅ Done (`ui/screens/memos/*` list/detail/dialogs, attachment preview widget, capture deep-link/file prefill wiring, and Docker `meson compile` + `meson test` smoke pass)
 **Phase 7** — Nav reorder, polish, Flatpak + `.deb` packaging — ✅ Done
+
+**Phase 8** — Linux CLI + stable markdown sizing — ✅ Done (`cross-dashboard-cli` smart task/capture piping, cached entity listings, service-driven sync, terminal Pomodoro notifications; fixed internally-scrollable WebKit markdown viewports replace document-height JavaScript polling)
 
 ---
 

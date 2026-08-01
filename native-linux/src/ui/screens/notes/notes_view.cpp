@@ -174,7 +174,7 @@ NotesView::NotesView(AppContainer& app, SyncScheduler& sync)
     detail_.pack_start(*detail_hdr, false, false);
     auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
     detail_.pack_start(*sep, false, false);
-    detail_.pack_start(*body, false, false);
+    detail_.pack_start(*body, true, true);
 
     detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     detail_scroll_.add(detail_);

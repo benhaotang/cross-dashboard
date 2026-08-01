@@ -74,6 +74,8 @@ Database::Database(std::string path)
         throw std::runtime_error(message);
     }
     db_.reset(raw);
+    if (sqlite3_busy_timeout(db_.get(), 5000) != SQLITE_OK)
+        throw std::runtime_error(sqlite3_errmsg(db_.get()));
     exec_sql(db_.get(), "PRAGMA journal_mode=WAL;");
     exec_sql(db_.get(), "PRAGMA foreign_keys=ON;");
     migrate();

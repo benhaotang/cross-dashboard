@@ -12,7 +12,7 @@ namespace cd {
 /** Label (small caps via markup) + read-only markdown body — mirrors mobile `ReadMarkdownField`. */
 class ReadMarkdownField final : public Gtk::Box {
 public:
-    ReadMarkdownField();
+    explicit ReadMarkdownField(MarkdownView::HeightMode height_mode = MarkdownView::HeightMode::Full);
     ReadMarkdownField(ReadMarkdownField const&) = delete;
     ReadMarkdownField& operator=(ReadMarkdownField const&) = delete;
 

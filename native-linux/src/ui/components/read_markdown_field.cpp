@@ -6,15 +6,16 @@
 
 namespace cd {
 
-ReadMarkdownField::ReadMarkdownField()
+ReadMarkdownField::ReadMarkdownField(MarkdownView::HeightMode height_mode)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , title_("")
-    , body_{}
+    , body_{height_mode}
 {
     title_.set_halign(Gtk::ALIGN_START);
     title_.set_use_markup(true);
     pack_start(title_, false, false);
-    pack_start(body_, false, false);
+    bool const fills_detail = height_mode == MarkdownView::HeightMode::Full;
+    pack_start(body_, fills_detail, fills_detail);
 }
 
 void ReadMarkdownField::set_field_label(std::string const& small_caps_title)

@@ -76,7 +76,7 @@ EventsView::EventsView(AppContainer& app, SyncScheduler& sync)
 
     detail_.pack_start(detail_title_, false, false);
     detail_.pack_start(detail_when_, false, false);
-    detail_.pack_start(*md, false, false);
+    detail_.pack_start(*md, true, true);
 
     detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     detail_scroll_.add(detail_);

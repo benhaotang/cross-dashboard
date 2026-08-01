@@ -18,6 +18,7 @@ public:
     [[nodiscard]] std::vector<CalDavTask> get_due_soon(EpochMillis deadline_epoch, int limit) const;
     void upsert(CalDavTask const& row);
     void upsert_all(std::vector<CalDavTask> const& rows);
+    void replace_all(std::vector<CalDavTask> const& rows);
     void delete_all();
     void delete_by_uid(std::string const& uid);
 

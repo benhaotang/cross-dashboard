@@ -3,8 +3,8 @@
 #include "app_container.h"
 #include "app_viewmodel.h"
 #include "app_window.h"
-#include "background/notification_scheduler.h"
 #include "background/pomodoro_status_item.h"
+#include "background/service_dbus.h"
 #include "background/sync_scheduler.h"
 #include "data/prefs/prefs.h"
 
@@ -17,6 +17,24 @@
 namespace cd {
 
 namespace {
+
+bool request_service_sync_compat()
+{
+    GError* error = nullptr;
+    GDBusConnection* bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+    if (!bus) {
+        if (error) g_error_free(error);
+        return false;
+    }
+    GVariant* reply = g_dbus_connection_call_sync(bus, service_dbus::kBusName,
+        service_dbus::kObjectPath, service_dbus::kInterface, service_dbus::kSyncMethod, nullptr,
+        G_VARIANT_TYPE("(b)"), G_DBUS_CALL_FLAGS_NONE, 10000, nullptr, &error);
+    bool const ok = reply != nullptr;
+    if (reply) g_variant_unref(reply);
+    if (error) g_error_free(error);
+    g_object_unref(bus);
+    return ok;
+}
 
 void route_open_uri(Glib::ustring const& uri_ustr, AppViewModel& vm)
 {
@@ -69,14 +87,6 @@ void route_open_uri(Glib::ustring const& uri_ustr, AppViewModel& vm)
     g_free(dec);
 }
 
-gboolean delayed_first_sync_once(gpointer data)
-{
-    auto* sync = static_cast<SyncScheduler*>(data);
-    if (sync)
-        sync->sync_once();
-    return G_SOURCE_REMOVE;
-}
-
 } // namespace
 
 Glib::RefPtr<CdApplication> CdApplication::create()
@@ -96,10 +106,8 @@ void CdApplication::ensure_init()
         container_ = std::make_unique<AppContainer>();
     if (!model_)
         model_ = std::make_unique<AppViewModel>(*container_);
-    if (!notifications_)
-        notifications_ = std::make_unique<NotificationScheduler>(*container_);
     if (!sync_scheduler_)
-        sync_scheduler_ = std::make_unique<SyncScheduler>(*container_, *notifications_);
+        sync_scheduler_ = std::make_unique<SyncScheduler>();
     if (!pomodoro_status_item_)
         pomodoro_status_item_ = std::make_unique<PomodoroStatusItem>(*model_);
     if (!present_signal_bound_) {
@@ -124,9 +132,6 @@ void CdApplication::on_activate()
     AppSettings const settings = merged_app_preferences(container_->prefs());
     sync_scheduler_->start(settings.widget_sync_interval_minutes * 60);
     present_main();
-    // Full sync is heavy (network + parsers) and blocks this thread. Defer several seconds so the UI can
-    // process events; low priority so pending GTK work runs first.
-    g_timeout_add_full(G_PRIORITY_LOW, 2500, delayed_first_sync_once, sync_scheduler_.get(), nullptr);
 }
 
 void CdApplication::on_open(const Gio::Application::type_vec_files& files, const Glib::ustring& hint)
@@ -143,18 +148,18 @@ int CdApplication::on_command_line(Glib::RefPtr<Gio::ApplicationCommandLine> con
     ensure_init();
     int argc = 0;
     char** argv = command_line->get_arguments(argc);
-    bool reschedule_only = false;
+    bool sync_only = false;
     for (int i = 0; i < argc; ++i) {
-        if (argv[i] && std::string(argv[i]) == "--reschedule-alarms") {
-            reschedule_only = true;
+        if (argv[i] && (std::string(argv[i]) == "--reschedule-alarms"
+                || std::string(argv[i]) == "--sync")) {
+            sync_only = true;
             break;
         }
     }
     if (argv) g_strfreev(argv);
 
-    if (reschedule_only) {
-        notifications_->reschedule_all();
-        return 0;
+    if (sync_only) {
+        return request_service_sync_compat() ? 0 : 1;
     }
 
     activate();

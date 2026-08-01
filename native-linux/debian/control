@@ -20,7 +20,7 @@ Build-Depends:
  libcmark-gfm-extensions-dev,
  libwebkit2gtk-4.1-dev | libwebkit2gtk-4.0-dev,
  libnotify-dev,
- libappindicator3-dev,
+ libayatana-appindicator3-dev | libappindicator3-dev,
 Standards-Version: 4.7.2
 
 Package: cross-dashboard

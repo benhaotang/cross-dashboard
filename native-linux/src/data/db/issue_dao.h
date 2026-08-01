@@ -17,6 +17,7 @@ public:
     [[nodiscard]] std::vector<GiteaIssue> get_by_state(std::string const& state) const;
     void upsert(GiteaIssue const& row);
     void upsert_all(std::vector<GiteaIssue> const& rows);
+    void replace_all(std::vector<GiteaIssue> const& rows);
     void delete_all();
 
 private:

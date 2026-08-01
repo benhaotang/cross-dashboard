@@ -49,4 +49,48 @@ url: crossdashboard://capture?text={popclip text}
 > [!NOTE]
 > This is mainly a personal project for myself, therefore, only Android 16+ and Mac OS 15+ are supported, with no plan to support older versions.
 
+## Linux CLI and background service
+
+Native Linux installs `cross-dashboard-cli` alongside the GTK application. It shares the app's
+credentials, preferences, and SQLite cache:
+
+```bash
+# Smart task input (arguments or stdin)
+cross-dashboard-cli task '!!! deploy hotfix #work tomorrow morning'
+echo 'buy milk #errands tonight' | cross-dashboard-cli task
+
+# Capture to Memos
+echo 'Follow up with Alice' | cross-dashboard-cli capture
+
+# Cached listings; active/upcoming/open items are the default
+cross-dashboard-cli list tasks
+cross-dashboard-cli list events --json
+cross-dashboard-cli list issues --all
+
+# Force the background service to sync now
+cross-dashboard-cli sync
+
+# Terminal countdown plus desktop start/completion notifications
+cross-dashboard-cli pomo task 'deploy hotfix'
+cross-dashboard-cli pomo task -u 'exact-task-uid'
+cross-dashboard-cli pomo issue 'owner/repo#42' --minutes 50
+```
+
+Title-based Pomodoro lookup is interactive: it ranks exact, substring, and fuzzy matches and asks
+you to choose from a list showing calendar/due-date context. Use `task -u UID` in scripts or when
+you already know the exact task UID.
+
+Sync and calendar reminder delivery are owned by a persistent systemd user service, not the GTK
+frontend or cron. Enable it once after a native install:
+
+```bash
+systemctl --user daemon-reload # needed after a direct `meson install`; distro packages do this
+systemctl --user enable --now crossdashboard.service
+systemctl --user status crossdashboard.service
+journalctl --user -u crossdashboard.service
+```
+
+The service uses the sync interval configured in the app, keeps precise event reminder timers alive,
+and exposes a user-session D-Bus endpoint for force refreshes from the GUI and CLI.
+
 Shared under the MIT license. (If AI code is licensable:))

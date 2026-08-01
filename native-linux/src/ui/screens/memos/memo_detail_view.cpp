@@ -205,7 +205,7 @@ MemoDetailView::MemoDetailView(AppContainer& app)
 
     toolbar_.pack_end(edit_btn_, false, false);
 
-    auto* md = Gtk::manage(new MarkdownView());
+    auto* md = Gtk::manage(new MarkdownView(MarkdownView::HeightMode::WithFollowingContent));
     markdown_ = md;
     content_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     content_column_.set_margin_start(8);
@@ -301,7 +301,7 @@ void MemoDetailView::rebuild()
         auto comment_list = app_.memos_client().list_memo_comments(memo.name);
         for (auto const& c : comment_list) {
             auto* row = Gtk::manage(new Gtk::ListBoxRow());
-            auto* crm = Gtk::manage(new ReadMarkdownField());
+            auto* crm = Gtk::manage(new ReadMarkdownField(MarkdownView::HeightMode::Embedded));
             crm->set_field_label("");
             crm->set_markdown(c.content.empty() ? "_" : c.content);
             row->add(*crm);

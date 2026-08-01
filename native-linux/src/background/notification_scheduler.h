@@ -26,6 +26,7 @@ private:
 
     AppContainer& app_;
     std::unordered_map<int, AlarmTimer> timers_;
+    std::unordered_map<int, std::int64_t> notified_alarm_times_;
 };
 
 } // namespace cd

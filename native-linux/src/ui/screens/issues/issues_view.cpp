@@ -104,7 +104,7 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     detail_meta_.set_line_wrap(true);
     detail_meta_.set_selectable(true);
 
-    auto* rm = Gtk::manage(new ReadMarkdownField());
+    auto* rm = Gtk::manage(new ReadMarkdownField(MarkdownView::HeightMode::WithFollowingContent));
     body_ = rm;
     rm->set_field_label("Description");
     rm->set_markdown("");
@@ -261,7 +261,7 @@ void IssuesView::load_detail_from_network()
 
             vb->pack_start(*who, false, false);
 
-            auto* crm = Gtk::manage(new ReadMarkdownField());
+            auto* crm = Gtk::manage(new ReadMarkdownField(MarkdownView::HeightMode::Embedded));
             crm->set_field_label("");
             crm->set_markdown(c.body.empty() ? "_" : c.body);
             vb->pack_start(*crm, false, false);

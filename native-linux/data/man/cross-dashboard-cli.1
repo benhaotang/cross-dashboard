@@ -1,0 +1,74 @@
+.TH CROSS-DASHBOARD-CLI 1 "August 2026" "Cross-Dashboard 1.0.0" "User Commands"
+.SH NAME
+cross-dashboard-cli \- command-line access to Cross-Dashboard
+.SH SYNOPSIS
+.B cross-dashboard-cli task
+.RI [ smart-text ]
+.br
+.B cross-dashboard-cli capture
+.RI [ text ]
+.br
+.B cross-dashboard-cli list
+.I type
+.RI [ --all ]
+.RI [ --json ]
+.br
+.B cross-dashboard-cli sync
+.br
+.B cross-dashboard-cli pomo
+.I type target
+.RI [ --minutes N ]
+.br
+.B cross-dashboard-cli pomo task -u
+.I uid
+.RI [ --minutes N ]
+.SH DESCRIPTION
+Uses the same credentials, preferences, and SQLite cache as the native Linux GTK application.
+Input for
+.B task
+and
+.B capture
+is read from standard input when no text arguments are supplied.
+.PP
+The
+.B sync
+command asks the persistent Cross-Dashboard systemd user service to refresh all configured
+backends and waits for its completion signal. It does not perform a second in-process sync.
+.SH COMMANDS
+.TP
+.B task
+Create a CalDAV task with the app's smart priority, tag, and natural-date parsing.
+.TP
+.B capture
+Create a private memo on the configured Memos server.
+.TP
+.B list
+List cached tasks, events, issues, notes, or Capture memos. Tasks default to active, events to
+upcoming, issues to open, and memos to normal. Use
+.B --all
+to include inactive records.
+.TP
+.B sync
+Request an immediate service-owned sync over the user D-Bus.
+.TP
+.B pomo
+Run a foreground terminal Pomodoro for a cached task, event, or issue. Title lookup ranks exact,
+substring, and fuzzy matches, then asks for confirmation from a contextual list. Task choices show
+their calendar, status, due date, and UID, so same-named and recurring tasks can be distinguished.
+Use
+.B -u UID
+for exact task selection without an interactive chooser. Desktop notifications are shown at start
+and completion; completed task sessions are appended to the task description.
+.SH SERVICE
+Enable background sync and reminders with:
+.PP
+.EX
+systemctl --user daemon-reload
+systemctl --user enable --now crossdashboard.service
+.EE
+.PP
+Inspect logs with:
+.PP
+.EX
+journalctl --user -u crossdashboard.service
+.EE

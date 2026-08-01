@@ -1,5 +1,6 @@
 #include "repositories.h"
 
+#include "operation_lock.h"
 #include "repo_utils.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
@@ -75,6 +76,7 @@ std::vector<std::string> EventRepository::selected_calendar_hrefs() const
 
 void EventRepository::sync_many(std::vector<std::string> const& calendar_hrefs)
 {
+    OperationLock operation_lock;
     using namespace std::chrono;
     if (calendar_hrefs.empty()) return;
     EpochMillis now_m = millis_now_wall();
@@ -85,8 +87,7 @@ void EventRepository::sync_many(std::vector<std::string> const& calendar_hrefs)
 
     auto upcoming = dao_.get_upcoming(0, 1);
     if (!fresh.empty() || !upcoming.empty()) {
-        dao_.delete_all();
-        dao_.upsert_all(fresh);
+        dao_.replace_all(fresh);
     }
 }
 
@@ -97,6 +98,7 @@ std::vector<CalendarEvent> EventRepository::get_upcoming(int limit)
 
 CalendarEvent EventRepository::create(CalendarEvent const& event, std::string const& calendar_href)
 {
+    OperationLock operation_lock;
     auto saved = client_.create_event(event, calendar_href);
     dao_.upsert_all(std::vector<CalendarEvent>{saved});
     return saved;
@@ -104,6 +106,7 @@ CalendarEvent EventRepository::create(CalendarEvent const& event, std::string co
 
 void EventRepository::remove(CalendarEvent const& event)
 {
+    OperationLock operation_lock;
     client_.delete_event(event);
     dao_.delete_all();
 }
@@ -119,17 +122,18 @@ TaskRepository::TaskRepository(TaskDao& dao, DailyStatsDao& stats, CalDavClient&
 
 void TaskRepository::sync_many(std::vector<std::string> const& calendar_hrefs)
 {
+    OperationLock operation_lock;
     if (calendar_hrefs.empty()) return;
     auto fresh = client_.fetch_tasks(calendar_hrefs);
     auto duepeek = dao_.get_due_soon(std::numeric_limits<EpochMillis>::max(), 1);
     if (!fresh.empty() || !duepeek.empty()) {
-        dao_.delete_all();
-        dao_.upsert_all(fresh);
+        dao_.replace_all(fresh);
     }
 }
 
 CalDavTask TaskRepository::create(CalDavTask const& task, std::string const& calendar_href)
 {
+    OperationLock operation_lock;
     auto saved = client_.create_task(task, calendar_href);
     dao_.upsert_all(std::vector<CalDavTask>{saved});
     return saved;
@@ -137,12 +141,14 @@ CalDavTask TaskRepository::create(CalDavTask const& task, std::string const& cal
 
 void TaskRepository::update(CalDavTask const& task)
 {
+    OperationLock operation_lock;
     client_.update_task(task);
     dao_.upsert_all(std::vector<CalDavTask>{task});
 }
 
 void TaskRepository::remove(CalDavTask const& task)
 {
+    OperationLock operation_lock;
     client_.delete_task(task);
     dao_.delete_by_uid(task.uid);
 }
@@ -176,17 +182,18 @@ NoteRepository::NoteRepository(NoteDao& dao, CalDavClient& client)
 
 void NoteRepository::sync_many(std::vector<std::string> const& calendar_hrefs)
 {
+    OperationLock operation_lock;
     if (calendar_hrefs.empty()) return;
     auto fresh = client_.fetch_notes(calendar_hrefs);
     bool no_sentinel = !dao_.get_by_uid("_").has_value();
     if (!fresh.empty() || no_sentinel) {
-        dao_.delete_all();
-        dao_.upsert_all(fresh);
+        dao_.replace_all(fresh);
     }
 }
 
 Note NoteRepository::create(Note const& note, std::string const& calendar_href)
 {
+    OperationLock operation_lock;
     auto saved = client_.create_note(note, calendar_href);
     dao_.upsert_all(std::vector<Note>{saved});
     return saved;
@@ -194,12 +201,14 @@ Note NoteRepository::create(Note const& note, std::string const& calendar_href)
 
 void NoteRepository::update(Note const& note)
 {
+    OperationLock operation_lock;
     client_.update_note(note);
     dao_.upsert_all(std::vector<Note>{note});
 }
 
 void NoteRepository::remove(Note const& note)
 {
+    OperationLock operation_lock;
     client_.delete_note(note);
     dao_.delete_by_uid(note.uid);
 }
@@ -215,6 +224,7 @@ IssueRepository::IssueRepository(IssueDao& dao, DailyStatsDao& stats, GiteaClien
 
 void IssueRepository::sync_many(std::vector<std::string> const& repositories)
 {
+    OperationLock operation_lock;
     if (repositories.empty()) return;
     auto open = client_.fetch_issues(repositories, "open");
     auto closed = client_.fetch_issues(repositories, "closed");
@@ -223,14 +233,14 @@ void IssueRepository::sync_many(std::vector<std::string> const& repositories)
     all.insert(all.end(), open.begin(), open.end());
     all.insert(all.end(), closed.begin(), closed.end());
     if (!all.empty()) {
-        dao_.delete_all();
-        dao_.upsert_all(all);
+        dao_.replace_all(all);
     }
 }
 
 GiteaIssue IssueRepository::update_issue(std::string const& repo, int number,
     std::optional<std::string> title, std::optional<std::string> body, std::optional<std::string> state)
 {
+    OperationLock operation_lock;
     auto updated = client_.update_issue(repo, number, title, body, state);
     dao_.upsert_all(std::vector<GiteaIssue>{updated});
     if (state.has_value() && *state == "closed")
@@ -245,11 +255,13 @@ std::vector<GiteaComment> IssueRepository::fetch_comments(std::string const& rep
 
 void IssueRepository::add_comment(std::string const& repo, int number, std::string const& body)
 {
+    OperationLock operation_lock;
     (void)client_.add_comment(repo, number, body);
 }
 
 void IssueRepository::replace_labels(std::string const& repo, int number, std::vector<std::string> label_names)
 {
+    OperationLock operation_lock;
     auto existing = client_.fetch_labels(repo);
     std::vector<std::int64_t> ids;
     ids.reserve(label_names.size());
@@ -289,6 +301,7 @@ void IssueRepository::replace_labels(std::string const& repo, int number, std::v
 
 GiteaIssue IssueRepository::create_issue(std::string const& repo, std::string const& title, std::string const& body)
 {
+    OperationLock operation_lock;
     auto issue = client_.create_issue(repo, title, body);
     dao_.upsert_all(std::vector<GiteaIssue>{issue});
     return issue;
@@ -304,6 +317,7 @@ MemoRepository::MemoRepository(MemoDao& dao, MemosClient& client)
 
 void MemoRepository::sync_all()
 {
+    OperationLock operation_lock;
     if (!client_.base_url_opt().has_value()) return;
 
     std::vector<MemosMemo> all_fetched;
@@ -322,14 +336,14 @@ void MemoRepository::sync_all()
     }
 
     if (!all_fetched.empty()) {
-        dao_.delete_all();
-        dao_.upsert_all(all_fetched);
+        dao_.replace_all(all_fetched);
     }
 }
 
 std::optional<MemosMemo> MemoRepository::create_memo(
     std::string const& content, MemoVisibility visibility, std::vector<PendingAttachment> const& attachments)
 {
+    OperationLock operation_lock;
     std::vector<std::string> names;
     for (auto const& pa : attachments) {
         auto att =
@@ -343,6 +357,7 @@ std::optional<MemosMemo> MemoRepository::create_memo(
 
 void MemoRepository::delete_memo(std::string const& memo_name, bool force)
 {
+    OperationLock operation_lock;
     if (!client_.delete_memo(memo_name, force))
         return;
     dao_.delete_by_name(memo_name);
@@ -350,6 +365,7 @@ void MemoRepository::delete_memo(std::string const& memo_name, bool force)
 
 std::optional<MemosMemo> MemoRepository::archive_memo(std::string const& memo_name)
 {
+    OperationLock operation_lock;
     auto updated = client_.update_memo(memo_name, std::nullopt, MemoState::Archived, std::nullopt);
     if (!updated.has_value()) return std::nullopt;
     dao_.upsert(*updated);
@@ -358,6 +374,7 @@ std::optional<MemosMemo> MemoRepository::archive_memo(std::string const& memo_na
 
 std::optional<MemosMemo> MemoRepository::restore_memo(std::string const& memo_name)
 {
+    OperationLock operation_lock;
     auto updated = client_.update_memo(memo_name, std::nullopt, MemoState::Normal, std::nullopt);
     if (!updated.has_value()) return std::nullopt;
     dao_.upsert(*updated);
@@ -367,6 +384,7 @@ std::optional<MemosMemo> MemoRepository::restore_memo(std::string const& memo_na
 std::optional<MemosMemo> MemoRepository::update_memo_content(
     std::string const& memo_name, std::string const& content, MemoVisibility visibility)
 {
+    OperationLock operation_lock;
     auto updated = client_.update_memo(memo_name, content, std::nullopt, visibility);
     if (!updated.has_value()) return std::nullopt;
     dao_.upsert(*updated);
@@ -376,11 +394,13 @@ std::optional<MemosMemo> MemoRepository::update_memo_content(
 void MemoRepository::add_memo_comment(
     std::string const& memo_name, std::string const& body, MemoVisibility visibility)
 {
+    OperationLock operation_lock;
     (void)client_.create_memo_comment(memo_name, body, visibility);
 }
 
 std::optional<std::string> MemoRepository::create_share(std::string const& memo_id)
 {
+    OperationLock operation_lock;
     return client_.create_memo_share(memo_id);
 }
 

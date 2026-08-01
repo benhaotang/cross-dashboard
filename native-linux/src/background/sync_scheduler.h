@@ -1,17 +1,15 @@
 #pragma once
 
+#include <gio/gio.h>
 #include <sigc++/signal.h>
 
 #include <cstdint>
 
 namespace cd {
 
-class AppContainer;
-class NotificationScheduler;
-
 class SyncScheduler final {
 public:
-    SyncScheduler(AppContainer& app, NotificationScheduler& notifications);
+    SyncScheduler();
     ~SyncScheduler();
 
     SyncScheduler(SyncScheduler const&) = delete;
@@ -21,15 +19,17 @@ public:
     void stop();
     void sync_once();
 
-    /** Fired on the GTK main thread after each `sync_once()` completes (success or catch). */
+    /** Fired on the GTK main thread when the service reports that its sync has completed. */
     sigc::signal<void()> signal_sync_completed;
 
 private:
-    bool ensure_systemd_units(int interval_seconds);
+    static void sync_signal_cb(GDBusConnection* connection, char const* sender_name,
+        char const* object_path, char const* interface_name, char const* signal_name,
+        GVariant* parameters, void* user_data);
+    static void sync_requested_cb(GObject* source, GAsyncResult* result, void* user_data);
 
-    AppContainer& app_;
-    NotificationScheduler& notifications_;
-    std::uint32_t source_id_{};
+    GDBusConnection* connection_{};
+    std::uint32_t subscription_id_{};
 };
 
 } // namespace cd
