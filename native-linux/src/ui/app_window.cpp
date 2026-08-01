@@ -64,12 +64,17 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     root_overlay_ = gtk_overlay_new();
     leaflet_ = GTK_WIDGET(hdy_leaflet_new());
     gtk_orientable_set_orientation(GTK_ORIENTABLE(leaflet_), GTK_ORIENTATION_HORIZONTAL);
+    // In wide/unfolded mode the navigation rail keeps its requested width;
+    // only the main content consumes extra horizontal space.
+    hdy_leaflet_set_homogeneous(
+        HDY_LEAFLET(leaflet_), FALSE, GTK_ORIENTATION_HORIZONTAL, FALSE);
     hdy_leaflet_set_transition_type(HDY_LEAFLET(leaflet_), HDY_LEAFLET_TRANSITION_TYPE_OVER);
     hdy_leaflet_set_can_swipe_back(HDY_LEAFLET(leaflet_), TRUE);
     hdy_leaflet_set_can_swipe_forward(HDY_LEAFLET(leaflet_), TRUE);
 
     sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_set_size_request(sidebar_box_, 240, -1);
+    gtk_widget_set_hexpand(sidebar_box_, FALSE);
     gtk_style_context_add_class(gtk_widget_get_style_context(sidebar_box_), "cd-sidebar");
 
     sidebar_list_ = gtk_list_box_new();
@@ -79,6 +84,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     main_outer_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_set_size_request(main_outer_, 480, -1);
+    gtk_widget_set_hexpand(main_outer_, TRUE);
     header_bar_ = GTK_WIDGET(hdy_header_bar_new());
     hdy_header_bar_set_show_close_button(HDY_HEADER_BAR(header_bar_), TRUE);
     hdy_header_bar_set_title(HDY_HEADER_BAR(header_bar_), "Cross-Dashboard");
@@ -86,6 +92,10 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     sidebar_toggle_btn_ = gtk_toggle_button_new();
     GtkWidget* sidebar_icon = gtk_image_new_from_icon_name("open-menu-symbolic", GTK_ICON_SIZE_BUTTON);
     gtk_container_add(GTK_CONTAINER(sidebar_toggle_btn_), sidebar_icon);
+    // The button itself is excluded from the initial show_all() while the
+    // leaflet is wide. Keep its child realized so showing the button after a
+    // fold does not produce an empty square.
+    gtk_widget_show(sidebar_icon);
     gtk_widget_set_tooltip_text(sidebar_toggle_btn_, "Show or hide navigation sidebar");
     gtk_widget_set_no_show_all(sidebar_toggle_btn_, TRUE);
     gtk_style_context_add_class(

@@ -117,6 +117,9 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     // New capture: icon-only button
     new_btn_.set_label("");
     new_btn_.set_image_from_icon_name("list-add-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    // Match the working labelled New Issue button: GTK may globally hide
+    // button images unless this property is explicitly enabled.
+    new_btn_.set_always_show_image(true);
     new_btn_.set_tooltip_text("New capture");
     new_btn_.set_relief(Gtk::RELIEF_NONE);
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(new_btn_.gobj())), "cd-icon-btn");
