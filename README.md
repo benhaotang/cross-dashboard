@@ -49,6 +49,19 @@ url: crossdashboard://capture?text={popclip text}
 > [!NOTE]
 > This is mainly a personal project for myself, therefore, only Android 16+ and Mac OS 15+ are supported, with no plan to support older versions.
 
+## Linux CalDAV defaults
+
+The native Linux app exposes default destination calendars under **Settings → CalDAV → Defaults
+for new items**. Run calendar discovery first, then choose and save:
+
+- Default event calendar from collections supporting `VEVENT`.
+- Default task calendar from collections supporting `VTODO`.
+- Default note calendar from collections supporting `VJOURNAL`.
+
+These defaults are used by task quick input, CLI task creation, new notes, Capture → Create Event,
+and Capture → Extract Tasks. Saving a default also keeps that calendar in the selected sync set.
+Existing saved defaults remain visible in Settings before calendars are rediscovered.
+
 ## Linux CLI and background service
 
 Native Linux installs `cross-dashboard-cli` alongside the GTK application. It shares the app's
@@ -90,7 +103,8 @@ you already know the exact task UID.
 
 The background service owns one global Pomodoro shared by the GTK UI, CLI, notifications, and
 Waybar. Starting another timer while one is active is rejected; interrupting the terminal display
-does not stop the background timer.
+does not stop the background timer. The GTK Pomodoro popup can link a new session to any cached
+incomplete task or open issue, and keeps pause/resume, stop, and skip controls available while it runs.
 
 ### Waybar module
 

@@ -2,6 +2,8 @@
 
 #include "app_container.h"
 #include "background/service_dbus.h"
+#include "data/db/issue_dao.h"
+#include "data/db/task_dao.h"
 #include "data/prefs/prefs.h"
 
 #include <glib.h>
@@ -13,6 +15,7 @@
 namespace cd {
 
 AppViewModel::AppViewModel(AppContainer& app)
+    : app_(app)
 {
     AppSettings const settings = merged_app_preferences(app.prefs());
     pomodoro_state_.settings = settings.pomodoro_settings;
@@ -87,8 +90,8 @@ void AppViewModel::start_pomodoro(PomodoroPhase phase)
     GError* error = nullptr;
     GVariant* reply = g_dbus_connection_call_sync(pomodoro_bus_, service_dbus::kBusName,
         service_dbus::kObjectPath, service_dbus::kInterface, service_dbus::kStartPomodoroMethod,
-        g_variant_new("(ssssi)", active_task_uid_.has_value() ? "task" : "timer",
-            active_task_uid_.value_or("").c_str(), active_task_title_.c_str(), phase_name, minutes),
+        g_variant_new("(ssssi)", active_target_kind_.c_str(), active_target_id_.c_str(),
+            active_target_title_.c_str(), phase_name, minutes),
         G_VARIANT_TYPE("(b)"), G_DBUS_CALL_FLAGS_NONE, 10000, nullptr, &error);
     if (reply) g_variant_unref(reply);
     if (error) {
@@ -116,10 +119,48 @@ void AppViewModel::skip_pomodoro_phase()
 
 void AppViewModel::set_active_task(std::string uid, std::string title)
 {
-    active_task_uid_ = std::move(uid);
-    active_task_title_ = std::move(title);
-    pomodoro_state_.item_title = active_task_title_;
+    set_pomodoro_target("task", std::move(uid), std::move(title));
+}
+
+void AppViewModel::set_pomodoro_target(std::string kind, std::string id, std::string title)
+{
+    if (kind != "task" && kind != "issue") {
+        kind = "timer";
+        id.clear();
+        title.clear();
+    }
+    active_target_kind_ = std::move(kind);
+    active_target_id_ = std::move(id);
+    active_target_title_ = std::move(title);
+    pomodoro_state_.item_title = active_target_title_;
     emit_pomodoro_state();
+}
+
+std::string AppViewModel::pomodoro_target_key() const
+{
+    return active_target_kind_ + ":" + active_target_id_;
+}
+
+std::vector<PomodoroTargetOption> AppViewModel::pomodoro_target_options() const
+{
+    std::vector<PomodoroTargetOption> result;
+    for (auto const& task : TaskDao(app_.db()).get_all()) {
+        if (task.status == TaskStatus::Completed || task.status == TaskStatus::Cancelled)
+            continue;
+        result.push_back({"task:" + task.uid, "task", task.uid, task.summary,
+            "Task · " + task.summary});
+    }
+    for (auto const& issue : IssueDao(app_.db()).get_all()) {
+        if (issue.state != "open") continue;
+        std::string const id = issue.repository + "#" + std::to_string(issue.number);
+        result.push_back({"issue:" + id, "issue", id, issue.title,
+            "Issue · " + issue.title + " — " + id});
+    }
+    std::stable_sort(result.begin(), result.end(), [](auto const& a, auto const& b) {
+        if (a.kind != b.kind) return a.kind == "task";
+        return a.display < b.display;
+    });
+    return result;
 }
 
 void AppViewModel::request_present_window()
@@ -156,7 +197,9 @@ void AppViewModel::apply_pomodoro_variant(GVariant* value)
     pomodoro_state_.seconds_left = pomodoro_state_.active
         ? seconds : phase_duration_seconds(PomodoroPhase::Work);
     pomodoro_state_.item_title = title ? title : "";
-    if (kind && std::string{kind} == "task" && id && *id) active_task_uid_ = id;
+    active_target_kind_ = kind && *kind ? kind : "timer";
+    active_target_id_ = id ? id : "";
+    active_target_title_ = title ? title : "";
     emit_pomodoro_state();
 }
 

@@ -192,9 +192,9 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
         combo.set_hexpand(true);
         defaults_grid->attach(combo, 1, row, 1, 1);
     };
-    attach_default("New events", default_event_calendar_, 0);
-    attach_default("New tasks", default_task_calendar_, 1);
-    attach_default("New notes", default_note_calendar_, 2);
+    attach_default("Default event calendar", default_event_calendar_, 0);
+    attach_default("Default task calendar", default_task_calendar_, 1);
+    attach_default("Default note calendar", default_note_calendar_, 2);
     default_event_calendar_.set_tooltip_text("Calendars supporting VEVENT");
     default_task_calendar_.set_tooltip_text("Calendars supporting VTODO");
     default_note_calendar_.set_tooltip_text("Calendars supporting VJOURNAL");
