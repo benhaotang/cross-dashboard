@@ -50,11 +50,14 @@ bool contains_ci(std::string const& hay, std::string const& needle)
 
 std::string pick_note_calendar(AppContainer& app)
 {
-    auto hrefs = app.events().selected_calendar_hrefs();
-    if (!hrefs.empty())
-        return hrefs[0];
+    if (auto s = app.secrets().get(CredentialKey::CALDAV_DEFAULT_NOTE_CALENDAR))
+        if (!s->empty()) return *s;
+    // Preserve the pre-selector behavior for existing installations until a
+    // dedicated note default is chosen.
     if (auto s = app.secrets().get(CredentialKey::CALDAV_DEFAULT_EVENT_CALENDAR))
         if (!s->empty()) return *s;
+    auto hrefs = app.events().selected_calendar_hrefs();
+    if (!hrefs.empty()) return hrefs[0];
     return {};
 }
 
@@ -174,7 +177,7 @@ NotesView::NotesView(AppContainer& app, SyncScheduler& sync)
     detail_.pack_start(*detail_hdr, false, false);
     auto* sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
     detail_.pack_start(*sep, false, false);
-    detail_.pack_start(*body, false, false);
+    detail_.pack_start(*body, true, true);
 
     detail_scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     detail_scroll_.add(detail_);
@@ -271,7 +274,7 @@ void NotesView::on_new_note()
         Gtk::Window* transient = dynamic_cast<Gtk::Window*>(get_toplevel());
         if (transient) {
             Gtk::MessageDialog dlg(
-                *transient, "Set CalDAV selected calendars or default event calendar.", false,
+                *transient, "Choose a default notes calendar in Settings → CalDAV.", false,
                 Gtk::MESSAGE_WARNING, Gtk::BUTTONS_CLOSE);
             dlg.run();
         }

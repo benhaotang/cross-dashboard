@@ -16,6 +16,7 @@ inline constexpr char CALDAV_AUTH_METHOD[] = "caldav_auth_method";
 inline constexpr char CALDAV_SELECTED_CALENDARS[] = "caldav_selected_calendars";
 inline constexpr char CALDAV_DEFAULT_EVENT_CALENDAR[] = "caldav_default_event_calendar";
 inline constexpr char CALDAV_DEFAULT_TASK_CALENDAR[] = "caldav_default_task_calendar";
+inline constexpr char CALDAV_DEFAULT_NOTE_CALENDAR[] = "caldav_default_note_calendar";
 inline constexpr char NEXTCLOUD_SSO_ACCOUNT[] = "nextcloud_sso_account";
 inline constexpr char GITEA_TOKEN[] = "gitea_token";
 inline constexpr char GITEA_INSTANCE[] = "gitea_instance";

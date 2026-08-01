@@ -17,6 +17,7 @@ public:
     [[nodiscard]] std::optional<MemosMemo> get_by_name(std::string const& name) const;
     void upsert(MemosMemo const& row);
     void upsert_all(std::vector<MemosMemo> const& rows);
+    void replace_all(std::vector<MemosMemo> const& rows);
     void delete_all();
     void delete_by_name(std::string const& name);
 

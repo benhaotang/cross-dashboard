@@ -33,9 +33,19 @@ namespace cd {
 
 namespace {
 
+extern "C" void app_window_leaflet_folded_cb(GObject*, GParamSpec*, gpointer user)
+{
+    static_cast<AppWindow*>(user)->on_leaflet_folded();
+}
+
 extern "C" void app_window_sidebar_row_cb(GtkListBox*, GtkListBoxRow* row, gpointer user)
 {
     static_cast<AppWindow*>(user)->on_screen_row(row);
+}
+
+extern "C" void app_window_sidebar_toggle_cb(GtkToggleButton*, gpointer user)
+{
+    static_cast<AppWindow*>(user)->on_sidebar_toggled();
 }
 
 } // namespace
@@ -52,13 +62,19 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     set_can_focus(true);
 
     root_overlay_ = gtk_overlay_new();
-    paned_ = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_paned_set_wide_handle(GTK_PANED(paned_), TRUE);
-    gtk_style_context_add_class(gtk_widget_get_style_context(paned_), "cd-main-paned");
-    if (AtkObject* a = gtk_widget_get_accessible(paned_))
-        atk_object_set_name(a, "Resize sidebar");
+    leaflet_ = GTK_WIDGET(hdy_leaflet_new());
+    gtk_orientable_set_orientation(GTK_ORIENTABLE(leaflet_), GTK_ORIENTATION_HORIZONTAL);
+    // In wide/unfolded mode the navigation rail keeps its requested width;
+    // only the main content consumes extra horizontal space.
+    hdy_leaflet_set_homogeneous(
+        HDY_LEAFLET(leaflet_), FALSE, GTK_ORIENTATION_HORIZONTAL, FALSE);
+    hdy_leaflet_set_transition_type(HDY_LEAFLET(leaflet_), HDY_LEAFLET_TRANSITION_TYPE_OVER);
+    hdy_leaflet_set_can_swipe_back(HDY_LEAFLET(leaflet_), TRUE);
+    hdy_leaflet_set_can_swipe_forward(HDY_LEAFLET(leaflet_), TRUE);
 
     sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_size_request(sidebar_box_, 240, -1);
+    gtk_widget_set_hexpand(sidebar_box_, FALSE);
     gtk_style_context_add_class(gtk_widget_get_style_context(sidebar_box_), "cd-sidebar");
 
     sidebar_list_ = gtk_list_box_new();
@@ -67,34 +83,54 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     gtk_box_pack_start(GTK_BOX(sidebar_box_), sidebar_list_, TRUE, TRUE, 0);
 
     main_outer_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_size_request(main_outer_, 480, -1);
+    gtk_widget_set_hexpand(main_outer_, TRUE);
     header_bar_ = GTK_WIDGET(hdy_header_bar_new());
     hdy_header_bar_set_show_close_button(HDY_HEADER_BAR(header_bar_), TRUE);
     hdy_header_bar_set_title(HDY_HEADER_BAR(header_bar_), "Cross-Dashboard");
+
+    sidebar_toggle_btn_ = gtk_toggle_button_new();
+    GtkWidget* sidebar_icon = gtk_image_new_from_icon_name("open-menu-symbolic", GTK_ICON_SIZE_BUTTON);
+    gtk_container_add(GTK_CONTAINER(sidebar_toggle_btn_), sidebar_icon);
+    // The button itself is excluded from the initial show_all() while the
+    // leaflet is wide. Keep its child realized so showing the button after a
+    // fold does not produce an empty square.
+    gtk_widget_show(sidebar_icon);
+    gtk_widget_set_tooltip_text(sidebar_toggle_btn_, "Show or hide navigation sidebar");
+    gtk_widget_set_no_show_all(sidebar_toggle_btn_, TRUE);
+    gtk_style_context_add_class(
+        gtk_widget_get_style_context(sidebar_toggle_btn_), "cd-icon-btn");
+    if (AtkObject* a = gtk_widget_get_accessible(sidebar_toggle_btn_))
+        atk_object_set_name(a, "Show or hide navigation sidebar");
 
     GtkWidget* pomodoro_btn = gtk_button_new_with_label("Pomodoro");
     gtk_widget_set_tooltip_text(pomodoro_btn, "Open Pomodoro timer");
     if (AtkObject* a = gtk_widget_get_accessible(pomodoro_btn))
         atk_object_set_name(a, "Open Pomodoro timer");
 
+    hdy_header_bar_pack_start(HDY_HEADER_BAR(header_bar_), sidebar_toggle_btn_);
     hdy_header_bar_pack_end(HDY_HEADER_BAR(header_bar_), pomodoro_btn);
 
     // Use header_bar_ as the window titlebar — eliminates the duplicate OS titlebar.
     gtk_window_set_titlebar(GTK_WINDOW(gobj()), header_bar_);
     gtk_box_pack_start(GTK_BOX(main_outer_), GTK_WIDGET(stack_.gobj()), TRUE, TRUE, 0);
 
-    gtk_paned_pack1(GTK_PANED(paned_), sidebar_box_, FALSE, FALSE);
-    gtk_paned_pack2(GTK_PANED(paned_), main_outer_, TRUE, TRUE);
-    gtk_paned_set_position(GTK_PANED(paned_), 240);
+    hdy_leaflet_insert_child_after(HDY_LEAFLET(leaflet_), sidebar_box_, nullptr);
+    hdy_leaflet_insert_child_after(HDY_LEAFLET(leaflet_), main_outer_, sidebar_box_);
+    hdy_leaflet_set_visible_child(HDY_LEAFLET(leaflet_), main_outer_);
 
     pomodoro_bar_ = std::make_unique<PomodoroBar>(vm_);
     pomodoro_modal_ = std::make_unique<PomodoroModal>(vm_);
 
-    gtk_container_add(GTK_CONTAINER(root_overlay_), paned_);
+    gtk_container_add(GTK_CONTAINER(root_overlay_), leaflet_);
     gtk_overlay_add_overlay(GTK_OVERLAY(root_overlay_), pomodoro_bar_->widget());
     gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(root_overlay_), pomodoro_bar_->widget(), FALSE);
     gtk_container_add(GTK_CONTAINER(gobj()), root_overlay_);
 
+    g_signal_connect(leaflet_, "notify::folded", G_CALLBACK(app_window_leaflet_folded_cb), this);
+    g_signal_connect(leaflet_, "notify::visible-child", G_CALLBACK(app_window_leaflet_folded_cb), this);
     g_signal_connect(sidebar_list_, "row-selected", G_CALLBACK(app_window_sidebar_row_cb), this);
+    g_signal_connect(sidebar_toggle_btn_, "toggled", G_CALLBACK(app_window_sidebar_toggle_cb), this);
     g_signal_connect(pomodoro_btn, "clicked",
         G_CALLBACK(+[](GtkButton*, gpointer user) {
             static_cast<AppWindow*>(user)->vm_.set_pomodoro_modal_visible(true);
@@ -106,6 +142,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
         current_screen_key_ = "Capture";
         stack_.set_visible_child(Glib::ustring{"Capture"});
         hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), "Capture");
+        show_main_content();
         if (memos_)
             memos_->rebuild();
     });
@@ -127,6 +164,7 @@ AppWindow::AppWindow(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
 
     gtk_widget_show_all(header_bar_);
     show_all_children();
+    on_leaflet_folded();
     apply_theme();
 }
 
@@ -401,6 +439,44 @@ void AppWindow::on_screen_row(GtkListBoxRow* row)
     hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), key);
 
     refresh_current_screen();
+    show_main_content();
+}
+
+void AppWindow::update_sidebar_toggle(bool active)
+{
+    updating_sidebar_toggle_ = true;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(sidebar_toggle_btn_), active ? TRUE : FALSE);
+    updating_sidebar_toggle_ = false;
+}
+
+void AppWindow::show_main_content()
+{
+    if (!hdy_leaflet_get_folded(HDY_LEAFLET(leaflet_))) return;
+    hdy_leaflet_set_visible_child(HDY_LEAFLET(leaflet_), main_outer_);
+    update_sidebar_toggle(false);
+}
+
+void AppWindow::on_sidebar_toggled()
+{
+    if (updating_sidebar_toggle_ || !hdy_leaflet_get_folded(HDY_LEAFLET(leaflet_))) return;
+    bool const show_sidebar =
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sidebar_toggle_btn_)) != FALSE;
+    hdy_leaflet_set_visible_child(
+        HDY_LEAFLET(leaflet_), show_sidebar ? sidebar_box_ : main_outer_);
+}
+
+void AppWindow::on_leaflet_folded()
+{
+    bool const folded = hdy_leaflet_get_folded(HDY_LEAFLET(leaflet_)) != FALSE;
+    gtk_widget_set_visible(sidebar_toggle_btn_, folded ? TRUE : FALSE);
+    if (!folded) {
+        update_sidebar_toggle(false);
+        return;
+    }
+
+    GtkWidget* visible = hdy_leaflet_get_visible_child(HDY_LEAFLET(leaflet_));
+    bool const sidebar_visible = visible == sidebar_box_;
+    update_sidebar_toggle(sidebar_visible);
 }
 
 void AppWindow::on_new_task_shortcut()
@@ -408,6 +484,7 @@ void AppWindow::on_new_task_shortcut()
     current_screen_key_ = "Tasks";
     stack_.set_visible_child(Glib::ustring{"Tasks"});
     hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), "Tasks");
+    show_main_content();
     if (tasks_)
         tasks_->focus_quick_input();
 }

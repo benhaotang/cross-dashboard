@@ -8,10 +8,9 @@ extern "C" {
 #include <webkit2/webkit2.h>
 }
 
-#include <algorithm>
 #include <cstring>
-#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #ifndef PACKAGE_DATADIR
@@ -29,7 +28,7 @@ constexpr char kHead[] =
     "['script','noscript','style','textarea','pre','code']},chtml:{fontURL:\"mathjax/output/chtml/fonts/woff-v2\","
     "matchFontHeight:false}};</script>"
     "<style>"
-    "html,body{margin:0;padding:0;overflow-x:hidden;overflow-y:hidden;background:transparent;"
+    "html,body{margin:0;padding:0;overflow-x:hidden;overflow-y:auto;background:transparent;"
     "font-family:system-ui,\"Segoe UI\",Roboto,\"Helvetica Neue\",sans-serif;line-height:1.45;"
     "font-size:15px;-webkit-font-smoothing:antialiased;}"
     "a{color:#3584e4;}code,pre{font-family:ui-monospace,\"SF Mono\",Consolas,monospace;font-size:0.9em;}"
@@ -273,7 +272,7 @@ constexpr char kHeadNoMj[] =
     "<!DOCTYPE html><html><head><meta charset='utf-8'/><meta name='viewport' content="
     "'width=device-width,initial-scale=1'/>"
     "<style>"
-    "html,body{margin:0;padding:0;overflow-x:hidden;overflow-y:hidden;background:transparent;"
+    "html,body{margin:0;padding:0;overflow-x:hidden;overflow-y:auto;background:transparent;"
     "font-family:system-ui,\"Segoe UI\",Roboto,\"Helvetica Neue\",sans-serif;line-height:1.45;"
     "font-size:15px;-webkit-font-smoothing:antialiased;}"
     "a{color:#3584e4;}code,pre{font-family:ui-monospace,\"SF Mono\",Consolas,monospace;font-size:0.9em;}"
@@ -288,124 +287,33 @@ constexpr char kHeadNoMj[] =
 
 } // namespace
 
-gboolean markdown_view_height_cb(gpointer user_data)
-{
-    static_cast<MarkdownView*>(user_data)->measure_height_once();
-    return FALSE;
-}
-
-namespace {
-
-struct MarkdownMeasureCtx {
-    MarkdownView* self{};
-    unsigned gen{};
-};
-
-} // namespace
-
-void markdown_measure_js_done(GObject* wv, GAsyncResult* res, gpointer user_data)
-{
-    std::unique_ptr<MarkdownMeasureCtx> ctx(static_cast<MarkdownMeasureCtx*>(user_data));
-    if (!ctx || !ctx->self || !wv)
-        return;
-    MarkdownView* const self = ctx->self;
-    if (ctx->gen != self->load_generation_)
-        return;
-
-    GError* err = nullptr;
-    WebKitJavascriptResult* jr = webkit_web_view_run_javascript_finish(WEBKIT_WEB_VIEW(wv), res, &err);
-    if (!jr) {
-        if (err)
-            g_error_free(err);
-        return;
-    }
-    JSCValue* val = webkit_javascript_result_get_js_value(jr);
-    if (jsc_value_is_number(val)) {
-        int const raw = static_cast<int>(jsc_value_to_double(val));
-        int const padded = std::max(raw + 8, 40);
-        int const with_floor = std::max(padded, self->height_floor_);
-        if (with_floor > self->max_content_height_) {
-            self->max_content_height_ = with_floor;
-            gtk_widget_set_size_request(GTK_WIDGET(self->webview_), -1, with_floor);
-        }
-    }
-    webkit_javascript_result_unref(jr);
-}
-
-MarkdownView::MarkdownView()
+MarkdownView::MarkdownView(HeightMode height_mode)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0)
 {
+    constexpr int kFullHeight = 520;
+    constexpr int kFollowingContentHeight = kFullHeight * 4 / 5;
+    constexpr int kEmbeddedHeight = 160;
+    int const viewport_height = height_mode == HeightMode::Full
+        ? 120
+        : height_mode == HeightMode::WithFollowingContent ? kFollowingContentHeight : kEmbeddedHeight;
+    bool const fills_detail = height_mode == HeightMode::Full;
+
     webview_ = WEBKIT_WEB_VIEW(webkit_web_view_new());
     GtkWidget* w = GTK_WIDGET(webview_);
     gtk_widget_set_hexpand(w, TRUE);
-    gtk_widget_set_vexpand(w, FALSE);
+    gtk_widget_set_vexpand(w, fills_detail ? TRUE : FALSE);
+    gtk_widget_set_size_request(w, -1, viewport_height);
     WebKitSettings* settings = webkit_web_view_get_settings(webview_);
     webkit_settings_set_enable_javascript(settings, TRUE);
     webkit_settings_set_enable_write_console_messages_to_stdout(settings, FALSE);
-    gtk_box_pack_start(GTK_BOX(gobj()), w, FALSE, FALSE, 0);
-    g_signal_connect(webview_, "load-changed", G_CALLBACK(load_changed_cb), this);
-}
-
-MarkdownView::~MarkdownView()
-{
-    cancel_height_polish();
-}
-
-void MarkdownView::cancel_height_polish()
-{
-    for (unsigned id : height_timeout_ids_) {
-        if (id != 0u)
-            g_source_remove(static_cast<guint>(id));
-    }
-    height_timeout_ids_.clear();
-}
-
-void MarkdownView::schedule_height_polish()
-{
-    cancel_height_polish();
-    // Fewer, spaced measurements: slow typesetting (MathJax) was causing visible "creep" when polling every 60ms.
-    constexpr unsigned delays_ms[] = {120, 450, 1100, 2200};
-    for (unsigned ms : delays_ms) {
-        guint const id = g_timeout_add(ms, markdown_view_height_cb, this);
-        height_timeout_ids_.push_back(static_cast<unsigned>(id));
-    }
-}
-
-void MarkdownView::measure_height_once()
-{
-    char const* script =
-        "Math.max(document.body.scrollHeight||0,document.documentElement.scrollHeight||0,"
-        "document.body.offsetHeight||0,document.documentElement.offsetHeight||0)";
-
-    auto* ctx = new MarkdownMeasureCtx;
-    ctx->self = this;
-    ctx->gen = load_generation_;
-    webkit_web_view_run_javascript(
-        webview_, script, nullptr, (GAsyncReadyCallback)markdown_measure_js_done, ctx);
-}
-
-void MarkdownView::load_changed_cb(WebKitWebView* wv, int load_event, gpointer user_data)
-{
-    (void)wv;
-    if (load_event != WEBKIT_LOAD_FINISHED)
-        return;
-    auto* self = static_cast<MarkdownView*>(user_data);
-    self->schedule_height_polish();
+    gtk_box_pack_start(GTK_BOX(gobj()), w, fills_detail ? TRUE : FALSE, fills_detail ? TRUE : FALSE, 0);
 }
 
 void MarkdownView::load_markdown(std::string const& markdown)
 {
     if (!webview_)
         return;
-    ++load_generation_;
-    cancel_height_polish();
-    max_content_height_ = 0;
-
-    std::size_t const n = markdown.size();
-    height_floor_ = static_cast<int>(std::clamp(n / 4 + 80, std::size_t{120}, std::size_t{1800}));
-
     webkit_web_view_stop_loading(webview_);
-    gtk_widget_set_size_request(GTK_WIDGET(webview_), -1, height_floor_);
 
     std::string const body = markdown_with_display_math_to_html(markdown);
     std::string html;

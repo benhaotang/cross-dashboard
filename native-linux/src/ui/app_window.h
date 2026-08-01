@@ -25,7 +25,7 @@ class ViewsView;
 class PomodoroBar;
 class PomodoroModal;
 
-/** Main window: resizable GtkPaned sidebar + HdyHeaderBar + screen stack. */
+/** Adaptive HdyLeaflet shell: persistent sidebar when wide, toggleable navigation when narrow. */
 class AppWindow final : public Gtk::ApplicationWindow {
 public:
     AppWindow(AppContainer&, AppViewModel&, SyncScheduler&);
@@ -33,9 +33,13 @@ public:
     AppWindow& operator=(AppWindow const&) = delete;
 
     void on_screen_row(GtkListBoxRow* row);
+    void on_leaflet_folded();
+    void on_sidebar_toggled();
 
+    [[nodiscard]] GtkWidget* leaflet_widget() const { return leaflet_; }
     [[nodiscard]] GtkWidget* sidebar_box_widget() const { return sidebar_box_; }
     [[nodiscard]] GtkWidget* main_outer_widget() const { return main_outer_; }
+    [[nodiscard]] GtkWidget* sidebar_toggle_widget() const { return sidebar_toggle_btn_; }
 
 private:
     void apply_theme();
@@ -47,15 +51,19 @@ private:
     bool on_key_press_event(GdkEventKey* event) override;
     void load_theme_css();
     void focus_search_on_current_screen();
+    void show_main_content();
+    void update_sidebar_toggle(bool active);
     /** Reloads visible screen from local DB (after sync, tab change, etc.). */
     void refresh_current_screen();
 
-    GtkWidget* paned_{};
+    GtkWidget* leaflet_{};
     GtkWidget* root_overlay_{};
     GtkWidget* sidebar_box_{};
     GtkWidget* sidebar_list_{};
     GtkWidget* main_outer_{};
     GtkWidget* header_bar_{};
+    GtkWidget* sidebar_toggle_btn_{};
+    bool updating_sidebar_toggle_{};
 
     Gtk::Stack stack_;
 

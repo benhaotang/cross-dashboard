@@ -323,7 +323,7 @@ void TasksView::on_quick_submit(Glib::ustring const& text)
 
     std::optional<std::string> cal = app_.secrets().get(CredentialKey::CALDAV_DEFAULT_TASK_CALENDAR);
     if (!cal.has_value() || cal->empty()) {
-        show_warning("Set CALDAV_DEFAULT_TASK_CALENDAR credential to your tasks collection URL.");
+        show_warning("Choose a default tasks calendar in Settings → CalDAV.");
         return;
     }
 

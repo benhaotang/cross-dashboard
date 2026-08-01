@@ -28,6 +28,8 @@ std::vector<std::string> extract_unchecked_lines(std::string const& content)
 
 std::string first_calendar_href(AppContainer& app)
 {
+    if (auto href = app.secrets().get(CredentialKey::CALDAV_DEFAULT_TASK_CALENDAR))
+        if (!href->empty()) return *href;
     auto hrefs = app.events().selected_calendar_hrefs();
     return hrefs.empty() ? std::string{} : hrefs.front();
 }

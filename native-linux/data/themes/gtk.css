@@ -30,15 +30,6 @@ headerbar {
     color: alpha(@theme_fg_color, 0.4);
 }
 
-/* Main horizontal split (draggable sidebar width) */
-.cd-main-paned > separator {
-    background: @cd_sidebar_sep;
-    min-width: 1px;
-}
-.cd-main-paned > separator:hover {
-    background: @cd_accent;
-}
-
 .cd-nav-list {
     background-color: transparent;
     border: none;

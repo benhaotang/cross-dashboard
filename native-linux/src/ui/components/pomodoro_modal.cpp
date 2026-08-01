@@ -122,6 +122,13 @@ PomodoroModal::PomodoroModal(AppViewModel& vm)
 
     idle_section_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_widget_set_margin_top(idle_section_, 14);
+
+    gtk_box_pack_start(GTK_BOX(idle_section_), section_caption("<span size='smaller' weight='600' alpha='60%'>LINK TO</span>"), FALSE, FALSE, 0);
+    target_combo_ = gtk_combo_box_text_new();
+    gtk_widget_set_hexpand(target_combo_, TRUE);
+    gtk_widget_set_tooltip_text(target_combo_, "Choose a task or open issue for this focus session");
+    gtk_box_pack_start(GTK_BOX(idle_section_), target_combo_, FALSE, FALSE, 0);
+
     gtk_box_pack_start(GTK_BOX(idle_section_), section_caption("<span size='smaller' weight='600' alpha='60%'>CHOOSE PHASE</span>"), FALSE, FALSE, 0);
 
     GtkWidget* start_linked = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -193,6 +200,7 @@ PomodoroModal::PomodoroModal(AppViewModel& vm)
 
     g_signal_connect(dialog_, "delete-event", G_CALLBACK(delete_event_cb), this);
 
+    g_signal_connect(target_combo_, "changed", G_CALLBACK(target_changed_cb), this);
     g_signal_connect(start_focus, "clicked", G_CALLBACK(start_focus_cb), this);
     g_signal_connect(start_short, "clicked", G_CALLBACK(start_short_break_cb), this);
     g_signal_connect(start_long, "clicked", G_CALLBACK(start_long_break_cb), this);
@@ -202,6 +210,12 @@ PomodoroModal::PomodoroModal(AppViewModel& vm)
 
     vm_.signal_pomodoro_state_changed.connect([this](PomodoroState const& state) { update(state); });
     gtk_widget_show_all(outer);
+    // active_section_ deliberately ignores outer's show_all so it stays hidden while idle.
+    // Realize all of its children once so making the section visible also shows its controls.
+    gtk_widget_set_no_show_all(active_section_, FALSE);
+    gtk_widget_show_all(active_section_);
+    gtk_widget_set_no_show_all(active_section_, TRUE);
+    reload_targets();
     update(vm_.pomodoro_state());
 }
 
@@ -209,6 +223,7 @@ void PomodoroModal::present(GtkWindow* parent)
 {
     if (parent)
         gtk_window_set_transient_for(GTK_WINDOW(dialog_), parent);
+    reload_targets();
     vm_.set_pomodoro_modal_visible(true);
     gtk_widget_show_all(dialog_);
     gtk_window_present(GTK_WINDOW(dialog_));
@@ -258,6 +273,36 @@ void PomodoroModal::update(PomodoroState const& state)
     gboolean const session_active = state.active;
     gtk_widget_set_visible(idle_section_, !session_active);
     gtk_widget_set_visible(active_section_, session_active);
+}
+
+void PomodoroModal::reload_targets()
+{
+    reloading_targets_ = true;
+    targets_ = vm_.pomodoro_target_options();
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(target_combo_));
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(target_combo_), "timer:", "No linked task or issue");
+    for (auto const& target : targets_)
+        gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(target_combo_), target.key.c_str(), target.display.c_str());
+
+    std::string const selected = vm_.pomodoro_target_key();
+    if (!gtk_combo_box_set_active_id(GTK_COMBO_BOX(target_combo_), selected.c_str()))
+        gtk_combo_box_set_active_id(GTK_COMBO_BOX(target_combo_), "timer:");
+    reloading_targets_ = false;
+}
+
+void PomodoroModal::target_changed_cb(GtkComboBox* combo, gpointer user_data)
+{
+    auto* self = static_cast<PomodoroModal*>(user_data);
+    if (self->reloading_targets_) return;
+    char const* key = gtk_combo_box_get_active_id(combo);
+    if (!key || std::string{key} == "timer:") {
+        self->vm_.set_pomodoro_target("timer", "", "");
+        return;
+    }
+    auto const it = std::find_if(self->targets_.begin(), self->targets_.end(),
+        [key](PomodoroTargetOption const& option) { return option.key == key; });
+    if (it != self->targets_.end())
+        self->vm_.set_pomodoro_target(it->kind, it->id, it->title);
 }
 
 void PomodoroModal::start_focus_cb(GtkButton*, gpointer user_data)

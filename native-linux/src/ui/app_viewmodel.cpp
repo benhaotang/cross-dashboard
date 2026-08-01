@@ -1,46 +1,61 @@
 #include "app_viewmodel.h"
 
 #include "app_container.h"
+#include "background/service_dbus.h"
+#include "data/db/issue_dao.h"
 #include "data/db/task_dao.h"
 #include "data/prefs/prefs.h"
-#include "data/repository/repositories.h"
 
 #include <glib.h>
 
-#include <chrono>
-#include <ctime>
+#include <algorithm>
 #include <cstdio>
 #include <utility>
 
 namespace cd {
 
-namespace {
-
-EpochMillis now_epoch_millis()
-{
-    using namespace std::chrono;
-    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
-
-} // namespace
-
 AppViewModel::AppViewModel(AppContainer& app)
     : app_(app)
 {
-    AppSettings const settings = merged_app_preferences(app_.prefs());
+    AppSettings const settings = merged_app_preferences(app.prefs());
     pomodoro_state_.settings = settings.pomodoro_settings;
     pomodoro_state_.active = false;
     pomodoro_state_.running = false;
     pomodoro_state_.phase = PomodoroPhase::Work;
     pomodoro_state_.seconds_left = phase_duration_seconds(PomodoroPhase::Work);
+
+    GError* error = nullptr;
+    pomodoro_bus_ = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+    if (!pomodoro_bus_) {
+        std::fprintf(stderr, "Pomodoro service bus unavailable: %s\n",
+            error ? error->message : "unknown error");
+        if (error) g_error_free(error);
+        return;
+    }
+    pomodoro_subscription_id_ = g_dbus_connection_signal_subscribe(pomodoro_bus_,
+        service_dbus::kBusName, service_dbus::kInterface,
+        service_dbus::kPomodoroStateChangedSignal, service_dbus::kObjectPath, nullptr,
+        G_DBUS_SIGNAL_FLAGS_NONE, &AppViewModel::pomodoro_dbus_signal_cb, this, nullptr);
+    GVariant* reply = g_dbus_connection_call_sync(pomodoro_bus_, service_dbus::kBusName,
+        service_dbus::kObjectPath, service_dbus::kInterface,
+        service_dbus::kGetPomodoroStateMethod, nullptr,
+        G_VARIANT_TYPE(service_dbus::kPomodoroStateTupleType), G_DBUS_CALL_FLAGS_NONE,
+        10000, nullptr, &error);
+    if (reply) {
+        apply_pomodoro_variant(reply);
+        g_variant_unref(reply);
+    }
+    else if (error) {
+        std::fprintf(stderr, "Pomodoro service unavailable: %s\n", error->message);
+        g_error_free(error);
+    }
 }
 
 AppViewModel::~AppViewModel()
 {
-    if (pomodoro_timer_id_ != 0) {
-        g_source_remove(pomodoro_timer_id_);
-        pomodoro_timer_id_ = 0;
-    }
+    if (pomodoro_bus_ && pomodoro_subscription_id_ != 0)
+        g_dbus_connection_signal_unsubscribe(pomodoro_bus_, pomodoro_subscription_id_);
+    if (pomodoro_bus_) g_object_unref(pomodoro_bus_);
 }
 
 void AppViewModel::trigger_capture(std::string text)
@@ -64,50 +79,88 @@ void AppViewModel::set_pomodoro_modal_visible(bool visible)
 
 void AppViewModel::start_pomodoro(PomodoroPhase phase)
 {
-    if (!pomodoro_state_.active || pomodoro_state_.phase != phase)
-        start_phase(phase);
-    pomodoro_state_.running = true;
-    if (pomodoro_timer_id_ == 0)
-        pomodoro_timer_id_ = g_timeout_add_seconds(1, &AppViewModel::pomodoro_tick_cb, this);
-    emit_pomodoro_state();
+    if (pomodoro_state_.active) {
+        if (!pomodoro_state_.running) call_pomodoro_control(service_dbus::kResumePomodoroMethod);
+        return;
+    }
+    if (!pomodoro_bus_) return;
+    char const* phase_name = phase == PomodoroPhase::ShortBreak ? "short-break"
+        : phase == PomodoroPhase::LongBreak ? "long-break" : "focus";
+    int const minutes = std::max(1, phase_duration_seconds(phase) / 60);
+    GError* error = nullptr;
+    GVariant* reply = g_dbus_connection_call_sync(pomodoro_bus_, service_dbus::kBusName,
+        service_dbus::kObjectPath, service_dbus::kInterface, service_dbus::kStartPomodoroMethod,
+        g_variant_new("(ssssi)", active_target_kind_.c_str(), active_target_id_.c_str(),
+            active_target_title_.c_str(), phase_name, minutes),
+        G_VARIANT_TYPE("(b)"), G_DBUS_CALL_FLAGS_NONE, 10000, nullptr, &error);
+    if (reply) g_variant_unref(reply);
+    if (error) {
+        std::fprintf(stderr, "start Pomodoro: %s\n", error->message);
+        g_error_free(error);
+    }
 }
 
 void AppViewModel::pause_or_resume_pomodoro()
 {
-    if (!pomodoro_state_.active)
-        return;
-    pomodoro_state_.running = !pomodoro_state_.running;
-    emit_pomodoro_state();
+    if (!pomodoro_state_.active) return;
+    call_pomodoro_control(pomodoro_state_.running
+            ? service_dbus::kPausePomodoroMethod : service_dbus::kResumePomodoroMethod);
 }
 
 void AppViewModel::stop_pomodoro()
 {
-    pomodoro_state_.active = false;
-    pomodoro_state_.running = false;
-    pomodoro_state_.phase = PomodoroPhase::Work;
-    pomodoro_state_.seconds_left = phase_duration_seconds(PomodoroPhase::Work);
-    pomodoro_state_.current_session = 1;
-    active_phase_started_at_.reset();
-    if (pomodoro_timer_id_ != 0) {
-        g_source_remove(pomodoro_timer_id_);
-        pomodoro_timer_id_ = 0;
-    }
-    emit_pomodoro_state();
+    call_pomodoro_control(service_dbus::kStopPomodoroMethod);
 }
 
 void AppViewModel::skip_pomodoro_phase()
 {
-    if (!pomodoro_state_.active)
-        return;
-    complete_current_phase();
+    if (pomodoro_state_.active) call_pomodoro_control(service_dbus::kSkipPomodoroMethod);
 }
 
 void AppViewModel::set_active_task(std::string uid, std::string title)
 {
-    active_task_uid_ = std::move(uid);
-    active_task_title_ = std::move(title);
-    pomodoro_state_.item_title = active_task_title_;
+    set_pomodoro_target("task", std::move(uid), std::move(title));
+}
+
+void AppViewModel::set_pomodoro_target(std::string kind, std::string id, std::string title)
+{
+    if (kind != "task" && kind != "issue") {
+        kind = "timer";
+        id.clear();
+        title.clear();
+    }
+    active_target_kind_ = std::move(kind);
+    active_target_id_ = std::move(id);
+    active_target_title_ = std::move(title);
+    pomodoro_state_.item_title = active_target_title_;
     emit_pomodoro_state();
+}
+
+std::string AppViewModel::pomodoro_target_key() const
+{
+    return active_target_kind_ + ":" + active_target_id_;
+}
+
+std::vector<PomodoroTargetOption> AppViewModel::pomodoro_target_options() const
+{
+    std::vector<PomodoroTargetOption> result;
+    for (auto const& task : TaskDao(app_.db()).get_all()) {
+        if (task.status == TaskStatus::Completed || task.status == TaskStatus::Cancelled)
+            continue;
+        result.push_back({"task:" + task.uid, "task", task.uid, task.summary,
+            "Task · " + task.summary});
+    }
+    for (auto const& issue : IssueDao(app_.db()).get_all()) {
+        if (issue.state != "open") continue;
+        std::string const id = issue.repository + "#" + std::to_string(issue.number);
+        result.push_back({"issue:" + id, "issue", id, issue.title,
+            "Issue · " + issue.title + " — " + id});
+    }
+    std::stable_sort(result.begin(), result.end(), [](auto const& a, auto const& b) {
+        if (a.kind != b.kind) return a.kind == "task";
+        return a.display < b.display;
+    });
+    return result;
 }
 
 void AppViewModel::request_present_window()
@@ -115,58 +168,62 @@ void AppViewModel::request_present_window()
     signal_present_window_requested.emit();
 }
 
-gboolean AppViewModel::pomodoro_tick_cb(gpointer user_data)
+void AppViewModel::pomodoro_dbus_signal_cb(GDBusConnection*, char const*, char const*, char const*,
+    char const*, GVariant* parameters, gpointer user_data)
 {
-    return static_cast<AppViewModel*>(user_data)->on_pomodoro_tick();
+    static_cast<AppViewModel*>(user_data)->apply_pomodoro_variant(parameters);
 }
 
-gboolean AppViewModel::on_pomodoro_tick()
+void AppViewModel::apply_pomodoro_variant(GVariant* value)
 {
-    if (!pomodoro_state_.active || !pomodoro_state_.running)
-        return G_SOURCE_CONTINUE;
+    gboolean active = FALSE;
+    gboolean running = FALSE;
+    gint seconds = 0;
+    gint duration = 0;
+    gint completed = 0;
+    char const* phase = nullptr;
+    char const* kind = nullptr;
+    char const* id = nullptr;
+    char const* title = nullptr;
+    g_variant_get(value, "(bbiii&s&s&s&s)", &active, &running, &seconds, &duration, &completed,
+        &phase, &kind, &id, &title);
+    pomodoro_state_.active = active != FALSE;
+    pomodoro_state_.running = running != FALSE;
+    pomodoro_state_.completed_sessions = completed;
+    pomodoro_state_.current_session = completed + 1;
+    std::string const phase_name = phase ? phase : "focus";
+    pomodoro_state_.phase = phase_name == "short-break" ? PomodoroPhase::ShortBreak
+        : phase_name == "long-break" ? PomodoroPhase::LongBreak : PomodoroPhase::Work;
+    pomodoro_state_.seconds_left = pomodoro_state_.active
+        ? seconds : phase_duration_seconds(PomodoroPhase::Work);
+    pomodoro_state_.item_title = title ? title : "";
+    active_target_kind_ = kind && *kind ? kind : "timer";
+    active_target_id_ = id ? id : "";
+    active_target_title_ = title ? title : "";
+    emit_pomodoro_state();
+}
 
-    if (pomodoro_state_.seconds_left > 0)
-        --pomodoro_state_.seconds_left;
-
-    if (pomodoro_state_.seconds_left <= 0)
-        complete_current_phase();
-    else
-        emit_pomodoro_state();
-
-    return G_SOURCE_CONTINUE;
+bool AppViewModel::call_pomodoro_control(char const* method)
+{
+    if (!pomodoro_bus_) return false;
+    GError* error = nullptr;
+    GVariant* reply = g_dbus_connection_call_sync(pomodoro_bus_, service_dbus::kBusName,
+        service_dbus::kObjectPath, service_dbus::kInterface, method, nullptr,
+        G_VARIANT_TYPE("(b)"), G_DBUS_CALL_FLAGS_NONE, 10000, nullptr, &error);
+    if (!reply) {
+        std::fprintf(stderr, "Pomodoro control: %s\n", error ? error->message : "unknown error");
+        if (error) g_error_free(error);
+        return false;
+    }
+    gboolean changed = FALSE;
+    g_variant_get(reply, "(b)", &changed);
+    g_variant_unref(reply);
+    return changed != FALSE;
 }
 
 void AppViewModel::emit_pomodoro_state()
 {
     signal_pomodoro_state_changed.emit(pomodoro_state_);
-}
-
-void AppViewModel::start_phase(PomodoroPhase phase)
-{
-    pomodoro_state_.phase = phase;
-    pomodoro_state_.seconds_left = phase_duration_seconds(phase);
-    pomodoro_state_.active = true;
-    active_phase_started_at_ = now_epoch_millis();
-}
-
-void AppViewModel::complete_current_phase()
-{
-    PomodoroPhase finished = pomodoro_state_.phase;
-    if (finished == PomodoroPhase::Work) {
-        ++pomodoro_state_.completed_sessions;
-        ++pomodoro_state_.current_session;
-        app_.stats().increment_pomodoro();
-        append_pomodoro_session_log();
-        if (pomodoro_state_.completed_sessions % pomodoro_state_.settings.sessions_until_long_break == 0)
-            start_phase(PomodoroPhase::LongBreak);
-        else
-            start_phase(PomodoroPhase::ShortBreak);
-    }
-    else {
-        start_phase(PomodoroPhase::Work);
-    }
-    pomodoro_state_.running = true;
-    emit_pomodoro_state();
 }
 
 int AppViewModel::phase_duration_seconds(PomodoroPhase phase) const
@@ -177,47 +234,6 @@ int AppViewModel::phase_duration_seconds(PomodoroPhase phase) const
     case PomodoroPhase::LongBreak: return pomodoro_state_.settings.long_break_minutes * 60;
     }
     return 25 * 60;
-}
-
-void AppViewModel::append_pomodoro_session_log()
-{
-    if (!active_task_uid_.has_value() || !active_phase_started_at_.has_value())
-        return;
-
-    EpochMillis const end_ms = now_epoch_millis();
-    auto make_hhmm = [](EpochMillis ms) -> std::string {
-        std::time_t const tt = static_cast<std::time_t>(ms / 1000LL);
-        std::tm tm{};
-#if defined(_WIN32)
-        localtime_s(&tm, &tt);
-#else
-        localtime_r(&tt, &tm);
-#endif
-        char buf[16]{};
-        std::strftime(buf, sizeof(buf), "%H:%M", &tm);
-        return std::string(buf);
-    };
-
-    TaskDao dao(app_.db());
-    auto task_opt = dao.get_by_uid(*active_task_uid_);
-    if (!task_opt.has_value())
-        return;
-
-    CalDavTask task = *task_opt;
-    std::string const line =
-        "🍅 Pomodoro: " + make_hhmm(*active_phase_started_at_) + "–" + make_hhmm(end_ms);
-    if (task.description.has_value() && !task.description->empty())
-        task.description = *task.description + "\n" + line;
-    else
-        task.description = line;
-    task.last_modified = end_ms;
-
-    try {
-        app_.tasks().update(task);
-    }
-    catch (std::exception const& err) {
-        std::fprintf(stderr, "pomodoro log update failed: %s\n", err.what());
-    }
 }
 
 } // namespace cd

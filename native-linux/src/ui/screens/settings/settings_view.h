@@ -6,6 +6,7 @@
 #include <gtkmm/box.h>
 #include <gtkmm/button.h>
 #include <gtkmm/checkbutton.h>
+#include <gtkmm/comboboxtext.h>
 #include <gtkmm/entry.h>
 #include <gtkmm/grid.h>
 #include <gtkmm/label.h>
@@ -54,6 +55,7 @@ private:
     void on_save_calendar_selection_clicked();
     void save_kanban_columns_csv();
     void populate_calendar_checks(std::vector<CalDavCalendar> cals);
+    void populate_default_calendar_selectors();
 
     AppContainer& app_;
     SyncScheduler& sync_;
@@ -91,6 +93,10 @@ private:
     Gtk::ScrolledWindow cal_scroll_{};
     Gtk::Box cal_checks_box_{Gtk::ORIENTATION_VERTICAL, 4};
     std::vector<std::pair<Gtk::CheckButton*, std::string>> cal_row_hrefs_;
+    std::vector<CalDavCalendar> discovered_calendars_;
+    Gtk::ComboBoxText default_event_calendar_;
+    Gtk::ComboBoxText default_task_calendar_;
+    Gtk::ComboBoxText default_note_calendar_;
 
     Gtk::Entry kanban_columns_csv_;
     Gtk::Button save_kanban_btn_{"Save Kanban column tags"};

@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.crossdashboard.Service
+Exec=@libexecdir@/cross-dashboard-service
+SystemdService=crossdashboard.service

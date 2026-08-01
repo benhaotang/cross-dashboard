@@ -176,29 +176,32 @@ TaskEditDialog::TaskEditDialog(Gtk::Window& parent, CalDavTask const& task)
     desc_scroll->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     desc_scroll->add(description_);
 
-    Gtk::Grid grid{};
-    grid.set_column_spacing(10);
-    grid.set_row_spacing(8);
+    // The content area owns this grid.  A stack-local Grid is destroyed when
+    // the constructor returns, leaving the still-open dialog with an empty
+    // body.
+    auto* grid = Gtk::manage(new Gtk::Grid());
+    grid->set_column_spacing(10);
+    grid->set_row_spacing(8);
 
     int r = 0;
-    grid.attach(*align_start_label("Summary"), 0, r, 1, 1);
-    grid.attach(summary_, 1, r++, 1, 1);
-    grid.attach(*align_start_label("Status"), 0, r, 1, 1);
-    grid.attach(status_, 1, r++, 1, 1);
-    grid.attach(*align_start_label("Priority"), 0, r, 1, 1);
-    grid.attach(priority_, 1, r++, 1, 1);
-    grid.attach(*align_start_label("Tags"), 0, r, 1, 1);
-    grid.attach(categories_, 1, r++, 1, 1);
-    grid.attach(due_toggle_, 1, r++, 1, 1);
-    grid.attach(*align_start_label("Due (local)"), 0, r, 1, 1);
-    grid.attach(due_entry_, 1, r++, 1, 1);
-    grid.attach(*align_start_label("Description"), 0, r, 1, 1);
-    grid.attach(*desc_scroll, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Summary"), 0, r, 1, 1);
+    grid->attach(summary_, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Status"), 0, r, 1, 1);
+    grid->attach(status_, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Priority"), 0, r, 1, 1);
+    grid->attach(priority_, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Tags"), 0, r, 1, 1);
+    grid->attach(categories_, 1, r++, 1, 1);
+    grid->attach(due_toggle_, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Due (local)"), 0, r, 1, 1);
+    grid->attach(due_entry_, 1, r++, 1, 1);
+    grid->attach(*align_start_label("Description"), 0, r, 1, 1);
+    grid->attach(*desc_scroll, 1, r++, 1, 1);
 
     Gtk::Box& box = *get_content_area();
     box.set_spacing(10);
     box.set_border_width(10);
-    box.pack_start(grid, true, true);
+    box.pack_start(*grid, true, true);
 
     set_default_size(520, 460);
     show_all_children();

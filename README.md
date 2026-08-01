@@ -49,4 +49,60 @@ url: crossdashboard://capture?text={popclip text}
 > [!NOTE]
 > This is mainly a personal project for myself, therefore, only Android 16+ and Mac OS 15+ are supported, with no plan to support older versions.
 
+## Linux CLI and background service
+
+Linux version installs `cross-dashboard-cli` alongside the GUI application.
+
+```bash
+# Add task
+cross-dashboard-cli task '!!! deploy hotfix #work tomorrow morning'
+echo 'buy milk #errands tonight' | cross-dashboard-cli task
+
+# Capture to Memos
+echo 'Follow up with Alice' | cross-dashboard-cli capture
+
+# Cached listings; active/upcoming/open items are the default
+cross-dashboard-cli list tasks
+cross-dashboard-cli list events --json
+cross-dashboard-cli list issues --all
+
+# Fuzzel/dmenu pipelines
+cross-dashboard-cli list task --fuzzel | fuzzel --dmenu --with-nth=2
+
+# Force the background service to sync now
+cross-dashboard-cli sync
+
+# Pomo timer
+cross-dashboard-cli pomo task 'deploy hotfix'
+# With fuzzel
+cross-dashboard-cli pomo fuzzel
+# Control
+cross-dashboard-cli pomo status/pause/resume/stop
+```
+
+### Waybar module
+
+```json
+"custom/cross-dashboard": {
+    "exec": "cross-dashboard-cli waybar",
+    "return-type": "json",
+    "escape": true,
+    "tooltip": true,
+    "exec-on-event": false,
+    "on-click": "cross-dashboard-cli pomo toggle",
+    "on-click-middle": "cross-dashboard",
+    "on-click-right": "cross-dashboard-cli sync"
+  }
+```
+
+### Systemd service
+
+```bash
+# To start the backgroud service or to refresh the service
+systemctl --user daemon-reload
+systemctl --user enable --now crossdashboard.service
+systemctl --user status crossdashboard.service
+journalctl --user -u crossdashboard.service
+```
+
 Shared under the MIT license. (If AI code is licensable:))

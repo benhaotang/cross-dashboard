@@ -1,0 +1,14 @@
+[Unit]
+Description=Cross-Dashboard sync, notifications, and Pomodoro service
+Documentation=man:cross-dashboard-cli(1)
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=com.crossdashboard.Service
+ExecStart=@libexecdir@/cross-dashboard-service
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

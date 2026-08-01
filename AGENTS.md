@@ -563,6 +563,24 @@ native-linux/
 | Notifications | libnotify |
 | Pomodoro tray | libappindicator3 (XFCE/KDE/MATE native; GNOME needs extension — see MIGRATION.md) |
 
+### Linux process and navigation coordination
+
+- `cross-dashboard-service` is the sole periodic-sync and event-reminder owner. The GTK frontend and
+  `cross-dashboard-cli sync` request force refreshes over `com.crossdashboard.Service` D-Bus.
+- GUI, CLI, and service repository mutations use the per-user `OperationLock`; SQLite uses WAL, a
+  5-second busy timeout, and transactional `replace_all()` operations so readers never observe the
+  temporary empty state of a cache refresh.
+- `cross-dashboard-service` is also the sole Pomodoro countdown owner. The GUI and CLI control its
+  singleton timer through D-Bus; it publishes the live state used by the packaged Waybar module.
+  The GTK popup selects from cached incomplete tasks/open issues before starting, then exposes
+  pause/resume, stop, and skip controls for the active service-owned session.
+- Linux Settings → CalDAV exposes component-filtered defaults for new events (`VEVENT`), tasks
+  (`VTODO`), and notes (`VJOURNAL`). They use `caldav_default_event_calendar`,
+  `caldav_default_task_calendar`, and the Linux note key `caldav_default_note_calendar`; creation
+  flows must prefer these defaults instead of the first selected calendar.
+- The main window uses `HdyLeaflet`: a persistent 240px sidebar when wide and a header-bar toggle plus
+  swipe navigation when folded below the combined sidebar/content minimum width.
+
 ### Key Platform Differences from Android
 
 | Android | Linux equivalent |
@@ -585,10 +603,24 @@ native-linux/
 **Phase 2** — Core UI & navigation — ✅ Done (`main.cpp`, leaflet shell, Dashboard, Tasks views)
 
 **Phase 3** — Remaining screens — ✅ Done (Events, Notes w/ `HdySearchBar`, Issues w/ comments/attachments, Inbox, Views Kanban DnD, Settings, `ReadMarkdownField`, MathJax bundle)
-**Phase 4** — Background sync & notifications — 🔄 In progress (`background/sync_scheduler.*`, `background/notification_scheduler.*`, `--reschedule-alarms` command-line handler, systemd user unit scaffolding)
-**Phase 5** — Pomodoro timer — ✅ Done (`ui/app_viewmodel.*` timer state/tick loop, `ui/components/pomodoro_bar.*`, `ui/components/pomodoro_modal.*`, `background/pomodoro_status_item.*` tray integration with passive fallback, session log append into task description)
+**Phase 4** — Background sync & notifications — ✅ Done (`cross-dashboard-service` persistent systemd user service owns scheduled sync and libnotify event reminders; GUI/CLI force refresh over `com.crossdashboard.Service` D-Bus)
+**Phase 5** — Pomodoro timer — ✅ Done (`cross-dashboard-service` owns the singleton timer, phase
+transitions, notifications, statistics, and task session logs; `ui/app_viewmodel.*` is a D-Bus
+controller/subscriber used by `ui/components/pomodoro_bar.*`, `ui/components/pomodoro_modal.*`, and
+`background/pomodoro_status_item.*`)
 **Phase 6** — Capture (Memos) screen — ✅ Done (`ui/screens/memos/*` list/detail/dialogs, attachment preview widget, capture deep-link/file prefill wiring, and Docker `meson compile` + `meson test` smoke pass)
 **Phase 7** — Nav reorder, polish, Flatpak + `.deb` packaging — ✅ Done
+
+**Phase 8** — Linux CLI + stable markdown sizing — ✅ Done (`cross-dashboard-cli` smart task/capture piping, cached entity listings, service-driven sync, terminal Pomodoro notifications; fixed internally-scrollable WebKit markdown viewports replace document-height JavaScript polling)
+
+**Phase 9** — Wayland integrations + shared Pomodoro — ✅ Done (`--fuzzel` stable-ID listings,
+unified Fuzzel picker, singleton service-owned Pomodoro controls/status, shared GUI/CLI state, and a
+persistent Waybar JSON module with packaged config/CSS)
+
+**Phase 10** — Linux CalDAV defaults — ✅ Done (Settings calendar discovery provides separate
+`VEVENT`, `VTODO`, and `VJOURNAL` default selectors; saved defaults are retained before rediscovery,
+automatically included in the selected sync set, and used by task quick input/CLI, Notes, Capture
+event creation, and Capture task extraction)
 
 ---
 

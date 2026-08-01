@@ -10,7 +10,6 @@ namespace cd {
 class AppContainer;
 class AppViewModel;
 class AppWindow;
-class NotificationScheduler;
 class PomodoroStatusItem;
 class SyncScheduler;
 
@@ -31,7 +30,6 @@ private:
 
     std::unique_ptr<AppContainer> container_;
     std::unique_ptr<AppViewModel> model_;
-    std::unique_ptr<NotificationScheduler> notifications_;
     std::unique_ptr<SyncScheduler> sync_scheduler_;
     std::unique_ptr<PomodoroStatusItem> pomodoro_status_item_;
     AppWindow* window_{nullptr};
