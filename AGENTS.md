@@ -570,6 +570,8 @@ native-linux/
 - GUI, CLI, and service repository mutations use the per-user `OperationLock`; SQLite uses WAL, a
   5-second busy timeout, and transactional `replace_all()` operations so readers never observe the
   temporary empty state of a cache refresh.
+- `cross-dashboard-service` is also the sole Pomodoro countdown owner. The GUI and CLI control its
+  singleton timer through D-Bus; it publishes the live state used by the packaged Waybar module.
 - The main window uses `HdyLeaflet`: a persistent 240px sidebar when wide and a header-bar toggle plus
   swipe navigation when folded below the combined sidebar/content minimum width.
 
@@ -601,6 +603,10 @@ native-linux/
 **Phase 7** — Nav reorder, polish, Flatpak + `.deb` packaging — ✅ Done
 
 **Phase 8** — Linux CLI + stable markdown sizing — ✅ Done (`cross-dashboard-cli` smart task/capture piping, cached entity listings, service-driven sync, terminal Pomodoro notifications; fixed internally-scrollable WebKit markdown viewports replace document-height JavaScript polling)
+
+**Phase 9** — Wayland integrations + shared Pomodoro — ✅ Done (`--fuzzel` stable-ID listings,
+unified Fuzzel picker, singleton service-owned Pomodoro controls/status, shared GUI/CLI state, and a
+persistent Waybar JSON module with packaged config/CSS)
 
 ---
 

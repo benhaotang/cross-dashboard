@@ -1,5 +1,5 @@
 [Unit]
-Description=Cross-Dashboard background sync and notifications
+Description=Cross-Dashboard sync, notifications, and Pomodoro service
 Documentation=man:cross-dashboard-cli(1)
 After=graphical-session.target
 

@@ -12,12 +12,21 @@ cross-dashboard-cli \- command-line access to Cross-Dashboard
 .I type
 .RI [ --all ]
 .RI [ --json ]
+.RI [ --fuzzel ]
 .br
 .B cross-dashboard-cli sync
+.br
+.B cross-dashboard-cli waybar
 .br
 .B cross-dashboard-cli pomo
 .I type target
 .RI [ --minutes N ]
+.br
+.B cross-dashboard-cli pomo fuzzel
+.RI [ --minutes N ]
+.br
+.B cross-dashboard-cli pomo
+.BR status | pause | resume | stop | toggle
 .br
 .B cross-dashboard-cli pomo task -u
 .I uid
@@ -47,9 +56,18 @@ List cached tasks, events, issues, notes, or Capture memos. Tasks default to act
 upcoming, issues to open, and memos to normal. Use
 .B --all
 to include inactive records.
+Use
+.B --fuzzel
+for two tab-separated columns: a stable entity ID followed by friendly display text. This is
+compatible with
+.BR "fuzzel --dmenu --with-nth=2" .
 .TP
 .B sync
 Request an immediate service-owned sync over the user D-Bus.
+.TP
+.B waybar
+Continuously emit one JSON object per line for a Waybar custom module. It displays the shared
+Pomodoro first, then a current event, overdue task, or nearest upcoming item.
 .TP
 .B pomo
 Run a foreground terminal Pomodoro for a cached task, event, or issue. Title lookup ranks exact,
@@ -59,6 +77,18 @@ Use
 .B -u UID
 for exact task selection without an interactive chooser. Desktop notifications are shown at start
 and completion; completed task sessions are appended to the task description.
+Use
+.B pomo fuzzel
+to select across active tasks, upcoming events, and open issues. The service permits one global
+timer at a time. Inspect or control it with
+.BR "pomo status" ,
+.BR "pomo pause" ,
+.BR "pomo resume" ,
+or
+.BR "pomo stop" .
+For status-bar integrations,
+.B pomo toggle
+opens Fuzzel while idle and pauses or resumes the active timer otherwise.
 .SH SERVICE
 Enable background sync and reminders with:
 .PP

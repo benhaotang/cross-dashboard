@@ -41,6 +41,7 @@ core_sources = files(
   'data/repository/operation_lock.cpp',
   'data/repository/repositories.cpp',
   'background/sync_runner.cpp',
+  'background/pomodoro_session.cpp',
   'app_container.cpp',
 )
 
@@ -96,7 +97,7 @@ if appindicator_dep.found()
   gui_deps += [appindicator_dep]
 endif
 
-executable(
+gui_exe = executable(
   'cross-dashboard',
   gui_sources,
   include_directories: src_inc,
@@ -114,13 +115,13 @@ cli_exe = executable(
   'cross-dashboard-cli',
   core_sources + files('cli_main.cpp'),
   include_directories: src_inc,
-  dependencies: core_deps + [notify_dep, threads_dep],
+  dependencies: core_deps + [threads_dep],
   install: true,
 )
 
 test('cli_help', cli_exe, args: ['--help'])
 
-executable(
+service_exe = executable(
   'cross-dashboard-service',
   core_sources + files(
     'background/notification_scheduler.cpp',
@@ -173,6 +174,26 @@ database_concurrency_exe = executable(
 
 test('database_concurrency', database_concurrency_exe)
 
+cli_fuzzel_test_exe = executable(
+  'cli_fuzzel_test',
+  files(
+    '../tests/cli_fuzzel.cpp',
+    'data/db/database.cpp',
+    'data/db/daos.cpp',
+  ),
+  include_directories: include_directories('.', 'ui'),
+  dependencies: [sqlite3_dep, glib_dep, json_dep],
+  install: false,
+)
+test('cli_fuzzel', cli_fuzzel_test_exe, args: [cli_exe.full_path()])
+
+dbus_run_session = find_program('dbus-run-session')
+service_pomodoro_test = find_program('../tests/service_pomodoro_test.sh')
+test('service_pomodoro', dbus_run_session,
+  args: [service_pomodoro_test.full_path(), service_exe.full_path(), cli_exe.full_path()],
+  timeout: 30,
+)
+
 install_data(
   '../com.crossdashboard.app.desktop',
   install_dir: get_option('datadir') / 'applications',
@@ -195,6 +216,11 @@ install_data(
 )
 
 install_man('../data/man/cross-dashboard-cli.1')
+
+install_subdir(
+  '../data/waybar',
+  install_dir: get_option('datadir') / 'cross-dashboard',
+)
 
 service_config = configuration_data()
 service_config.set('libexecdir', get_option('prefix') / get_option('libexecdir'))

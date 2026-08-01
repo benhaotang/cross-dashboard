@@ -180,6 +180,28 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     cal_scroll_.set_min_content_height(160);
     cal_scroll_.add(cal_checks_box_);
     caldav_page->pack_start(cal_scroll_, true, true);
+
+    pack_section_title(*caldav_page, "Defaults for new items");
+    auto* defaults_grid = Gtk::manage(new Gtk::Grid());
+    defaults_grid->set_column_spacing(10);
+    defaults_grid->set_row_spacing(8);
+    auto attach_default = [&](char const* label, Gtk::ComboBoxText& combo, int row) {
+        auto* field_label = Gtk::manage(new Gtk::Label(label));
+        field_label->set_halign(Gtk::ALIGN_START);
+        defaults_grid->attach(*field_label, 0, row, 1, 1);
+        combo.set_hexpand(true);
+        defaults_grid->attach(combo, 1, row, 1, 1);
+    };
+    attach_default("New events", default_event_calendar_, 0);
+    attach_default("New tasks", default_task_calendar_, 1);
+    attach_default("New notes", default_note_calendar_, 2);
+    default_event_calendar_.set_tooltip_text("Calendars supporting VEVENT");
+    default_task_calendar_.set_tooltip_text("Calendars supporting VTODO");
+    default_note_calendar_.set_tooltip_text("Calendars supporting VJOURNAL");
+    caldav_page->pack_start(*defaults_grid, false, false);
+    populate_default_calendar_selectors();
+
+    cal_save_selection_btn_.set_label("Save calendar settings");
     cal_save_selection_btn_.signal_clicked().connect(
         sigc::mem_fun(*this, &SettingsView::on_save_calendar_selection_clicked));
     caldav_page->pack_start(cal_save_selection_btn_, false, false);
@@ -570,13 +592,14 @@ void SettingsView::on_discover_calendars_clicked()
 
 void SettingsView::populate_calendar_checks(std::vector<CalDavCalendar> cals)
 {
+    discovered_calendars_ = std::move(cals);
     cal_row_hrefs_.clear();
     for (Gtk::Widget* w : cal_checks_box_.get_children()) cal_checks_box_.remove(*w);
 
     auto selected = calendars_from_selected_json(app_.secrets().get(CredentialKey::CALDAV_SELECTED_CALENDARS));
     std::unordered_set<std::string> sel(selected.begin(), selected.end());
 
-    for (auto const& cal : cals) {
+    for (auto const& cal : discovered_calendars_) {
         auto* row = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 6));
         auto* cb = Gtk::manage(new Gtk::CheckButton());
         std::string lab =
@@ -591,19 +614,76 @@ void SettingsView::populate_calendar_checks(std::vector<CalDavCalendar> cals)
         cal_row_hrefs_.push_back({cb, cal.href});
     }
     cal_checks_box_.show_all();
+    populate_default_calendar_selectors();
+}
+
+void SettingsView::populate_default_calendar_selectors()
+{
+    auto populate = [&](Gtk::ComboBoxText& combo, char const* component, char const* credential_key) {
+        auto selected = app_.secrets().get(credential_key);
+        combo.remove_all();
+        combo.append("", "Not set");
+        bool selected_was_discovered = false;
+        int compatible_count = 0;
+        for (auto const& calendar : discovered_calendars_) {
+            if (std::find(calendar.components.begin(), calendar.components.end(), component)
+                == calendar.components.end())
+                continue;
+            std::string const label = calendar.display_name.empty()
+                ? calendar.href : calendar.display_name + " — " + calendar.href;
+            combo.append(calendar.href, label);
+            ++compatible_count;
+            if (selected && *selected == calendar.href) selected_was_discovered = true;
+        }
+        // Before the first discovery, still show and preserve an existing
+        // default rather than presenting a misleading "Not set" value.
+        if (selected && !selected->empty() && !selected_was_discovered)
+            combo.append(*selected, *selected + " — saved default");
+        if (selected && !selected->empty()) combo.set_active_id(*selected);
+        else combo.set_active(0);
+        combo.set_sensitive(compatible_count > 0 || (selected && !selected->empty()));
+    };
+
+    populate(default_event_calendar_, "VEVENT", CredentialKey::CALDAV_DEFAULT_EVENT_CALENDAR);
+    populate(default_task_calendar_, "VTODO", CredentialKey::CALDAV_DEFAULT_TASK_CALENDAR);
+    populate(default_note_calendar_, "VJOURNAL", CredentialKey::CALDAV_DEFAULT_NOTE_CALENDAR);
 }
 
 void SettingsView::on_save_calendar_selection_clicked()
 {
-    nlohmann::json arr = nlohmann::json::array();
-    for (auto const& pr : cal_row_hrefs_) {
-        if (pr.first->get_active()) arr.push_back(pr.second);
+    std::vector<std::string> selected_hrefs;
+    if (cal_row_hrefs_.empty()) {
+        // Saving an already-visible default before running discovery must not
+        // erase the previously selected sync collections.
+        selected_hrefs = calendars_from_selected_json(
+            app_.secrets().get(CredentialKey::CALDAV_SELECTED_CALENDARS));
     }
+    else {
+        for (auto const& pr : cal_row_hrefs_) {
+            if (pr.first->get_active()) selected_hrefs.push_back(pr.second);
+        }
+    }
+
+    auto save_default = [&](Gtk::ComboBoxText& combo, char const* key) {
+        std::string const href = combo.get_active_id();
+        if (href.empty()) (void)app_.secrets().remove(key);
+        else {
+            (void)app_.secrets().set(key, href);
+            if (std::find(selected_hrefs.begin(), selected_hrefs.end(), href) == selected_hrefs.end())
+                selected_hrefs.push_back(href);
+        }
+    };
+    save_default(default_event_calendar_, CredentialKey::CALDAV_DEFAULT_EVENT_CALENDAR);
+    save_default(default_task_calendar_, CredentialKey::CALDAV_DEFAULT_TASK_CALENDAR);
+    save_default(default_note_calendar_, CredentialKey::CALDAV_DEFAULT_NOTE_CALENDAR);
+
+    nlohmann::json arr = selected_hrefs;
     (void)app_.secrets().set(CredentialKey::CALDAV_SELECTED_CALENDARS, arr.dump());
 
     Gtk::Window* win = dynamic_cast<Gtk::Window*>(get_toplevel());
     if (win) {
-        Gtk::MessageDialog dlg(*win, "Saved calendar selection.", false, Gtk::MESSAGE_INFO, Gtk::BUTTONS_CLOSE);
+        Gtk::MessageDialog dlg(*win, "Saved calendar selection and defaults.", false,
+            Gtk::MESSAGE_INFO, Gtk::BUTTONS_CLOSE);
         dlg.run();
     }
 }

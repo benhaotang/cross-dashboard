@@ -1,0 +1,13 @@
+// Add "custom/cross-dashboard" to modules-left, modules-center, or modules-right.
+{
+  "custom/cross-dashboard": {
+    "exec": "cross-dashboard-cli waybar",
+    "return-type": "json",
+    "escape": true,
+    "tooltip": true,
+    "exec-on-event": false,
+    "on-click": "cross-dashboard-cli pomo toggle",
+    "on-click-middle": "cross-dashboard",
+    "on-click-right": "cross-dashboard-cli sync"
+  }
+}

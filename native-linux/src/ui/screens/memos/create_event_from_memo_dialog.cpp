@@ -1,6 +1,7 @@
 #include "create_event_from_memo_dialog.h"
 
 #include "app_container.h"
+#include "data/prefs/prefs.h"
 
 #include <chrono>
 
@@ -16,6 +17,8 @@ EpochMillis now_ms()
 
 std::string first_calendar_href(AppContainer& app)
 {
+    if (auto href = app.secrets().get(CredentialKey::CALDAV_DEFAULT_EVENT_CALENDAR))
+        if (!href->empty()) return *href;
     auto hrefs = app.events().selected_calendar_hrefs();
     return hrefs.empty() ? std::string{} : hrefs.front();
 }

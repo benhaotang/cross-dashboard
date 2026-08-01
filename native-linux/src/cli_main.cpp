@@ -1,4 +1,5 @@
 #include "app_container.h"
+#include "background/pomodoro_session.h"
 #include "background/service_dbus.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
@@ -11,7 +12,6 @@
 
 #include <glib.h>
 #include <gio/gio.h>
-#include <libnotify/notify.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -90,18 +90,16 @@ std::string format_epoch(std::optional<EpochMillis> value)
     return out;
 }
 
-void desktop_notification(std::string const& title, std::string const& body)
+std::string one_line(std::string value)
 {
-    if (!notify_is_initted() && !notify_init("cross-dashboard-cli")) return;
-    NotifyNotification* notification = notify_notification_new(title.c_str(), body.c_str(), nullptr);
-    notify_notification_set_timeout(notification, NOTIFY_EXPIRES_DEFAULT);
-    GError* error = nullptr;
-    if (!notify_notification_show(notification, &error) && error) {
-        std::cerr << "notification: " << error->message << '\n';
-        g_error_free(error);
-    }
-    g_object_unref(notification);
+    std::replace(value.begin(), value.end(), '\n', ' ');
+    std::replace(value.begin(), value.end(), '\r', ' ');
+    std::replace(value.begin(), value.end(), '\t', ' ');
+    return value;
 }
+
+std::string short_calendar(std::optional<std::string> const& href);
+struct PomoTarget;
 
 void print_usage(std::ostream& out)
 {
@@ -109,10 +107,14 @@ void print_usage(std::ostream& out)
            "Usage:\n"
            "  cross-dashboard-cli task [SMART TEXT]        Create a task (or read stdin)\n"
            "  cross-dashboard-cli capture [TEXT]           Create a private Capture memo (or read stdin)\n"
-           "  cross-dashboard-cli list TYPE [--all|--json] List tasks, events, issues, notes, or capture\n"
+           "  cross-dashboard-cli list TYPE [--all|--json|--fuzzel]\n"
+           "                                                List tasks, events, issues, notes, or capture\n"
            "  cross-dashboard-cli sync                     Sync every configured backend\n"
+           "  cross-dashboard-cli waybar                   Stream Waybar custom-module JSON\n"
            "  cross-dashboard-cli pomo TYPE TARGET [--minutes N]\n"
            "  cross-dashboard-cli pomo task -u UID [--minutes N]\n"
+           "  cross-dashboard-cli pomo fuzzel [--minutes N]\n"
+           "  cross-dashboard-cli pomo status|pause|resume|stop|toggle\n"
            "                                                Run a terminal timer for a task/event/issue\n\n"
            "Smart task example: echo '!!! deploy #work tomorrow morning' | cross-dashboard-cli task\n"
            "Pomodoro title search is fuzzy and asks you to choose from contextual matches.\n"
@@ -225,7 +227,7 @@ int create_capture(AppContainer& app, std::string const& content)
     return 0;
 }
 
-int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_output)
+int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_output, bool fuzzel_output)
 {
     kind = lower(std::move(kind));
     nlohmann::json output = nlohmann::json::array();
@@ -238,6 +240,11 @@ int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_
                 output.push_back({{"uid", task.uid}, {"summary", task.summary},
                     {"status", task_status_to_ical(task.status)}, {"priority", task.priority},
                     {"due", task.due.value_or(0)}, {"categories", task.categories}});
+            }
+            else if (fuzzel_output) {
+                std::cout << task.uid << '\t' << one_line(task.summary) << " — "
+                          << task_status_to_ical(task.status) << " — due " << format_epoch(task.due)
+                          << " — " << short_calendar(task.calendar_href) << '\n';
             }
             else {
                 std::cout << task.uid << '\t' << task_status_to_ical(task.status) << '\t'
@@ -254,6 +261,11 @@ int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_
                 output.push_back({{"uid", event.uid}, {"summary", event.summary}, {"start", event.start},
                     {"end", event.end}, {"location", event.location.value_or("")}});
             }
+            else if (fuzzel_output) {
+                std::cout << event.uid << '\t' << one_line(event.summary) << " — "
+                          << format_epoch(event.start) << " — " << short_calendar(event.calendar_href)
+                          << '\n';
+            }
             else {
                 std::cout << event.uid << '\t' << format_epoch(event.start) << '\t' << event.summary << '\n';
             }
@@ -267,6 +279,10 @@ int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_
                     {"title", issue.title}, {"state", issue.state}, {"labels", issue.labels},
                     {"url", issue.html_url}});
             }
+            else if (fuzzel_output) {
+                std::cout << issue.repository << '#' << issue.number << '\t' << one_line(issue.title)
+                          << " — " << issue.repository << " — " << issue.state << '\n';
+            }
             else {
                 std::cout << issue.repository << '#' << issue.number << '\t' << issue.state << '\t'
                           << issue.title << '\n';
@@ -277,6 +293,9 @@ int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_
         for (auto const& note : NoteDao(app.db()).get_all()) {
             if (json_output)
                 output.push_back({{"uid", note.uid}, {"summary", note.summary}, {"body", note.body}});
+            else if (fuzzel_output)
+                std::cout << note.uid << '\t' << one_line(note.summary) << " — "
+                          << short_calendar(note.calendar_href) << '\n';
             else
                 std::cout << note.uid << '\t' << note.summary << '\n';
         }
@@ -289,10 +308,14 @@ int list_entities(AppContainer& app, std::string kind, bool show_all, bool json_
                     {"visibility", memo_visibility_name(memo.visibility)}, {"content", memo.content},
                     {"tags", memo.tags}, {"created", memo.create_time}});
             }
+            else if (fuzzel_output) {
+                std::cout << memo.name << '\t' << one_line(memo.content) << " — "
+                          << memo_visibility_name(memo.visibility) << " — "
+                          << memo_state_name(memo.state) << '\n';
+            }
             else {
-                std::string one_line = memo.content;
-                std::replace(one_line.begin(), one_line.end(), '\n', ' ');
-                std::cout << memo.name << '\t' << memo_state_name(memo.state) << '\t' << one_line << '\n';
+                std::cout << memo.name << '\t' << memo_state_name(memo.state) << '\t'
+                          << one_line(memo.content) << '\n';
             }
         }
     }
@@ -453,73 +476,325 @@ PomoTarget find_pomo_target(AppContainer& app, std::string kind, std::string con
     throw std::runtime_error("no cached " + kind + " matches: " + selector);
 }
 
-void append_task_pomodoro_log(AppContainer& app, CalDavTask task, EpochMillis started, EpochMillis ended)
+PomoTarget find_exact_pomo_target(AppContainer& app, std::string const& key)
 {
-    auto hhmm = [](EpochMillis value) {
-        GDateTime* dt = g_date_time_new_from_unix_local(value / 1000);
-        if (!dt) return std::string{"?"};
-        gchar* formatted = g_date_time_format(dt, "%R");
-        std::string out = formatted ? formatted : "?";
-        g_free(formatted);
-        g_date_time_unref(dt);
-        return out;
-    };
-    std::string const line = "🍅 Pomodoro: " + hhmm(started) + "–" + hhmm(ended);
-    task.description = task.description.has_value() && !task.description->empty()
-        ? std::optional<std::string>{*task.description + "\n" + line}
-        : std::optional<std::string>{line};
-    task.last_modified = ended;
-    app.tasks().update(task);
+    auto const separator = key.find(':');
+    if (separator == std::string::npos) throw std::runtime_error("invalid Fuzzel selection");
+    std::string const kind = key.substr(0, separator);
+    std::string const id = key.substr(separator + 1);
+    if (kind == "task") {
+        auto task = TaskDao(app.db()).get_by_uid(id);
+        if (!task) throw std::runtime_error("selected task is no longer in the cache: " + id);
+        return {kind, task->uid, task->summary,
+            short_calendar(task->calendar_href) + ", due " + format_epoch(task->due), *task};
+    }
+    if (kind == "event") {
+        for (auto const& event : EventDao(app.db()).get_all()) {
+            if (event.uid == id)
+                return {kind, event.uid, event.summary,
+                    short_calendar(event.calendar_href) + ", starts " + format_epoch(event.start),
+                    std::nullopt};
+        }
+        throw std::runtime_error("selected event is no longer in the cache: " + id);
+    }
+    if (kind == "issue") {
+        for (auto const& issue : IssueDao(app.db()).get_all()) {
+            std::string const qualified = issue.repository + "#" + std::to_string(issue.number);
+            if (qualified == id)
+                return {kind, qualified, issue.title, issue.repository + ", " + issue.state,
+                    std::nullopt};
+        }
+        throw std::runtime_error("selected issue is no longer in the cache: " + id);
+    }
+    throw std::runtime_error("invalid Fuzzel Pomodoro type: " + kind);
+}
+
+PomoTarget choose_pomodoro_with_fuzzel(AppContainer& app)
+{
+    std::ostringstream choices;
+    for (auto const& task : TaskDao(app.db()).get_all()) {
+        if (task.status == TaskStatus::Completed || task.status == TaskStatus::Cancelled) continue;
+        choices << "task:" << task.uid << '\t' << "Task · " << one_line(task.summary)
+                << " · due " << format_epoch(task.due) << " · " << short_calendar(task.calendar_href)
+                << '\n';
+    }
+    EpochMillis const now = now_millis();
+    for (auto const& event : EventDao(app.db()).get_all()) {
+        if (event.end < now) continue;
+        choices << "event:" << event.uid << '\t' << "Event · " << one_line(event.summary)
+                << " · " << format_epoch(event.start) << " · " << short_calendar(event.calendar_href)
+                << '\n';
+    }
+    for (auto const& issue : IssueDao(app.db()).get_all()) {
+        if (issue.state != "open") continue;
+        std::string const id = issue.repository + "#" + std::to_string(issue.number);
+        choices << "issue:" << id << '\t' << "Issue · " << one_line(issue.title)
+                << " · " << id << '\n';
+    }
+    std::string const input = choices.str();
+    if (input.empty()) throw std::runtime_error("no active cached tasks, upcoming events, or open issues");
+
+    GError* error = nullptr;
+    GSubprocess* process = g_subprocess_new(
+        static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDIN_PIPE | G_SUBPROCESS_FLAGS_STDOUT_PIPE
+            | G_SUBPROCESS_FLAGS_STDERR_SILENCE),
+        &error, "fuzzel", "--dmenu", "--with-nth=2", "--prompt=Pomodoro> ", nullptr);
+    if (!process) {
+        std::string message = error ? error->message : "could not start fuzzel";
+        if (error) g_error_free(error);
+        throw std::runtime_error(message + "; install fuzzel or select with task -u UID");
+    }
+    gchar* selected = nullptr;
+    gboolean const communicated =
+        g_subprocess_communicate_utf8(process, input.c_str(), nullptr, &selected, nullptr, &error);
+    bool const successful = communicated && g_subprocess_get_successful(process);
+    std::string result = selected ? selected : "";
+    g_free(selected);
+    g_object_unref(process);
+    if (!communicated) {
+        std::string message = error ? error->message : "fuzzel communication failed";
+        if (error) g_error_free(error);
+        throw std::runtime_error(message);
+    }
+    if (error) g_error_free(error);
+    if (!successful || result.empty()) throw std::runtime_error("Pomodoro selection cancelled");
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) result.pop_back();
+    auto const tab = result.find('\t');
+    return find_exact_pomo_target(app, result.substr(0, tab));
+}
+
+struct ServicePomodoroState {
+    bool active{};
+    bool running{};
+    int seconds_left{};
+    int duration_seconds{};
+    int completed_sessions{};
+    std::string phase;
+    std::string kind;
+    std::string id;
+    std::string title;
+};
+
+GVariant* call_service(char const* method, GVariant* parameters, GVariantType const* reply_type)
+{
+    GError* error = nullptr;
+    GDBusConnection* bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+    if (!bus) {
+        std::string message = error ? error->message : "session bus unavailable";
+        if (error) g_error_free(error);
+        throw std::runtime_error(message);
+    }
+    GVariant* reply = g_dbus_connection_call_sync(bus, cd::service_dbus::kBusName,
+        cd::service_dbus::kObjectPath, cd::service_dbus::kInterface, method, parameters,
+        reply_type, G_DBUS_CALL_FLAGS_NONE, 10000, nullptr, &error);
+    g_object_unref(bus);
+    if (!reply) {
+        std::string message = error ? error->message : "background service unavailable";
+        if (error) g_error_free(error);
+        throw std::runtime_error(message
+            + "; run systemctl --user enable --now crossdashboard.service");
+    }
+    return reply;
+}
+
+ServicePomodoroState service_pomodoro_state()
+{
+    GVariant* reply = call_service(cd::service_dbus::kGetPomodoroStateMethod, nullptr,
+        G_VARIANT_TYPE(cd::service_dbus::kPomodoroStateTupleType));
+    gboolean active = FALSE;
+    gboolean running = FALSE;
+    gint seconds = 0;
+    gint duration = 0;
+    gint completed = 0;
+    char const* phase = nullptr;
+    char const* kind = nullptr;
+    char const* id = nullptr;
+    char const* title = nullptr;
+    g_variant_get(reply, "(bbiii&s&s&s&s)", &active, &running, &seconds, &duration, &completed,
+        &phase, &kind, &id, &title);
+    ServicePomodoroState result{active != FALSE, running != FALSE, seconds, duration, completed,
+        phase ? phase : "", kind ? kind : "", id ? id : "", title ? title : ""};
+    g_variant_unref(reply);
+    return result;
+}
+
+std::string printable_phase(std::string const& phase)
+{
+    if (phase == "short-break") return "Short break";
+    if (phase == "long-break") return "Long break";
+    return "Focus";
+}
+
+void print_pomodoro_status(ServicePomodoroState const& state, bool carriage_return = false)
+{
+    if (!state.active) {
+        std::cout << "No active Pomodoro\n";
+        return;
+    }
+    int const mm = state.seconds_left / 60;
+    int const ss = state.seconds_left % 60;
+    if (carriage_return) std::cout << '\r';
+    std::cout << printable_phase(state.phase) << ' ' << std::setfill('0') << std::setw(2) << mm
+              << ':' << std::setw(2) << ss << (state.running ? "" : " paused");
+    if (!state.title.empty()) std::cout << " — " << state.title;
+    if (!state.kind.empty()) std::cout << " (" << state.kind << ' ' << state.id << ')';
+    if (carriage_return) std::cout << "        " << std::flush;
+    else std::cout << '\n';
+}
+
+bool service_pomodoro_control(char const* method)
+{
+    GVariant* reply = call_service(method, nullptr, G_VARIANT_TYPE("(b)"));
+    gboolean changed = FALSE;
+    g_variant_get(reply, "(b)", &changed);
+    g_variant_unref(reply);
+    return changed != FALSE;
+}
+
+int run_pomodoro_target(AppContainer& app, PomoTarget target, int minutes)
+{
+    if (minutes <= 0) minutes = merged_app_preferences(app.prefs()).pomodoro_settings.work_minutes;
+    if (minutes <= 0 || minutes > 24 * 60)
+        throw std::runtime_error("Pomodoro duration must be between 1 minute and 24 hours");
+    GVariant* reply = call_service(cd::service_dbus::kStartPomodoroMethod,
+        g_variant_new("(ssssi)", target.kind.c_str(), target.id.c_str(), target.title.c_str(),
+            "focus", minutes), G_VARIANT_TYPE("(b)"));
+    gboolean started = FALSE;
+    g_variant_get(reply, "(b)", &started);
+    g_variant_unref(reply);
+    if (!started) {
+        auto const current = service_pomodoro_state();
+        std::cerr << "A Pomodoro is already active:\n";
+        print_pomodoro_status(current);
+        return 2;
+    }
+
+    auto const initial = service_pomodoro_state();
+    std::cout << "Started in background: " << target.title << " (" << target.kind << ' '
+              << target.id << ")\n";
+    if (!isatty(STDOUT_FILENO)) return 0;
+    std::signal(SIGINT, handle_interrupt);
+    std::signal(SIGTERM, handle_interrupt);
+    while (!interrupted.load()) {
+        auto const current = service_pomodoro_state();
+        if (!current.active || current.completed_sessions > initial.completed_sessions
+            || current.phase != "focus") {
+            std::cout << "\rPomodoro complete: " << target.title << "                    \n";
+            return 0;
+        }
+        print_pomodoro_status(current, true);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    std::cout << "\nPomodoro continues in the background; use `pomo stop` to stop it.\n";
+    return 130;
 }
 
 int run_pomodoro(AppContainer& app, std::string const& kind, std::string const& selector, int minutes,
     bool exact_task_uid)
 {
-    PomoTarget target = find_pomo_target(app, kind, selector, exact_task_uid);
-    if (minutes <= 0) minutes = merged_app_preferences(app.prefs()).pomodoro_settings.work_minutes;
-    if (minutes <= 0) throw std::runtime_error("Pomodoro duration must be positive");
-    if (minutes > 24 * 60) throw std::runtime_error("Pomodoro duration cannot exceed 24 hours");
+    return run_pomodoro_target(
+        app, find_pomo_target(app, kind, selector, exact_task_uid), minutes);
+}
 
-    int seconds_left = minutes * 60;
-    EpochMillis const started = now_millis();
-    std::cout << "Focus: " << target.title << " (" << target.kind << ' ' << target.id << ")\n";
-    desktop_notification("Pomodoro started", target.title);
+std::string compact_title(std::string const& title, glong max_chars = 32)
+{
+    if (!g_utf8_validate(title.c_str(), title.size(), nullptr)) return one_line(title).substr(0, max_chars);
+    if (g_utf8_strlen(title.c_str(), title.size()) <= max_chars) return one_line(title);
+    gchar* shortened = g_utf8_substring(title.c_str(), 0, max_chars - 1);
+    std::string result = shortened ? shortened : "";
+    g_free(shortened);
+    return one_line(result) + "…";
+}
+
+std::string compact_when(EpochMillis timestamp)
+{
+    GDateTime* value = g_date_time_new_from_unix_local(timestamp / 1000);
+    GDateTime* now = g_date_time_new_now_local();
+    if (!value || !now) {
+        if (value) g_date_time_unref(value);
+        if (now) g_date_time_unref(now);
+        return "Soon";
+    }
+    bool const today = g_date_time_get_year(value) == g_date_time_get_year(now)
+        && g_date_time_get_day_of_year(value) == g_date_time_get_day_of_year(now);
+    gchar* formatted = g_date_time_format(value, today ? "%R" : "%a %R");
+    std::string result = formatted ? formatted : "Soon";
+    g_free(formatted);
+    g_date_time_unref(value);
+    g_date_time_unref(now);
+    return result;
+}
+
+struct UpcomingStatus {
+    int priority{};
+    EpochMillis timestamp{};
+    std::string kind;
+    std::string title;
+    std::string tooltip;
+};
+
+std::optional<UpcomingStatus> next_waybar_item(AppContainer& app)
+{
+    EpochMillis const now = now_millis();
+    std::vector<UpcomingStatus> candidates;
+    for (auto const& event : EventDao(app.db()).get_all()) {
+        if (event.end < now) continue;
+        bool const happening = event.start <= now;
+        candidates.push_back({happening ? 0 : 2, happening ? now : event.start,
+            happening ? "event-active" : "event", event.summary,
+            std::string{happening ? "Happening now: " : "Upcoming event: "} + event.summary
+                + "\n" + format_epoch(event.start) + " – " + format_epoch(event.end)
+                + "\n" + short_calendar(event.calendar_href)});
+    }
+    for (auto const& task : TaskDao(app.db()).get_all()) {
+        if (!task.due || task.status == TaskStatus::Completed || task.status == TaskStatus::Cancelled)
+            continue;
+        bool const overdue = *task.due < now;
+        candidates.push_back({overdue ? 1 : 2, *task.due, overdue ? "task-overdue" : "task",
+            task.summary, std::string{overdue ? "Overdue task: " : "Task due: "} + task.summary
+                + "\n" + format_epoch(task.due) + "\n" + short_calendar(task.calendar_href)});
+    }
+    if (candidates.empty()) return std::nullopt;
+    return *std::min_element(candidates.begin(), candidates.end(), [](auto const& a, auto const& b) {
+        if (a.priority != b.priority) return a.priority < b.priority;
+        return a.timestamp < b.timestamp;
+    });
+}
+
+nlohmann::json waybar_payload(AppContainer& app)
+{
+    if (auto session = read_pomodoro_session()) {
+        int const left = current_seconds_left(*session, now_millis());
+        int const mm = left / 60;
+        int const ss = left % 60;
+        std::ostringstream timer;
+        timer << "󰔛 " << std::setfill('0') << std::setw(2) << mm << ':' << std::setw(2) << ss
+              << ' ' << compact_title(session->title, 24);
+        return {{"text", timer.str()},
+            {"tooltip", session->phase + ": " + session->title + "\n" + session->kind + " "
+                    + session->id + "\nLeft click: pause/resume · Right click: sync"},
+            {"class", "pomodoro"}, {"alt", "pomodoro"}};
+    }
+    auto item = next_waybar_item(app);
+    if (!item) return {{"text", ""}, {"tooltip", "No upcoming events or due tasks"},
+        {"class", "idle"}, {"alt", "idle"}};
+    std::string prefix;
+    if (item->kind == "event-active") prefix = " Now";
+    else if (item->kind == "task-overdue") prefix = " Overdue";
+    else prefix = std::string{item->kind == "task" ? " " : " "} + compact_when(item->timestamp);
+    return {{"text", prefix + " " + compact_title(item->title)},
+        {"tooltip", item->tooltip + "\nLeft click: choose Pomodoro · Right click: sync"},
+        {"class", item->kind}, {"alt", item->kind}};
+}
+
+int stream_waybar(AppContainer& app)
+{
     std::signal(SIGINT, handle_interrupt);
     std::signal(SIGTERM, handle_interrupt);
-
-    bool const interactive_output = isatty(STDOUT_FILENO);
-    int last_reported_minute = -1;
-    while (seconds_left > 0 && !interrupted.load()) {
-        int const mm = seconds_left / 60;
-        int const ss = seconds_left % 60;
-        if (interactive_output) {
-            std::cout << '\r' << std::setfill('0') << std::setw(2) << mm << ':' << std::setw(2) << ss
-                      << " remaining" << std::flush;
-        }
-        else if (mm != last_reported_minute) {
-            std::cout << mm << " minute(s) remaining\n";
-            last_reported_minute = mm;
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        --seconds_left;
-    }
-    if (interactive_output) std::cout << "\r                    \r";
-    if (interrupted.load()) {
-        std::cout << "Pomodoro cancelled\n";
-        return 130;
-    }
-
-    EpochMillis const ended = now_millis();
-    desktop_notification("Pomodoro complete", target.title + " — time for a break");
-    std::cout << "Pomodoro complete: " << target.title << '\n';
-    app.stats().increment_pomodoro();
-    if (target.task.has_value()) {
-        try {
-            append_task_pomodoro_log(app, *target.task, started, ended);
-        }
-        catch (std::exception const& error) {
-            std::cerr << "could not append task Pomodoro log: " << error.what() << '\n';
-        }
+    while (!interrupted.load()) {
+        std::cout << waybar_payload(app).dump() << '\n' << std::flush;
+        for (int i = 0; i < 10 && !interrupted.load(); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     return 0;
 }
@@ -539,19 +814,69 @@ int main(int argc, char** argv)
         if (command == "task") return create_task(app, text_from_args_or_stdin(argc, argv, 2));
         if (command == "capture") return create_capture(app, text_from_args_or_stdin(argc, argv, 2));
         if (command == "sync") return request_service_sync();
+        if (command == "waybar") {
+            if (argc != 2) throw std::runtime_error("waybar does not accept arguments");
+            return stream_waybar(app);
+        }
         if (command == "list") {
             if (argc < 3) throw std::runtime_error("list requires an entity type");
             bool all = false;
             bool json = false;
+            bool fuzzel = false;
             for (int i = 3; i < argc; ++i) {
                 std::string const option = argv[i];
                 if (option == "--all") all = true;
                 else if (option == "--json") json = true;
+                else if (option == "--fuzzel") fuzzel = true;
                 else throw std::runtime_error("unknown list option: " + option);
             }
-            return list_entities(app, argv[2], all, json);
+            if (json && fuzzel) throw std::runtime_error("--json and --fuzzel cannot be combined");
+            return list_entities(app, argv[2], all, json, fuzzel);
         }
         if (command == "pomo" || command == "pomodoro") {
+            if (argc < 3) throw std::runtime_error("pomo requires TYPE and TARGET, or `pomo fuzzel`");
+            std::string const pomo_action = lower(argv[2]);
+            if (pomo_action == "status") {
+                if (argc != 3) throw std::runtime_error("pomo status does not accept arguments");
+                print_pomodoro_status(service_pomodoro_state());
+                return 0;
+            }
+            if (pomo_action == "toggle") {
+                if (argc != 3) throw std::runtime_error("pomo toggle does not accept arguments");
+                auto const current = service_pomodoro_state();
+                if (!current.active)
+                    return run_pomodoro_target(app, choose_pomodoro_with_fuzzel(app), 0);
+                char const* method = current.running ? cd::service_dbus::kPausePomodoroMethod
+                                                     : cd::service_dbus::kResumePomodoroMethod;
+                if (!service_pomodoro_control(method)) return 2;
+                std::cout << "Pomodoro " << (current.running ? "paused" : "resumed") << '\n';
+                return 0;
+            }
+            if (pomo_action == "pause" || pomo_action == "resume" || pomo_action == "stop") {
+                if (argc != 3) throw std::runtime_error("pomo " + pomo_action + " does not accept arguments");
+                char const* method = pomo_action == "pause" ? cd::service_dbus::kPausePomodoroMethod
+                    : pomo_action == "resume" ? cd::service_dbus::kResumePomodoroMethod
+                                                : cd::service_dbus::kStopPomodoroMethod;
+                bool const changed = service_pomodoro_control(method);
+                if (!changed) {
+                    std::cerr << "Pomodoro was not " << (pomo_action == "pause" ? "running"
+                        : pomo_action == "resume" ? "paused" : "active") << '\n';
+                    return 2;
+                }
+                std::cout << "Pomodoro " << (pomo_action == "pause" ? "paused"
+                    : pomo_action == "resume" ? "resumed" : "stopped") << '\n';
+                return 0;
+            }
+            if (pomo_action == "fuzzel") {
+                int minutes = 0;
+                for (int i = 3; i < argc; ++i) {
+                    std::string const value = argv[i];
+                    if (value != "--minutes" || ++i >= argc)
+                        throw std::runtime_error("pomo fuzzel only accepts --minutes N");
+                    minutes = std::stoi(argv[i]);
+                }
+                return run_pomodoro_target(app, choose_pomodoro_with_fuzzel(app), minutes);
+            }
             if (argc < 4) throw std::runtime_error("pomo requires TYPE and TARGET");
             int minutes = 0;
             bool exact_task_uid = false;

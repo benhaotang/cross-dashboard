@@ -3,6 +3,7 @@
 #include "domain/models.h"
 
 #include <glib.h>
+#include <gio/gio.h>
 #include <sigc++/sigc++.h>
 
 #include <optional>
@@ -39,22 +40,20 @@ public:
     sigc::signal<void()> signal_present_window_requested;
 
 private:
-    static gboolean pomodoro_tick_cb(gpointer user_data);
-    gboolean on_pomodoro_tick();
+    static void pomodoro_dbus_signal_cb(GDBusConnection*, char const*, char const*, char const*,
+        char const*, GVariant*, gpointer user_data);
+    void apply_pomodoro_variant(GVariant* value);
+    bool call_pomodoro_control(char const* method);
     void emit_pomodoro_state();
-    void start_phase(PomodoroPhase phase);
-    void complete_current_phase();
     int phase_duration_seconds(PomodoroPhase phase) const;
-    void append_pomodoro_session_log();
 
     std::string capture_initial_text_;
     PomodoroState pomodoro_state_{};
     bool pomodoro_modal_visible_{false};
-    unsigned int pomodoro_timer_id_{0};
     std::optional<std::string> active_task_uid_;
     std::string active_task_title_;
-    std::optional<EpochMillis> active_phase_started_at_;
-    AppContainer& app_;
+    GDBusConnection* pomodoro_bus_{};
+    guint pomodoro_subscription_id_{};
 };
 
 } // namespace cd

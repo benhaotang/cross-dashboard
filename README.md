@@ -67,6 +67,9 @@ cross-dashboard-cli list tasks
 cross-dashboard-cli list events --json
 cross-dashboard-cli list issues --all
 
+# Stable ID + friendly display text for Fuzzel/dmenu pipelines
+cross-dashboard-cli list task --fuzzel | fuzzel --dmenu --with-nth=2
+
 # Force the background service to sync now
 cross-dashboard-cli sync
 
@@ -74,11 +77,34 @@ cross-dashboard-cli sync
 cross-dashboard-cli pomo task 'deploy hotfix'
 cross-dashboard-cli pomo task -u 'exact-task-uid'
 cross-dashboard-cli pomo issue 'owner/repo#42' --minutes 50
+cross-dashboard-cli pomo fuzzel
+cross-dashboard-cli pomo status
+cross-dashboard-cli pomo pause
+cross-dashboard-cli pomo resume
+cross-dashboard-cli pomo stop
 ```
 
 Title-based Pomodoro lookup is interactive: it ranks exact, substring, and fuzzy matches and asks
 you to choose from a list showing calendar/due-date context. Use `task -u UID` in scripts or when
 you already know the exact task UID.
+
+The background service owns one global Pomodoro shared by the GTK UI, CLI, notifications, and
+Waybar. Starting another timer while one is active is rejected; interrupting the terminal display
+does not stop the background timer.
+
+### Waybar module
+
+The package installs a ready-to-merge module at
+`/usr/share/cross-dashboard/waybar/config.jsonc` and its pill styling at
+`/usr/share/cross-dashboard/waybar/style.css`. Add `custom/cross-dashboard` to the desired Waybar
+module list, merge the module object into your config, and import or copy the CSS rules. The module
+uses Nerd Font glyphs and behaves as follows:
+
+- Active Pomodoro: live countdown and target.
+- Left click opens Fuzzel while idle, or pauses/resumes an active Pomodoro.
+- Otherwise: current event, overdue task, or the nearest upcoming event/task.
+- Middle click opens Cross-Dashboard; right click asks the service to sync.
+- No relevant item: the module hides itself.
 
 Sync and calendar reminder delivery are owned by a persistent systemd user service, not the GTK
 frontend or cron. Enable it once after a native install:
