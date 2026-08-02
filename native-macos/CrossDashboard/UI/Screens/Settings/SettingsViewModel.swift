@@ -44,6 +44,9 @@ final class SettingsViewModel {
     var orderedVisibleScreens: [String] = allScreens
     var hiddenScreens: [String] { allScreens.filter { !orderedVisibleScreens.contains($0) } }
     var kanbanColumnsInput: String = ""
+    var timeZoneOverride: String = ""
+    var timeZoneError: String? = nil
+    var systemTimeZone: String { AppTimeZone.system.identifier }
 
     // ─── Task defaults ────────────────────────────────────────────────────────
 
@@ -119,6 +122,7 @@ final class SettingsViewModel {
         // Appearance
         orderedVisibleScreens = prefs.visibleScreens.isEmpty ? allScreens : prefs.visibleScreens
         kanbanColumnsInput  = prefs.kanbanColumns.joined(separator: ", ")
+        timeZoneOverride = prefs.timeZoneOverride ?? ""
 
         // Task defaults
         taskMorningHour   = prefs.taskDefaults.morningHour
@@ -198,6 +202,18 @@ final class SettingsViewModel {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         if !cols.isEmpty { container.preferences.kanbanColumns = cols }
+    }
+
+    func saveTimeZone() {
+        let normalized = timeZoneOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalized.isEmpty && TimeZone(identifier: normalized) == nil {
+            timeZoneError = "Unknown timezone. Use an IANA identifier such as Europe/Berlin."
+            return
+        }
+        timeZoneError = nil
+        timeZoneOverride = normalized
+        container.preferences.timeZoneOverride = normalized.isEmpty ? nil : normalized
+        Task { await container.syncAll() }
     }
 
     func saveTaskDefaults() {

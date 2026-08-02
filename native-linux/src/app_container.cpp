@@ -16,6 +16,7 @@ AppContainer::AppContainer()
     , memo_dao_{db_}
     , stats_dao_{db_}
 {
+    (void)apply_timezone_override(prefs_.timezone_override());
     SoupSession* ss = soup_session_new();
     if (!ss) throw std::runtime_error("SoupSession init failed");
     soup_.reset(ss);

@@ -189,6 +189,25 @@ private struct AppearanceSettingsTab: View {
                 .pickerStyle(.segmented)
             }
 
+            Section("Date & time") {
+                TextField("Timezone override", text: $viewModel.timeZoneOverride,
+                          prompt: Text("Automatic (\(viewModel.systemTimeZone))"))
+                    .textFieldStyle(.roundedBorder)
+                Text("Leave blank to use the system timezone. Otherwise enter an IANA timezone such as Europe/Berlin.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let error = viewModel.timeZoneError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
+                HStack {
+                    Button("Apply") { viewModel.saveTimeZone() }
+                    Button("Use System Timezone") {
+                        viewModel.timeZoneOverride = ""
+                        viewModel.saveTimeZone()
+                    }
+                }
+            }
+
             Section("Visible screens") {
                 Text("Drag to reorder. Toggle to show / hide.")
                     .font(.caption)

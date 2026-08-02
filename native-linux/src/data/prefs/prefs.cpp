@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <memory>
 
@@ -172,6 +174,21 @@ std::optional<int> AppPreferences::sync_interval_minutes() const
     return v;
 }
 
+std::optional<std::string> AppPreferences::timezone_override() const
+{
+    KeyFileGuard kf(g_key_file_new());
+    if (!load_ini(kf.get(), ini_path_)) return std::nullopt;
+    GError* err{};
+    gchar* v = g_key_file_get_string(kf.get(), kIniGroup, "timezone_override", &err);
+    if (!v) {
+        if (err) g_error_free(err);
+        return std::nullopt;
+    }
+    std::string out{v};
+    g_free(v);
+    return out.empty() ? std::nullopt : std::optional<std::string>{std::move(out)};
+}
+
 std::optional<int> AppPreferences::pomodoro_work_minutes() const
 {
     KeyFileGuard kf(g_key_file_new());
@@ -269,6 +286,17 @@ bool AppPreferences::set_sync_interval_minutes(int v)
     return save_ini(kf.get(), ini_path_);
 }
 
+bool AppPreferences::set_timezone_override(std::optional<std::string> const& value)
+{
+    KeyFileGuard kf(g_key_file_new());
+    if (!load_ini(kf.get(), ini_path_)) {}
+    if (value.has_value() && !value->empty())
+        g_key_file_set_string(kf.get(), kIniGroup, "timezone_override", value->c_str());
+    else
+        g_key_file_remove_key(kf.get(), kIniGroup, "timezone_override", nullptr);
+    return save_ini(kf.get(), ini_path_);
+}
+
 bool AppPreferences::set_pomodoro_work_minutes(int v)
 {
     KeyFileGuard kf(g_key_file_new());
@@ -307,6 +335,51 @@ bool AppPreferences::set_kanban_column_tags_csv(std::string const& v)
     if (!load_ini(kf.get(), ini_path_)) {}
     g_key_file_set_string(kf.get(), kIniGroup, "kanban_column_tags", v.c_str());
     return save_ini(kf.get(), ini_path_);
+}
+
+namespace {
+struct OriginalTimezone {
+    std::optional<std::string> env;
+    std::string identifier;
+
+    OriginalTimezone()
+    {
+        if (char const* value = std::getenv("TZ")) env = value;
+        GTimeZone* zone = g_time_zone_new_local();
+        identifier = zone ? g_time_zone_get_identifier(zone) : "UTC";
+        if (zone) g_time_zone_unref(zone);
+    }
+};
+
+OriginalTimezone const& original_timezone()
+{
+    static OriginalTimezone const value;
+    return value;
+}
+} // namespace
+
+std::string const& system_timezone_id()
+{
+    return original_timezone().identifier;
+}
+
+bool apply_timezone_override(std::optional<std::string> const& zone_id)
+{
+    auto const& original = original_timezone();
+    if (zone_id.has_value() && !zone_id->empty()) {
+        GTimeZone* zone = g_time_zone_new_identifier(zone_id->c_str());
+        if (!zone) return false;
+        g_time_zone_unref(zone);
+        g_setenv("TZ", zone_id->c_str(), TRUE);
+    }
+    else if (original.env.has_value()) {
+        g_setenv("TZ", original.env->c_str(), TRUE);
+    }
+    else {
+        g_unsetenv("TZ");
+    }
+    tzset();
+    return true;
 }
 
 AppSettings merged_app_preferences(AppPreferences const& prefs)

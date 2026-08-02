@@ -287,11 +287,12 @@ object ICalParser {
         val value = rawLine.substring(colonIdx + 1).trim()
         val paramPart = rawLine.substring(0, colonIdx)
 
-        // VALUE=DATE → all-day, set to midnight UTC
+        // VALUE=DATE has no timezone. Anchor it at midnight in the effective app timezone so
+        // date-only tasks and all-day events remain on the selected calendar date in the UI.
         if (paramPart.contains("VALUE=DATE", ignoreCase = true)) {
             return try {
                 LocalDate.parse(value, DateTimeFormatter.BASIC_ISO_DATE)
-                    .atStartOfDay(ZoneOffset.UTC).toInstant()
+                    .atStartOfDay(ZoneId.systemDefault()).toInstant()
             } catch (_: DateTimeParseException) { null }
         }
 
@@ -311,10 +312,11 @@ object ICalParser {
         }
 
         // TZID param
-        val tzidMatch = Regex("TZID=([^;:]+)").find(paramPart)
+        val fallbackZone = ZoneId.systemDefault()
+        val tzidMatch = Regex("TZID=([^;:]+)", RegexOption.IGNORE_CASE).find(paramPart)
         val tz = tzidMatch?.groupValues?.get(1)?.let {
-            runCatching { ZoneId.of(it) }.getOrNull() ?: ZoneOffset.UTC
-        } ?: ZoneOffset.UTC
+            runCatching { ZoneId.of(it) }.getOrNull() ?: fallbackZone
+        } ?: fallbackZone
 
         return try {
             LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
