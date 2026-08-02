@@ -33,6 +33,22 @@ class AppPreferences @Inject constructor(
         ds.edit { it[Keys.THEME] = theme.name }
     }
 
+    // ─── Timezone ────────────────────────────────────────────────────────────
+
+    /** Null means automatic: use the operating-system timezone. */
+    val timeZoneOverrideFlow: Flow<String?> = ds.data
+        .catchIo()
+        .map { p -> p[Keys.TIME_ZONE_OVERRIDE]?.takeIf { it.isNotBlank() } }
+
+    suspend fun setTimeZoneOverride(zoneId: String?) {
+        val normalized = zoneId?.trim()?.takeIf { it.isNotEmpty() }
+        ds.edit { p ->
+            if (normalized == null) p.remove(Keys.TIME_ZONE_OVERRIDE)
+            else p[Keys.TIME_ZONE_OVERRIDE] = normalized
+        }
+        AppTimeZone.applyOverride(normalized)
+    }
+
     // ─── Visible screens ─────────────────────────────────────────────────────
 
     val visibleScreensFlow: Flow<List<String>> = ds.data
@@ -177,6 +193,7 @@ class AppPreferences @Inject constructor(
 
     private object Keys {
         val THEME = stringPreferencesKey("theme")
+        val TIME_ZONE_OVERRIDE = stringPreferencesKey("time_zone_override")
         val VISIBLE_SCREENS = stringPreferencesKey("visible_screens")
         val KANBAN_COLUMNS = stringPreferencesKey("kanban_columns")
         val POMODORO_WORK = intPreferencesKey("pomodoro_work")

@@ -9,13 +9,18 @@ import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkManager
 import com.crossdashboard.app.worker.SyncWorker
+import com.crossdashboard.app.data.prefs.AppPreferences
+import com.crossdashboard.app.data.prefs.AppTimeZone
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltAndroidApp
 class CrossDashboardApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var appPreferences: AppPreferences
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -24,6 +29,8 @@ class CrossDashboardApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Apply before repositories, workers, and UI parse or format cached timestamps.
+        runBlocking { AppTimeZone.applyOverride(appPreferences.timeZoneOverrideFlow.first()) }
         createNotificationChannels()
         ensurePeriodicSyncScheduled()
     }

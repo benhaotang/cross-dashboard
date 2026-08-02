@@ -41,6 +41,7 @@ public:
     [[nodiscard]] std::optional<std::string> theme() const; // auto / light / dark
     [[nodiscard]] std::optional<std::string> visible_screens_ordered() const;
     [[nodiscard]] std::optional<int> sync_interval_minutes() const;
+    [[nodiscard]] std::optional<std::string> timezone_override() const;
     [[nodiscard]] std::optional<int> pomodoro_work_minutes() const;
     [[nodiscard]] std::optional<int> pomodoro_break_minutes() const;
     [[nodiscard]] std::optional<bool> notifications_enabled() const;
@@ -52,6 +53,7 @@ public:
     [[nodiscard]] bool set_theme(std::string const&);
     [[nodiscard]] bool set_visible_screens_ordered(std::string const&);
     [[nodiscard]] bool set_sync_interval_minutes(int);
+    [[nodiscard]] bool set_timezone_override(std::optional<std::string> const&);
     [[nodiscard]] bool set_pomodoro_work_minutes(int);
     [[nodiscard]] bool set_pomodoro_break_minutes(int);
     [[nodiscard]] bool set_notifications_enabled(bool);
@@ -64,5 +66,8 @@ private:
 
 /** Apply stored prefs as overrides on top of `AppSettings` defaults. */
 AppSettings merged_app_preferences(AppPreferences const& prefs);
+
+std::string const& system_timezone_id();
+bool apply_timezone_override(std::optional<std::string> const& zone_id);
 
 } // namespace cd

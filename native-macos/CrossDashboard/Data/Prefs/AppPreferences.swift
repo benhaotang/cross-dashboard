@@ -16,6 +16,18 @@ public final class AppPreferences {
         didSet { defaults.set(theme.rawValue, forKey: Keys.theme) }
     }
 
+    /// Nil means automatic: use the operating-system timezone.
+    public var timeZoneOverride: String? {
+        didSet {
+            if let value = timeZoneOverride, !value.isEmpty {
+                defaults.set(value, forKey: Keys.timeZoneOverride)
+            } else {
+                defaults.removeObject(forKey: Keys.timeZoneOverride)
+            }
+            AppTimeZone.applyOverride(timeZoneOverride)
+        }
+    }
+
     // ─── Visible screens ─────────────────────────────────────────────────────
 
     public var visibleScreens: [String] {
@@ -98,6 +110,7 @@ public final class AppPreferences {
 
         let rawTheme = defaults.string(forKey: Keys.theme) ?? ""
         theme = ThemePreference(rawValue: rawTheme) ?? .system
+        timeZoneOverride = defaults.string(forKey: Keys.timeZoneOverride)
 
         let screensRaw = defaults.string(forKey: Keys.visibleScreens)
         visibleScreens = screensRaw.flatMap {
@@ -133,12 +146,14 @@ public final class AppPreferences {
 
         let epoch = defaults.double(forKey: Keys.lastSync)
         lastSyncDate = epoch > 0 ? Date(timeIntervalSince1970: epoch) : nil
+        AppTimeZone.applyOverride(timeZoneOverride)
     }
 
     // ─── Keys ─────────────────────────────────────────────────────────────────
 
     private enum Keys {
         static let theme               = "pref_theme"
+        static let timeZoneOverride    = "pref_time_zone_override"
         static let visibleScreens      = "pref_visible_screens"
         static let kanbanColumns       = "pref_kanban_columns"
         static let pomodoroWork        = "pref_pomodoro_work"

@@ -99,6 +99,8 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
         theme_system_.set_active(true);
 
     sync_minutes_.set_value(s.widget_sync_interval_minutes);
+    if (auto zone = app_.prefs().timezone_override()) timezone_entry_.set_text(*zone);
+    timezone_entry_.set_placeholder_text("Automatic (" + system_timezone_id() + ")");
     notifications_.set_active(s.notifications_enabled);
     pom_work_.set_value(s.pomodoro_settings.work_minutes);
     pom_break_.set_value(s.pomodoro_settings.short_break_minutes);
@@ -292,6 +294,18 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     notifications_.set_label("Enable notifications (background sync & reminders)");
     sgrid->attach(notifications_, 0, 1, 2, 1);
     general_page->pack_start(*sgrid, false, false);
+    pack_section_title(*general_page, "Date & time");
+    auto* tz_help = Gtk::manage(new Gtk::Label(
+        "Leave blank to use the system timezone (" + system_timezone_id()
+        + "). Otherwise enter an IANA timezone such as Europe/Berlin."));
+    tz_help->set_line_wrap(true);
+    tz_help->set_halign(Gtk::ALIGN_START);
+    general_page->pack_start(*tz_help, false, false);
+    timezone_entry_.set_hexpand(true);
+    general_page->pack_start(timezone_entry_, false, false);
+    auto* save_timezone = Gtk::manage(new Gtk::Button("Apply timezone"));
+    save_timezone->signal_clicked().connect(sigc::mem_fun(*this, &SettingsView::save_timezone));
+    general_page->pack_start(*save_timezone, false, false);
     auto* save_general = Gtk::manage(new Gtk::Button("Save"));
     save_general->signal_clicked().connect([this] {
         save_sync_interval();
@@ -362,6 +376,26 @@ void SettingsView::save_theme()
 void SettingsView::save_sync_interval()
 {
     (void)app_.prefs().set_sync_interval_minutes(static_cast<int>(sync_minutes_.get_value()));
+}
+
+void SettingsView::save_timezone()
+{
+    std::string value = timezone_entry_.get_text();
+    auto not_space = [](unsigned char c) { return !std::isspace(c); };
+    value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+    value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+    std::optional<std::string> override = value.empty() ? std::nullopt : std::optional<std::string>{value};
+    if (!apply_timezone_override(override)) {
+        if (Gtk::Window* window = dynamic_cast<Gtk::Window*>(get_toplevel())) {
+            Gtk::MessageDialog dialog(*window, "Unknown timezone", false,
+                Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+            dialog.set_secondary_text("Use an IANA identifier such as Europe/Berlin.");
+            dialog.run();
+        }
+        return;
+    }
+    (void)app_.prefs().set_timezone_override(override);
+    sync_.sync_once();
 }
 
 void SettingsView::save_notifications()

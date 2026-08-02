@@ -145,7 +145,7 @@ std::optional<EpochMillis> parse_dt_raw_line(std::string const& raw_line)
         unsigned d{};
         if (std::strlen(vp) >= 8 && std::sscanf(vp, "%4d%2u%2u", &y, &m, &d) == 3) {
             g_autoptr(GDateTime) gdt =
-                g_date_time_new_utc(y, static_cast<gint>(m), static_cast<gint>(d), 0, 0, 0.0);
+                g_date_time_new_local(y, static_cast<gint>(m), static_cast<gint>(d), 0, 0, 0.0);
             if (!gdt) return std::nullopt;
             return g_date_time_to_unix(gdt) * 1000;
         }
@@ -183,7 +183,8 @@ std::optional<EpochMillis> parse_dt_raw_line(std::string const& raw_line)
         return std::nullopt;
 
     if (tz_name.has_value()) {
-        GTimeZone* tz = g_time_zone_new(tz_name->c_str());
+        GTimeZone* tz = g_time_zone_new_identifier(tz_name->c_str());
+        if (!tz) tz = g_time_zone_new_local();
         GDateTime* local = g_date_time_new(
             tz, y, static_cast<gint>(mo), static_cast<gint>(d), static_cast<gint>(H), static_cast<gint>(M),
             static_cast<gdouble>(S));
@@ -193,7 +194,8 @@ std::optional<EpochMillis> parse_dt_raw_line(std::string const& raw_line)
         g_date_time_unref(local);
         return ms;
     }
-    g_autoptr(GDateTime) gutc = g_date_time_new_utc(
+    // RFC 5545 floating time: interpret it in the effective application timezone.
+    g_autoptr(GDateTime) gutc = g_date_time_new_local(
         y, static_cast<gint>(mo), static_cast<gint>(d), static_cast<gint>(H), static_cast<gint>(M),
         static_cast<gdouble>(S));
     if (!gutc) return std::nullopt;

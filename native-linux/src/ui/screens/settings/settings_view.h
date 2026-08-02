@@ -36,6 +36,7 @@ public:
 private:
     void save_theme();
     void save_sync_interval();
+    void save_timezone();
     void save_notifications();
     void save_pomodoro();
 
@@ -73,6 +74,7 @@ private:
     Gtk::RadioButton theme_light_;
     Gtk::RadioButton theme_dark_;
     Gtk::SpinButton sync_minutes_;
+    Gtk::Entry timezone_entry_;
     Gtk::CheckButton notifications_;
     Gtk::SpinButton pom_work_;
     Gtk::SpinButton pom_break_;

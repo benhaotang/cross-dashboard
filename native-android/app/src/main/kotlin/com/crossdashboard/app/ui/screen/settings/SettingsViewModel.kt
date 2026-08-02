@@ -10,6 +10,7 @@ import com.crossdashboard.app.data.network.NextcloudLoginFlow
 import com.crossdashboard.app.data.network.NextcloudSsoHelper
 import com.crossdashboard.app.data.network.SsoResultBus
 import com.crossdashboard.app.data.prefs.AppPreferences
+import com.crossdashboard.app.data.prefs.AppTimeZone
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.domain.model.*
@@ -66,6 +67,8 @@ data class SettingsUiState(
 
     // ── Appearance ────────────────────────────────────────────────────────────
     val theme: ThemePreference = ThemePreference.SYSTEM,
+    val timeZoneOverride: String? = null,
+    val systemTimeZone: String = AppTimeZone.systemZoneId.id,
 
     // ── Navigation ───────────────────────────────────────────────────────────
     val visibleScreens: List<String> = ALL_SCREENS,
@@ -197,6 +200,9 @@ class SettingsViewModel @Inject constructor(
     private fun collectPrefsFlows() {
         viewModelScope.launch {
             prefs.themeFlow.collect { t -> _state.update { it.copy(theme = t) } }
+        }
+        viewModelScope.launch {
+            prefs.timeZoneOverrideFlow.collect { zone -> _state.update { it.copy(timeZoneOverride = zone) } }
         }
         viewModelScope.launch {
             prefs.visibleScreensFlow.collect { s -> _state.update { it.copy(visibleScreens = s) } }
@@ -487,6 +493,27 @@ class SettingsViewModel @Inject constructor(
 
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch { prefs.setTheme(theme) }
+    }
+
+    fun setTimeZoneOverride(value: String?) {
+        val normalized = value?.trim()?.takeIf { it.isNotEmpty() }
+        if (normalized != null && runCatching { java.time.ZoneId.of(normalized) }.isFailure) {
+            _state.update { it.copy(errorMessage = "Unknown timezone: $normalized") }
+            return
+        }
+        viewModelScope.launch {
+            prefs.setTimeZoneOverride(normalized)
+            _state.update {
+                it.copy(
+                    infoMessage = if (normalized == null) "Using system timezone" else "Timezone set to $normalized. Sync to reparse cached calendar data.",
+                )
+            }
+            workManager.enqueueUniqueWork(
+                SyncWorker.WORK_NAME_ONCE,
+                ExistingWorkPolicy.REPLACE,
+                SyncWorker.oneTimeRequest(),
+            )
+        }
     }
 
     // ─── Navigation ───────────────────────────────────────────────────────────

@@ -333,6 +333,7 @@ enum ICalParser {
 
         // All-day: VALUE=DATE
         if paramPart.contains("VALUE=DATE") {
+            dateOnlyFormatter.timeZone = .current
             return dateOnlyFormatter.date(from: String(value.prefix(8)))
         }
 

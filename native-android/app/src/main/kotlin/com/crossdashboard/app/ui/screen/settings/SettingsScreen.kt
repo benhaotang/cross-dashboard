@@ -132,6 +132,9 @@ fun SettingsScreen(
             item { SectionHeader("Navigation") }
             item { NavigationSection(state = state, vm = vm) }
 
+            item { SectionHeader("Date & Time") }
+            item { TimeZoneSection(state = state, vm = vm) }
+
             // ── Task input defaults ──────────────────────────────────────────
             item { SectionHeader("Task Input") }
             item { TaskDefaultsSection(state = state, vm = vm) }
@@ -155,6 +158,41 @@ fun SettingsScreen(
             // ── About ────────────────────────────────────────────────────────
             item { SectionHeader("About") }
             item { AboutSection() }
+        }
+    }
+}
+
+@Composable
+private fun TimeZoneSection(state: SettingsUiState, vm: SettingsViewModel) {
+    var input by remember(state.timeZoneOverride) { mutableStateOf(state.timeZoneOverride.orEmpty()) }
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "Automatic uses the device timezone (${state.systemTimeZone}). Set an IANA timezone as a fallback for calendar data and display.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = input,
+            onValueChange = { input = it },
+            label = { Text("Timezone override") },
+            placeholder = { Text("Europe/Berlin") },
+            supportingText = { Text(if (state.timeZoneOverride == null) "Automatic" else "Active: ${state.timeZoneOverride}") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { vm.setTimeZoneOverride(input) }, enabled = input.isNotBlank()) {
+                Text("Apply")
+            }
+            OutlinedButton(onClick = {
+                input = ""
+                vm.setTimeZoneOverride(null)
+            }) {
+                Text("Use system timezone")
+            }
         }
     }
 }

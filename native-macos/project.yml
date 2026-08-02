@@ -46,6 +46,7 @@ targets:
       - CrossDashboard/Domain/WidgetDataStore.swift
       - CrossDashboard/Data/Persistence/PersistenceController.swift
       - CrossDashboard/Data/Prefs/AppPreferences.swift
+      - CrossDashboard/Data/Prefs/AppTimeZone.swift
       - CrossDashboard/Data/Prefs/KeychainStore.swift
     settings:
       base:
@@ -68,6 +69,7 @@ targets:
           - Domain/Models.swift
           - Data/Persistence/PersistenceController.swift
           - Data/Prefs/AppPreferences.swift
+          - Data/Prefs/AppTimeZone.swift
           - Data/Prefs/KeychainStore.swift
     info:
       path: CrossDashboard/Info.plist
