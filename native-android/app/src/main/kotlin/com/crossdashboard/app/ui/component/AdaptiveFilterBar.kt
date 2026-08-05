@@ -129,7 +129,7 @@ private fun FilterDropdown(spec: AdaptiveFilterSpec) {
                         if (spec.multiSelect) {
                             Checkbox(checked = choice.key in spec.selectedKeys, onCheckedChange = null)
                         } else {
-                            RadioButton(checked = choice.key in spec.selectedKeys, onClick = null)
+                            RadioButton(selected = choice.key in spec.selectedKeys, onClick = null)
                         }
                     },
                     onClick = {
@@ -167,7 +167,7 @@ private fun FilterSheetSection(spec: AdaptiveFilterSpec) {
                 if (spec.multiSelect) {
                     Checkbox(checked = choice.key in spec.selectedKeys, onCheckedChange = null)
                 } else {
-                    RadioButton(checked = choice.key in spec.selectedKeys, onClick = null)
+                    RadioButton(selected = choice.key in spec.selectedKeys, onClick = null)
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(choice.label)
