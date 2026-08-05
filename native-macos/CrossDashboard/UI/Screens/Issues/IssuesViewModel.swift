@@ -25,7 +25,8 @@ final class IssuesViewModel {
     }
 
     var filter: Filter = .open
-    var selectedLabel: String?
+    var selectedLabels: Set<String> = []
+    var selectedMilestoneKey: String?
     var searchText: String = ""
     var selectedIssueID: Int64?
     var isLoading: Bool = false
@@ -72,12 +73,15 @@ final class IssuesViewModel {
         case .closed: base = allIssues.filter { $0.state == "closed" }
         case .all:    base = allIssues
         }
-        let labelFiltered = selectedLabel.map { label in
-            base.filter { $0.labels.contains(label) }
-        } ?? base
-        guard !searchText.isEmpty else { return labelFiltered }
+        let labelFiltered = base.filter { issue in
+            selectedLabels.allSatisfy { issue.labels.contains($0) }
+        }
+        let milestoneFiltered = labelFiltered.filter { issue in
+            selectedMilestoneKey == nil || milestoneKey(for: issue) == selectedMilestoneKey
+        }
+        guard !searchText.isEmpty else { return milestoneFiltered }
         let q = searchText.lowercased()
-        return labelFiltered.filter {
+        return milestoneFiltered.filter {
             $0.title.lowercased().contains(q) ||
             $0.body.lowercased().contains(q) ||
             $0.labels.contains { $0.lowercased().contains(q) }
@@ -88,6 +92,27 @@ final class IssuesViewModel {
         Array(Set(allIssues.flatMap(\.labels))).sorted {
             $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
         }
+    }
+
+    var allMilestones: [FilterMenuOption] {
+        var seen = Set<String>()
+        return allIssues.compactMap { issue in
+            guard let key = milestoneKey(for: issue),
+                  let title = issue.milestoneTitle,
+                  seen.insert(key).inserted else { return nil }
+            let repo = issue.repository.split(separator: "/").last.map(String.init) ?? issue.repository
+            return FilterMenuOption(id: key, label: "\(title) · \(repo)")
+        }.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    }
+
+    func clearFilters() {
+        filter = .open
+        selectedLabels = []
+        selectedMilestoneKey = nil
+    }
+
+    private func milestoneKey(for issue: GiteaIssue) -> String? {
+        issue.milestoneId.map { "\(issue.repository):\($0)" }
     }
 
     var selectedIssue: GiteaIssue? {

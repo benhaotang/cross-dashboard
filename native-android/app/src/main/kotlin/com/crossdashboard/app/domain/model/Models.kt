@@ -86,6 +86,9 @@ data class GiteaIssue(
     val updatedAt: Instant,
     val repository: String,     // "owner/repo"
     val htmlUrl: String,
+    val milestoneId: Long? = null,
+    val milestoneTitle: String? = null,
+    val milestoneDueOn: Instant? = null,
 )
 
 data class GiteaComment(
@@ -144,7 +147,6 @@ sealed class InboxItem {
     data class Event(val event: CalendarEvent, val durationMinutes: Int) : InboxItem()
     data class Task(val task: CalDavTask, val estimatedMinutes: Int?) : InboxItem()
     data class Issue(val issue: GiteaIssue, val estimatedMinutes: Int?) : InboxItem()
-    data class Milestone(val milestone: GiteaMilestone) : InboxItem()
 }
 
 // ─── Pomodoro ─────────────────────────────────────────────────────────────────

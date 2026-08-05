@@ -265,6 +265,7 @@ class GiteaClient @Inject constructor(
         val created_at: String,
         val updated_at: String,
         val html_url: String,
+        val milestone: GiteaMilestoneDto? = null,
     ) {
         fun toDomain(repo: String) = GiteaIssue(
             id = id,
@@ -278,8 +279,18 @@ class GiteaClient @Inject constructor(
             updatedAt = Instant.parse(updated_at),
             repository = repo,
             htmlUrl = html_url,
+            milestoneId = milestone?.id,
+            milestoneTitle = milestone?.title,
+            milestoneDueOn = milestone?.due_on?.let(Instant::parse),
         )
     }
+
+    @Serializable
+    private data class GiteaMilestoneDto(
+        val id: Long,
+        val title: String,
+        val due_on: String? = null,
+    )
 
     @Serializable
     private data class GiteaCommentDto(

@@ -160,6 +160,9 @@ public final class IssueModel {
     public var updatedAtEpoch: Double
     public var repository: String
     public var htmlUrl: String
+    public var milestoneId: Int64? = nil
+    public var milestoneTitle: String? = nil
+    public var milestoneDueOnEpoch: Double? = nil
 
     public init(from issue: GiteaIssue) {
         issueId = issue.id
@@ -173,6 +176,9 @@ public final class IssueModel {
         updatedAtEpoch = issue.updatedAt.timeIntervalSince1970
         repository = issue.repository
         htmlUrl = issue.htmlUrl
+        milestoneId = issue.milestoneId
+        milestoneTitle = issue.milestoneTitle
+        milestoneDueOnEpoch = issue.milestoneDueOn?.timeIntervalSince1970
     }
 
     public func toDomain() -> GiteaIssue {
@@ -189,7 +195,10 @@ public final class IssueModel {
             createdAt: Date(timeIntervalSince1970: createdAtEpoch),
             updatedAt: Date(timeIntervalSince1970: updatedAtEpoch),
             repository: repository,
-            htmlUrl: htmlUrl
+            htmlUrl: htmlUrl,
+            milestoneId: milestoneId,
+            milestoneTitle: milestoneTitle,
+            milestoneDueOn: milestoneDueOnEpoch.map { Date(timeIntervalSince1970: $0) }
         )
     }
 }

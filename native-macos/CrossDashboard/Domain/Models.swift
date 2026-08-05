@@ -165,10 +165,14 @@ public struct GiteaIssue: Codable, Identifiable, Hashable, Sendable {
     public let updatedAt: Date
     public let repository: String      // "owner/repo"
     public let htmlUrl: String
+    public let milestoneId: Int64?
+    public let milestoneTitle: String?
+    public let milestoneDueOn: Date?
 
     public init(id: Int64, number: Int, title: String, body: String, state: String,
                 labels: [String] = [], assignees: [String] = [],
-                createdAt: Date, updatedAt: Date, repository: String, htmlUrl: String) {
+                createdAt: Date, updatedAt: Date, repository: String, htmlUrl: String,
+                milestoneId: Int64? = nil, milestoneTitle: String? = nil, milestoneDueOn: Date? = nil) {
         self.id = id
         self.number = number
         self.title = title
@@ -180,6 +184,9 @@ public struct GiteaIssue: Codable, Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
         self.repository = repository
         self.htmlUrl = htmlUrl
+        self.milestoneId = milestoneId
+        self.milestoneTitle = milestoneTitle
+        self.milestoneDueOn = milestoneDueOn
     }
 }
 
@@ -285,14 +292,12 @@ public enum InboxItem: Identifiable, Sendable {
     case event(CalendarEvent, durationMinutes: Int)
     case task(CalDavTask, estimatedMinutes: Int?)
     case issue(GiteaIssue, estimatedMinutes: Int?)
-    case milestone(GiteaMilestone)
 
     public var id: String {
         switch self {
         case .event(let e, _):     return "event-\(e.uid)"
         case .task(let t, _):      return "task-\(t.uid)"
         case .issue(let i, _):     return "issue-\(i.id)"
-        case .milestone(let m):    return "milestone-\(m.id)"
         }
     }
 }

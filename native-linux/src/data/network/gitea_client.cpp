@@ -83,6 +83,12 @@ GiteaIssue issue_dto_to_domain(nlohmann::json const& j, std::string const& repo)
     i.updated_at = parse_iso_ms(j.value("updated_at", std::string{}));
     i.repository = repo;
     i.html_url = j.value("html_url", std::string{});
+    if (auto it = j.find("milestone"); it != j.end() && it->is_object()) {
+        i.milestone_id = it->value("id", std::int64_t{0});
+        i.milestone_title = it->value("title", std::string{});
+        auto const due = it->value("due_on", std::string{});
+        if (!due.empty()) i.milestone_due_on = parse_iso_ms(due);
+    }
     return i;
 }
 

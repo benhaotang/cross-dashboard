@@ -4,6 +4,7 @@
 #include "app_viewmodel.h"
 #include "background/sync_scheduler.h"
 #include "components/tag_flow.h"
+#include "components/searchable_filter_menu.h"
 #include "data/db/task_dao.h"
 #include "data/parser/task_input_parser.h"
 #include "data/prefs/prefs.h"
@@ -80,30 +81,13 @@ bool TasksView::task_matches_filter(CalDavTask const& t, TaskListFilter f)
     return true;
 }
 
-void TasksView::on_filter_changed()
-{
-    if (filter_active_.get_active()) {
-        task_filter_ = TaskListFilter::Active;
-        rebuild();
-    }
-    else if (filter_completed_.get_active()) {
-        task_filter_ = TaskListFilter::Completed;
-        rebuild();
-    }
-    else if (filter_all_.get_active()) {
-        task_filter_ = TaskListFilter::All;
-        rebuild();
-    }
-}
+void TasksView::on_filter_changed() { rebuild(); }
 
 TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL, 6)
     , app_(app)
     , vm_(vm)
     , sync_(sync)
-    , filter_active_(filter_group_, "Active")
-    , filter_completed_(filter_group_, "Done")
-    , filter_all_(filter_group_, "All")
     , scroll_{}
 {
     vm_.signal_new_task_requested.connect([this]() { focus_quick_input(); });
@@ -120,15 +104,34 @@ TasksView::TasksView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
         rebuild();
     });
 
-    filter_box_.get_style_context()->add_class("linked");
-    filter_active_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
-    filter_completed_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
-    filter_all_.signal_toggled().connect(sigc::mem_fun(*this, &TasksView::on_filter_changed));
-    filter_active_.set_active(true);
-    filter_box_.pack_start(filter_active_, false, false);
-    filter_box_.pack_start(filter_completed_, false, false);
-    filter_box_.pack_start(filter_all_, false, false);
-    toolbar_.pack_start(filter_box_, false, false);
+    status_filter_ = Gtk::manage(new SearchableFilterMenu("Status", false, false));
+    tag_filter_ = Gtk::manage(new SearchableFilterMenu("Tags", true, true));
+    status_filter_->set_options({{"active", "Active"}, {"completed", "Completed"}, {"all", "All"}});
+    status_filter_->set_selected({"active"});
+    status_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (selected.empty()) return;
+        if (*selected.begin() == "completed") task_filter_ = TaskListFilter::Completed;
+        else if (*selected.begin() == "all") task_filter_ = TaskListFilter::All;
+        else task_filter_ = TaskListFilter::Active;
+        rebuild();
+    });
+    tag_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        selected_tags_ = selected;
+        rebuild();
+    });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.set_tooltip_text("Clear filters");
+    clear_filters_btn_.signal_clicked().connect([this] {
+        task_filter_ = TaskListFilter::Active;
+        selected_tags_.clear();
+        status_filter_->set_selected({"active"});
+        tag_filter_->set_selected({});
+        rebuild();
+    });
+    toolbar_.pack_start(*status_filter_, false, false);
+    toolbar_.pack_start(*tag_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
 
     toolbar_.pack_end(refresh_btn_, false, false);
     pack_start(toolbar_, false, false);
@@ -154,7 +157,9 @@ void TasksView::focus_quick_input()
 bool TasksView::reveal_task(std::string const& uid)
 {
     task_filter_ = TaskListFilter::Active;
-    filter_active_.set_active(true);
+    selected_tags_.clear();
+    status_filter_->set_selected({"active"});
+    tag_filter_->set_selected({});
     rebuild();
 
     for (Gtk::Widget* widget : list_.get_children()) {
@@ -302,6 +307,13 @@ void TasksView::rebuild()
     TaskDao dao(app_.db());
     auto const all_tasks = dao.get_all();
     auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
+    std::set<std::string> all_tags;
+    for (auto const& task : all_tasks) all_tags.insert(task.categories.begin(), task.categories.end());
+    std::vector<std::pair<std::string, std::string>> tag_options;
+    for (auto const& tag : all_tags) tag_options.emplace_back(tag, "#" + tag);
+    tag_filter_->set_options(std::move(tag_options));
+    tag_filter_->set_selected(selected_tags_);
+    clear_filters_btn_.set_visible(task_filter_ != TaskListFilter::Active || !selected_tags_.empty());
 
     std::multimap<std::string, CalDavTask const*> children{};
     std::vector<CalDavTask const*> roots{};
@@ -315,7 +327,10 @@ void TasksView::rebuild()
     });
 
     std::function<void(CalDavTask const&, int)> visit = [&](CalDavTask const& t, int depth) {
-        bool const show = task_matches_filter(t, task_filter_);
+        bool const show = task_matches_filter(t, task_filter_)
+            && std::all_of(selected_tags_.begin(), selected_tags_.end(), [&t](std::string const& tag) {
+                return std::find(t.categories.begin(), t.categories.end(), tag) != t.categories.end();
+            });
         if (show)
             list_.append(*make_row(t, depth, magic_tags));
 

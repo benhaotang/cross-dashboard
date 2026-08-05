@@ -32,7 +32,9 @@ data class IssuesUiState(
     val issues: List<GiteaIssue> = emptyList(),
     val filter: IssueStateFilter = IssueStateFilter.OPEN,
     val availableLabels: List<String> = emptyList(),
-    val selectedLabel: String? = null,
+    val selectedLabels: Set<String> = emptySet(),
+    val availableMilestones: List<IssueMilestoneFilter> = emptyList(),
+    val selectedMilestoneKey: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     /** Comments keyed by issue id — loaded lazily on sheet open */
@@ -48,6 +50,12 @@ data class IssuesUiState(
     val magicTags: List<String> = emptyList(),
 )
 
+data class IssueMilestoneFilter(
+    val key: String,
+    val title: String,
+    val repository: String,
+)
+
 @HiltViewModel
 class IssuesViewModel @Inject constructor(
     private val issueRepo: IssueRepository,
@@ -56,7 +64,8 @@ class IssuesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(IssueStateFilter.OPEN)
-    private val _selectedLabel = MutableStateFlow<String?>(null)
+    private val _selectedLabels = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedMilestoneKey = MutableStateFlow<String?>(null)
     private val _state = MutableStateFlow(IssuesUiState())
     val state: StateFlow<IssuesUiState> = _state.asStateFlow()
 
@@ -67,7 +76,12 @@ class IssuesViewModel @Inject constructor(
         _state.update { it.copy(configuredRepos = repos) }
 
         viewModelScope.launch {
-            combine(issueRepo.allIssues, _filter, _selectedLabel) { issues, filter, selectedLabel ->
+            combine(
+                issueRepo.allIssues,
+                _filter,
+                _selectedLabels,
+                _selectedMilestoneKey,
+            ) { issues, filter, selectedLabels, selectedMilestoneKey ->
                 val stateFiltered = when (filter) {
                     IssueStateFilter.OPEN -> issues.filter { it.state == "open" }
                     IssueStateFilter.CLOSED -> issues.filter { it.state == "closed" }
@@ -75,18 +89,27 @@ class IssuesViewModel @Inject constructor(
                 }
                 Triple(
                     stateFiltered
-                        .filter { selectedLabel == null || selectedLabel in it.labels }
+                        .filter { issue -> selectedLabels.all { it in issue.labels } }
+                        .filter { issue ->
+                            selectedMilestoneKey == null || issue.milestoneKey() == selectedMilestoneKey
+                        }
                         .sortedByDescending { it.updatedAt },
                     issues.flatMap { it.labels }.distinct().sortedBy { it.lowercase() },
-                    selectedLabel,
+                    issues.mapNotNull { issue ->
+                        val id = issue.milestoneId ?: return@mapNotNull null
+                        val title = issue.milestoneTitle ?: return@mapNotNull null
+                        IssueMilestoneFilter("${issue.repository}:$id", title, issue.repository)
+                    }.distinctBy { it.key }.sortedBy { it.title.lowercase() },
                 )
-            }.collect { (filtered, labels, selectedLabel) ->
+            }.collect { (filtered, labels, milestones) ->
                 _state.update {
                     it.copy(
                         issues = filtered,
                         filter = _filter.value,
                         availableLabels = labels,
-                        selectedLabel = selectedLabel,
+                        selectedLabels = _selectedLabels.value,
+                        availableMilestones = milestones,
+                        selectedMilestoneKey = _selectedMilestoneKey.value,
                     )
                 }
             }
@@ -103,9 +126,22 @@ class IssuesViewModel @Inject constructor(
         _filter.value = filter
     }
 
-    fun setLabelFilter(label: String?) {
-        _selectedLabel.value = label
+    fun setLabelFilters(labels: Set<String>) {
+        _selectedLabels.value = labels
     }
+
+    fun setMilestoneFilter(key: String?) {
+        _selectedMilestoneKey.value = key
+    }
+
+    fun clearFilters() {
+        _filter.value = IssueStateFilter.OPEN
+        _selectedLabels.value = emptySet()
+        _selectedMilestoneKey.value = null
+    }
+
+    private fun GiteaIssue.milestoneKey(): String? =
+        milestoneId?.let { "$repository:$it" }
 
     fun sync() {
         viewModelScope.launch {

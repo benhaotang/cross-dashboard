@@ -200,6 +200,12 @@ void Database::migrate()
         exec_sql(db, "CREATE INDEX IF NOT EXISTS idx_comments_issue ON issue_comments(issue_id);");
         set_user_version(db, 1);
     }
+    if (v < 2) {
+        exec_sql(db, "ALTER TABLE issues ADD COLUMN milestone_id INTEGER;");
+        exec_sql(db, "ALTER TABLE issues ADD COLUMN milestone_title TEXT;");
+        exec_sql(db, "ALTER TABLE issues ADD COLUMN milestone_due_on_epoch INTEGER;");
+        set_user_version(db, 2);
+    }
 }
 
 } // namespace cd

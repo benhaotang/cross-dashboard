@@ -12,6 +12,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 enum class ViewMode { KANBAN, COVEY }
+enum class ViewTypeFilter(val displayName: String) { ALL("All"), TASKS("Tasks"), ISSUES("Issues") }
+enum class ViewDateFilter(val displayName: String) {
+    ALL("Any date"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This Week")
+}
 
 /** Covey four-quadrant tag names (fixed). */
 object CoveyTag {
@@ -42,6 +46,8 @@ data class ViewsUiState(
     val items: List<ViewItem> = emptyList(),
     val kanbanColumns: List<String> = DEFAULT_KANBAN_COLUMNS,
     val viewMode: ViewMode = ViewMode.KANBAN,
+    val typeFilter: ViewTypeFilter = ViewTypeFilter.ALL,
+    val dateFilter: ViewDateFilter = ViewDateFilter.ALL,
     /** When non-null, the assign modal is shown for this item (tap-card flow) */
     val assigningItem: ViewItem? = null,
     /**
@@ -64,6 +70,7 @@ class ViewsViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ViewsUiState())
     val state: StateFlow<ViewsUiState> = _state.asStateFlow()
+    private var allViewItems: List<ViewItem> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -93,12 +100,16 @@ class ViewsViewModel @Inject constructor(
                             title = i.title,
                             labels = i.labels,
                             isTask = false,
+                            due = i.milestoneDueOn,
                             issueRef = i,
                         )
                     }
                 Triple(taskItems + issueItems, columns, _state.value.viewMode)
             }.collect { (items, columns, mode) ->
-                _state.update { it.copy(items = items, kanbanColumns = columns, viewMode = mode) }
+                allViewItems = items
+                _state.update {
+                    it.copy(items = filterItems(items, it.typeFilter, it.dateFilter), kanbanColumns = columns, viewMode = mode)
+                }
             }
         }
     }
@@ -106,6 +117,48 @@ class ViewsViewModel @Inject constructor(
     // ─── View mode ────────────────────────────────────────────────────────────
 
     fun setViewMode(mode: ViewMode) = _state.update { it.copy(viewMode = mode) }
+    fun setTypeFilter(filter: ViewTypeFilter) = _state.update {
+        it.copy(typeFilter = filter, items = filterItems(allViewItems, filter, it.dateFilter))
+    }
+    fun setDateFilter(filter: ViewDateFilter) = _state.update {
+        it.copy(dateFilter = filter, items = filterItems(allViewItems, it.typeFilter, filter))
+    }
+    fun clearFilters() = _state.update {
+        it.copy(
+            typeFilter = ViewTypeFilter.ALL,
+            dateFilter = ViewDateFilter.ALL,
+            items = filterItems(allViewItems, ViewTypeFilter.ALL, ViewDateFilter.ALL),
+        )
+    }
+
+    private fun filterItems(
+        items: List<ViewItem>,
+        typeFilter: ViewTypeFilter,
+        dateFilter: ViewDateFilter,
+    ): List<ViewItem> {
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.LocalDate.now(zone)
+        val todayStart = today.atStartOfDay(zone).toInstant()
+        val tomorrowStart = today.plusDays(1).atStartOfDay(zone).toInstant()
+        val dayAfterTomorrow = today.plusDays(2).atStartOfDay(zone).toInstant()
+        val weekStart = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+            .atStartOfDay(zone).toInstant()
+        val nextWeek = weekStart.plus(java.time.Duration.ofDays(7))
+        return items.filter { item ->
+            val typeMatches = when (typeFilter) {
+                ViewTypeFilter.ALL -> true
+                ViewTypeFilter.TASKS -> item.isTask
+                ViewTypeFilter.ISSUES -> !item.isTask
+            }
+            val dateMatches = when (dateFilter) {
+                ViewDateFilter.ALL -> true
+                ViewDateFilter.TODAY -> item.due?.let { it >= todayStart && it < tomorrowStart } == true
+                ViewDateFilter.TOMORROW -> item.due?.let { it >= tomorrowStart && it < dayAfterTomorrow } == true
+                ViewDateFilter.THIS_WEEK -> item.due?.let { it >= weekStart && it < nextWeek } == true
+            }
+            typeMatches && dateMatches
+        }
+    }
 
     // ─── Assign modal ─────────────────────────────────────────────────────────
 

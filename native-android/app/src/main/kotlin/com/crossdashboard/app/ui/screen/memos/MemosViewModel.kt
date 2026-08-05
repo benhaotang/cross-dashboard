@@ -24,7 +24,8 @@ enum class MemoStateFilter { NORMAL, ARCHIVED, ALL }
 data class MemosUiState(
     val memos: List<MemosMemo> = emptyList(),
     val stateFilter: MemoStateFilter = MemoStateFilter.NORMAL,
-    val selectedTag: String? = null,
+    val availableTags: List<String> = emptyList(),
+    val selectedTags: Set<String> = emptySet(),
     val dateRangeStart: Instant? = null,
     val dateRangeEnd: Instant? = null,
     val isLoading: Boolean = false,
@@ -82,10 +83,16 @@ class MemosViewModel @Inject constructor(
             MemoStateFilter.ARCHIVED -> all.filter { it.state == MemoState.ARCHIVED }
             MemoStateFilter.ALL      -> all
         }
-        s.selectedTag?.let { tag -> filtered = filtered.filter { it.tags.contains(tag) } }
+        filtered = filtered.filter { memo -> s.selectedTags.all { it in memo.tags } }
         s.dateRangeStart?.let { start -> filtered = filtered.filter { it.displayTime >= start } }
         s.dateRangeEnd?.let { end -> filtered = filtered.filter { it.displayTime <= end } }
-        _state.update { it.copy(memos = filtered) }
+        _state.update {
+            it.copy(
+                memos = filtered,
+                availableTags = all.flatMap { memo -> memo.tags }
+                    .distinct().sortedBy { tag -> tag.lowercase() },
+            )
+        }
     }
 
     fun setStateFilter(filter: MemoStateFilter) {
@@ -95,11 +102,18 @@ class MemosViewModel @Inject constructor(
         }
     }
 
-    fun setTagFilter(tag: String?) {
-        _state.update { it.copy(selectedTag = tag) }
+    fun setTagFilters(tags: Set<String>) {
+        _state.update { it.copy(selectedTags = tags) }
         viewModelScope.launch {
             applyFilters(memoRepo.allMemos.first())
         }
+    }
+
+    fun clearFilters() {
+        _state.update {
+            it.copy(stateFilter = MemoStateFilter.NORMAL, selectedTags = emptySet())
+        }
+        viewModelScope.launch { applyFilters(memoRepo.allMemos.first()) }
     }
 
     fun setDateRange(start: Instant?, end: Instant?) {

@@ -2,7 +2,6 @@
 
 #include <gtkmm/box.h>
 #include <gtkmm/button.h>
-#include <gtkmm/comboboxtext.h>
 #include <gtkmm/label.h>
 #include <gtkmm/listbox.h>
 #include <gtkmm/scrolledwindow.h>
@@ -16,6 +15,7 @@
 namespace cd {
 
 class AppContainer;
+class SearchableFilterMenu;
 class SyncScheduler;
 
 /** Unified events, tasks, issues + estimated time from `#Nm` / `#Nh` tags. */
@@ -45,12 +45,15 @@ private:
     SyncScheduler& sync_;
     Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
     Gtk::Button refresh_btn_{};
-    Gtk::ComboBoxText filter_combo_{};
+    SearchableFilterMenu* type_filter_{};
+    SearchableFilterMenu* date_filter_{};
+    Gtk::Button clear_filters_btn_{};
     Gtk::ScrolledWindow scroll_;
     Gtk::ListBox list_;
     Gtk::Label total_line_;
     std::vector<Row> rows_;
-    int filter_index_{};
+    std::string type_filter_key_{"all"};
+    std::string date_filter_key_{"all"};
 };
 
 } // namespace cd

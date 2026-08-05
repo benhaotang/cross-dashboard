@@ -273,6 +273,7 @@ final class GiteaClient: Sendable {
         let created_at: String
         let updated_at: String
         let html_url: String
+        let milestone: GiteaMilestoneDto?
 
         func toDomain(repo: String) -> GiteaIssue {
             GiteaIssue(
@@ -282,9 +283,17 @@ final class GiteaClient: Sendable {
                 assignees: assignees?.map(\.login) ?? [],
                 createdAt: GiteaClient.parseDate(created_at),
                 updatedAt: GiteaClient.parseDate(updated_at),
-                repository: repo, htmlUrl: html_url
+                repository: repo, htmlUrl: html_url,
+                milestoneId: milestone?.id, milestoneTitle: milestone?.title,
+                milestoneDueOn: milestone?.due_on.map { GiteaClient.parseDate($0) }
             )
         }
+    }
+
+    private struct GiteaMilestoneDto: Codable {
+        let id: Int64
+        let title: String
+        let due_on: String?
     }
 
     private struct GiteaCommentDto: Codable {

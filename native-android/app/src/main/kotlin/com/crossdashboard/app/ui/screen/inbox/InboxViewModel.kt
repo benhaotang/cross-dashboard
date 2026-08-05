@@ -17,19 +17,21 @@ import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
-enum class InboxFilter(val displayName: String) {
+enum class InboxTypeFilter(val displayName: String) {
     ALL("All"),
     EVENTS("Events"),
     TASKS("Tasks"),
-    TASKS_TODAY("Today"),
-    TASKS_TOMORROW("Tomorrow"),
-    TASKS_THIS_WEEK("This Week"),
     ISSUES("Issues"),
+}
+
+enum class InboxDateFilter(val displayName: String) {
+    ALL("Any date"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This Week")
 }
 
 data class InboxUiState(
     val items: List<InboxItem> = emptyList(),
-    val filter: InboxFilter = InboxFilter.ALL,
+    val typeFilter: InboxTypeFilter = InboxTypeFilter.ALL,
+    val dateFilter: InboxDateFilter = InboxDateFilter.ALL,
     /** Sum of all timed items in minutes (0 = nothing timed) */
     val totalMinutes: Int = 0,
     val magicTags: List<String> = emptyList(),
@@ -45,28 +47,33 @@ class InboxViewModel @Inject constructor(
     private val prefs: AppPreferences,
 ) : ViewModel() {
 
-    private val _filter = MutableStateFlow(InboxFilter.ALL)
+    private val _typeFilter = MutableStateFlow(InboxTypeFilter.ALL)
+    private val _dateFilter = MutableStateFlow(InboxDateFilter.ALL)
     private val _state = MutableStateFlow(InboxUiState())
     val state: StateFlow<InboxUiState> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
+            val filters = combine(_typeFilter, _dateFilter) { type, date -> type to date }
             combine(
                 eventRepo.events,
                 taskRepo.allTasks,
                 issueRepo.allIssues,
-                _filter,
+                filters,
                 prefs.kanbanColumnsFlow,
-            ) { events, tasks, issues, filter, kanbanColumns ->
-                buildState(events, tasks, issues, filter, kanbanColumns)
+            ) { events, tasks, issues, activeFilters, kanbanColumns ->
+                buildState(events, tasks, issues, activeFilters.first, activeFilters.second, kanbanColumns)
             }.collect { newState ->
                 _state.value = newState
             }
         }
     }
 
-    fun setFilter(filter: InboxFilter) {
-        _filter.value = filter
+    fun setTypeFilter(filter: InboxTypeFilter) { _typeFilter.value = filter }
+    fun setDateFilter(filter: InboxDateFilter) { _dateFilter.value = filter }
+    fun clearFilters() {
+        _typeFilter.value = InboxTypeFilter.ALL
+        _dateFilter.value = InboxDateFilter.ALL
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
@@ -77,7 +84,8 @@ class InboxViewModel @Inject constructor(
         events: List<CalendarEvent>,
         tasks: List<CalDavTask>,
         issues: List<GiteaIssue>,
-        filter: InboxFilter,
+        typeFilter: InboxTypeFilter,
+        dateFilter: InboxDateFilter,
         kanbanColumns: List<String>,
     ): InboxUiState {
         val now = Instant.now()
@@ -112,20 +120,24 @@ class InboxViewModel @Inject constructor(
             .map { issue -> InboxItem.Issue(issue, parseTimeEstimate(issue.labels)) }
             .sortedByDescending { (it as InboxItem.Issue).issue.updatedAt }
 
-        val filtered: List<InboxItem> = when (filter) {
-            InboxFilter.ALL -> eventItems + taskItems + issueItems
-            InboxFilter.EVENTS -> eventItems
-            InboxFilter.TASKS -> taskItems
-            InboxFilter.TASKS_TODAY -> taskItems.filter {
-                it.task.due?.let { due -> due >= todayStart && due < tomorrowStart } == true
+        val typeFiltered: List<InboxItem> = when (typeFilter) {
+            InboxTypeFilter.ALL -> eventItems + taskItems + issueItems
+            InboxTypeFilter.EVENTS -> eventItems
+            InboxTypeFilter.TASKS -> taskItems
+            InboxTypeFilter.ISSUES -> issueItems
+        }
+        val filtered = typeFiltered.filter { item ->
+            val date = when (item) {
+                is InboxItem.Event -> item.event.start
+                is InboxItem.Task -> item.task.due
+                is InboxItem.Issue -> item.issue.milestoneDueOn
             }
-            InboxFilter.TASKS_TOMORROW -> taskItems.filter {
-                it.task.due?.let { due -> due >= tomorrowStart && due < dayAfterTomorrowStart } == true
+            when (dateFilter) {
+                InboxDateFilter.ALL -> true
+                InboxDateFilter.TODAY -> date?.let { it >= todayStart && it < tomorrowStart } == true
+                InboxDateFilter.TOMORROW -> date?.let { it >= tomorrowStart && it < dayAfterTomorrowStart } == true
+                InboxDateFilter.THIS_WEEK -> date?.let { it >= weekStart && it < nextWeekStart } == true
             }
-            InboxFilter.TASKS_THIS_WEEK -> taskItems.filter {
-                it.task.due?.let { due -> due >= weekStart && due < nextWeekStart } == true
-            }
-            InboxFilter.ISSUES -> issueItems
         }
 
         val total = filtered.sumOf { item ->
@@ -133,13 +145,13 @@ class InboxViewModel @Inject constructor(
                 is InboxItem.Event -> if (item.durationMinutes > 0) item.durationMinutes else 0
                 is InboxItem.Task -> item.estimatedMinutes ?: 0
                 is InboxItem.Issue -> item.estimatedMinutes ?: 0
-                is InboxItem.Milestone -> 0
             }
         }
 
         return InboxUiState(
             items = filtered,
-            filter = filter,
+            typeFilter = typeFilter,
+            dateFilter = dateFilter,
             totalMinutes = total,
             magicTags = kanbanColumns,
         )

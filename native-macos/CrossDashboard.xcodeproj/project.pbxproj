@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0601BDCA8D275566CD0A2DF6 /* ICalParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D29B70CBCD770F3A586AD2B /* ICalParser.swift */; };
 		08A0AFB5AD12CDEDC1C6F97E /* TagChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4C8B72220EFCEF15AC5589 /* TagChip.swift */; };
+		0A61D6F65E834A5E8AB7B921 /* SearchableFilterMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC41942C14F4774B32761B2 /* SearchableFilterMenu.swift */; };
 		0FB1CBCB39D9E27D260BE3C6 /* PriorityChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = E814E328379D4398953E77EC /* PriorityChip.swift */; };
 		17D6AF566C85C3459AB455A5 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124F842B5C6A9535389252ED /* AppContainer.swift */; };
 		1D9CFF2F25E421465872FA6B /* MathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D936F67DEE36C473B7420789 /* MathView.swift */; };
@@ -147,6 +148,7 @@
 		12E1C0DFCEB4C5CAEA73226E /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		135BC930364984F290E438C4 /* PomodoroViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroViewModel.swift; sourceTree = "<group>"; };
 		1497371EB1491387AC05E1A9 /* ReadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadField.swift; sourceTree = "<group>"; };
+		1BC41942C14F4774B32761B2 /* SearchableFilterMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableFilterMenu.swift; sourceTree = "<group>"; };
 		1554D6A1D32B6061E86AE3B8 /* EventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsView.swift; sourceTree = "<group>"; };
 		16CE67B6D747A474B4082058 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		18746691E76B33BE6C2CBAC8 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
@@ -399,6 +401,7 @@
 				D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */,
 				1497371EB1491387AC05E1A9 /* ReadField.swift */,
 				A32DC14708B03F8A2D3A95B2 /* ReadMarkdownField.swift */,
+				1BC41942C14F4774B32761B2 /* SearchableFilterMenu.swift */,
 				8B8B340CF8F723AE0D386BFB /* StatusBadge.swift */,
 				AC4C8B72220EFCEF15AC5589 /* TagChip.swift */,
 			);
@@ -740,6 +743,7 @@
 				76507D9CDEA780837A312414 /* QuickInputBar.swift in Sources */,
 				A360391D83197DA1D3251555 /* ReadField.swift in Sources */,
 				84F12B8D2E60829150A4B166 /* ReadMarkdownField.swift in Sources */,
+				0A61D6F65E834A5E8AB7B921 /* SearchableFilterMenu.swift in Sources */,
 				1E5ED21FC1B38020605467F2 /* SettingsView.swift in Sources */,
 				D6C4F80C8F28AA9E8FCC7690 /* SettingsViewModel.swift in Sources */,
 				750FF831C1C4F601579209A3 /* StatsRepository.swift in Sources */,

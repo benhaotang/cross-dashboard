@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.component.TagFlow
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
@@ -62,7 +65,13 @@ fun InboxScreen(
                 .padding(padding),
         ) {
             // ── Filter chips ──────────────────────────────────────────────────
-            FilterRow(filter = state.filter, onFilterChange = vm::setFilter)
+            FilterRow(
+                typeFilter = state.typeFilter,
+                dateFilter = state.dateFilter,
+                onTypeChange = vm::setTypeFilter,
+                onDateChange = vm::setDateFilter,
+                onClear = vm::clearFilters,
+            )
 
             if (state.items.isEmpty()) {
                 Box(
@@ -103,7 +112,6 @@ fun InboxScreen(
                                 onNavigate(Destination.IssueDetail(item.issue.id, item.issue.repository))
                             },
                         )
-                        is InboxItem.Milestone -> MilestoneInboxRow(item, zone)
                     }
                     HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 }
@@ -144,24 +152,31 @@ fun InboxScreen(
 // ─── Filter chips ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun FilterRow(filter: InboxFilter, onFilterChange: (InboxFilter) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(InboxFilter.entries) { f ->
-            val label = f.displayName
-            FilterChip(
-                selected = filter == f,
-                onClick = { onFilterChange(f) },
-                label = { Text(label) },
-                modifier = Modifier.semantics {
-                    contentDescription = "Show $label items"
-                    stateDescription = if (filter == f) "selected" else "not selected"
-                },
-            )
-        }
-    }
+private fun FilterRow(
+    typeFilter: InboxTypeFilter,
+    dateFilter: InboxDateFilter,
+    onTypeChange: (InboxTypeFilter) -> Unit,
+    onDateChange: (InboxDateFilter) -> Unit,
+    onClear: () -> Unit,
+) {
+    AdaptiveFilterBar(
+        filters = listOf(
+            AdaptiveFilterSpec(
+                title = "Type",
+                choices = InboxTypeFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                selectedKeys = setOf(typeFilter.name),
+                onSelectionChange = { keys -> keys.firstOrNull()?.let { onTypeChange(InboxTypeFilter.valueOf(it)) } },
+            ),
+            AdaptiveFilterSpec(
+                title = "Date",
+                choices = InboxDateFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                selectedKeys = setOf(dateFilter.name),
+                onSelectionChange = { keys -> keys.firstOrNull()?.let { onDateChange(InboxDateFilter.valueOf(it)) } },
+            ),
+        ),
+        hasActiveFilters = typeFilter != InboxTypeFilter.ALL || dateFilter != InboxDateFilter.ALL,
+        onClear = onClear,
+    )
 }
 
 // ─── Item rows ────────────────────────────────────────────────────────────────
@@ -334,38 +349,10 @@ private fun IssueInboxRow(
     }
 }
 
-@Composable
-private fun MilestoneInboxRow(item: InboxItem.Milestone, zone: ZoneId) {
-    val ms = item.milestone
-    val dueStr = ms.dueOn?.atZone(zone)?.format(DATE_FMT)
-    val dueDesc = if (dueStr != null) ", due $dueStr" else ""
-    val rowDesc = "Milestone: ${ms.title}, ${ms.openIssues} open, ${ms.closedIssues} closed$dueDesc"
-
-    ListItem(
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDesc },
-        leadingContent = {
-            Icon(
-                Icons.Outlined.Flag,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-            )
-        },
-        headlineContent = { Text(ms.title, fontWeight = FontWeight.Medium) },
-        supportingContent = {
-            Text(
-                "${ms.openIssues} open · ${ms.closedIssues} closed" +
-                    (if (dueStr != null) " · due $dueStr" else ""),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        },
-    )
-}
-
 // ─── Key helpers ──────────────────────────────────────────────────────────────
 
 private fun itemKey(item: InboxItem): String = when (item) {
     is InboxItem.Event -> "event_${item.event.uid}"
     is InboxItem.Task -> "task_${item.task.uid}"
     is InboxItem.Issue -> "issue_${item.issue.id}"
-    is InboxItem.Milestone -> "milestone_${item.milestone.id}"
 }

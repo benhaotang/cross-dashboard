@@ -5,6 +5,7 @@
 #include "components/attachment_row.h"
 #include "components/read_markdown_field.h"
 #include "components/tag_flow.h"
+#include "components/searchable_filter_menu.h"
 #include "data/db/issue_dao.h"
 #include "data/prefs/prefs.h"
 #include "data/repository/repo_utils.h"
@@ -92,13 +93,36 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     , attach_file_btn_("Attach…")
     , send_comment_btn_("Comment")
 {
-    state_combo_.append("open");
-    state_combo_.append("closed");
-    state_combo_.set_active(0);
-    state_combo_.signal_changed().connect(sigc::mem_fun(*this, &IssuesView::on_filter_changed));
-    label_combo_.append("All labels");
-    label_combo_.set_active(0);
-    label_combo_.signal_changed().connect(sigc::mem_fun(*this, &IssuesView::on_filter_changed));
+    status_filter_ = Gtk::manage(new SearchableFilterMenu("Status", false, false));
+    label_filter_menu_ = Gtk::manage(new SearchableFilterMenu("Tags", true, true));
+    milestone_filter_ = Gtk::manage(new SearchableFilterMenu("Milestone", false, true));
+    status_filter_->set_options({{"open", "Open"}, {"closed", "Closed"}, {"all", "All"}});
+    status_filter_->set_selected({"open"});
+    status_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) state_filter_ = *selected.begin();
+        rebuild();
+    });
+    label_filter_menu_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        selected_labels_ = selected;
+        rebuild();
+    });
+    milestone_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        selected_milestone_key_ = selected.empty()
+            ? std::nullopt : std::optional<std::string>(*selected.begin());
+        rebuild();
+    });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.set_tooltip_text("Clear filters");
+    clear_filters_btn_.signal_clicked().connect([this] {
+        state_filter_ = "open";
+        selected_labels_.clear();
+        selected_milestone_key_.reset();
+        status_filter_->set_selected({"open"});
+        label_filter_menu_->set_selected({});
+        milestone_filter_->set_selected({});
+        rebuild();
+    });
 
     // New issue: icon + label button
     new_issue_btn_.set_image_from_icon_name("list-add-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
@@ -117,8 +141,10 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
         atk_object_set_name(a, "Edit issue labels");
 
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
-    toolbar_.pack_start(state_combo_, false, false);
-    toolbar_.pack_start(label_combo_, false, false);
+    toolbar_.pack_start(*status_filter_, false, false);
+    toolbar_.pack_start(*label_filter_menu_, false, false);
+    toolbar_.pack_start(*milestone_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh issues");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -208,11 +234,6 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
 
 void IssuesView::on_filter_changed()
 {
-    if (rebuilding_) return;
-    int a = state_combo_.get_active_row_number();
-    state_filter_ = a == 1 ? "closed" : "open";
-    auto selected = label_combo_.get_active_text();
-    label_filter_ = selected == "All labels" ? "" : selected.raw();
     rebuild();
 }
 
@@ -235,31 +256,43 @@ void IssuesView::rebuild()
     list_ids_.clear();
 
     IssueDao dao(app_.db());
-    auto issues = dao.get_by_state(state_filter_);
+    auto issues = state_filter_ == "all" ? dao.get_all() : dao.get_by_state(state_filter_);
     auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     std::set<std::string> sorted_labels;
     for (auto const& issue : dao.get_all())
         sorted_labels.insert(issue.labels.begin(), issue.labels.end());
-    rebuilding_ = true;
-    label_combo_.remove_all();
-    label_combo_.append("All labels");
-    int active_label = 0;
-    int label_index = 1;
-    for (auto const& label : sorted_labels) {
-        label_combo_.append(label);
-        if (label == label_filter_) active_label = label_index;
-        ++label_index;
-    }
-    if (active_label == 0) label_filter_.clear();
-    label_combo_.set_active(active_label);
-    rebuilding_ = false;
+    std::vector<std::pair<std::string, std::string>> label_options;
+    for (auto const& label : sorted_labels) label_options.emplace_back(label, "#" + label);
+    label_filter_menu_->set_options(std::move(label_options));
+    label_filter_menu_->set_selected(selected_labels_);
 
-    if (!label_filter_.empty()) {
-        issues.erase(std::remove_if(issues.begin(), issues.end(), [this](GiteaIssue const& issue) {
-            return std::find(issue.labels.begin(), issue.labels.end(), label_filter_) == issue.labels.end();
-        }), issues.end());
+    std::vector<std::pair<std::string, std::string>> milestone_options;
+    std::set<std::string> milestone_seen;
+    for (auto const& issue : dao.get_all()) {
+        if (!issue.milestone_id || !issue.milestone_title) continue;
+        std::string const key = issue.repository + ":" + std::to_string(*issue.milestone_id);
+        if (milestone_seen.insert(key).second)
+            milestone_options.emplace_back(key, *issue.milestone_title + " · " + issue.repository);
     }
+    milestone_filter_->set_options(std::move(milestone_options));
+    milestone_filter_->set_selected(selected_milestone_key_
+        ? std::set<std::string>{*selected_milestone_key_} : std::set<std::string>{});
+    milestone_filter_->set_visible(!milestone_seen.empty());
+    clear_filters_btn_.set_visible(state_filter_ != "open" || !selected_labels_.empty()
+        || selected_milestone_key_.has_value());
+
+    issues.erase(std::remove_if(issues.begin(), issues.end(), [this](GiteaIssue const& issue) {
+        for (auto const& label : selected_labels_) {
+            if (std::find(issue.labels.begin(), issue.labels.end(), label) == issue.labels.end()) return true;
+        }
+        if (selected_milestone_key_) {
+            if (!issue.milestone_id) return true;
+            return issue.repository + ":" + std::to_string(*issue.milestone_id)
+                != *selected_milestone_key_;
+        }
+        return false;
+    }), issues.end());
 
     std::stable_sort(issues.begin(), issues.end(),
         [](auto const& a, auto const& b) { return a.updated_at > b.updated_at; });
@@ -303,7 +336,9 @@ void IssuesView::load_detail_from_network()
     if (!selected_issue_.has_value() || !body_) return;
 
     GiteaIssue const& iss = *selected_issue_;
-    detail_meta_.set_text(iss.repository + " #" + std::to_string(iss.number) + " · " + iss.state);
+    std::string detail_meta = iss.repository + " #" + std::to_string(iss.number) + " · " + iss.state;
+    if (iss.milestone_title) detail_meta += " · Milestone: " + *iss.milestone_title;
+    detail_meta_.set_text(detail_meta);
     if (iss.state == "open")
         toggle_state_btn_.set_label("Close issue");
     else
@@ -378,8 +413,11 @@ void IssuesView::on_selection_changed()
 bool IssuesView::reveal_issue(std::int64_t id)
 {
     state_filter_ = "open";
-    label_filter_.clear();
-    state_combo_.set_active(0);
+    selected_labels_.clear();
+    selected_milestone_key_.reset();
+    status_filter_->set_selected({"open"});
+    label_filter_menu_->set_selected({});
+    milestone_filter_->set_selected({});
     rebuild();
 
     auto const found = std::find(list_ids_.begin(), list_ids_.end(), id);

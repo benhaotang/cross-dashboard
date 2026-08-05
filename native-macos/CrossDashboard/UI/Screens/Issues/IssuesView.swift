@@ -88,36 +88,40 @@ struct IssuesView: View {
             .accessibilityLabel("Create issue")
         }
         ToolbarItem {
-            Picker("State", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.filter = $0 }
-            )) {
-                ForEach(IssuesViewModel.Filter.allCases) { f in
-                    Text(f.rawValue).tag(f)
-                }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("Filter by state")
-        }
-        ToolbarItem {
-            Menu {
-                Button("All labels") { viewModel.selectedLabel = nil }
-                Divider()
-                ForEach(viewModel.allLabels, id: \.self) { label in
-                    Button {
-                        viewModel.selectedLabel = viewModel.selectedLabel == label ? nil : label
-                    } label: {
-                        if viewModel.selectedLabel == label {
-                            Label(label, systemImage: "checkmark")
-                        } else {
-                            Text(label)
-                        }
+            SearchableFilterMenu(
+                title: "Status",
+                options: IssuesViewModel.Filter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.filter.rawValue],
+                onChange: { keys in
+                    if let value = keys.first, let filter = IssuesViewModel.Filter(rawValue: value) {
+                        viewModel.filter = filter
                     }
                 }
-            } label: {
-                Label(viewModel.selectedLabel.map { "#\($0)" } ?? "Labels", systemImage: "tag")
+            )
+        }
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Tags",
+                options: viewModel.allLabels.map { FilterMenuOption(id: $0, label: "#\($0)") },
+                selected: viewModel.selectedLabels,
+                allowsMultiple: true,
+                searchable: true,
+                onChange: { viewModel.selectedLabels = $0 }
+            )
+        }
+        if !viewModel.allMilestones.isEmpty {
+            ToolbarItem {
+                SearchableFilterMenu(
+                    title: "Milestone",
+                    options: viewModel.allMilestones,
+                    selected: viewModel.selectedMilestoneKey.map { [$0] } ?? [],
+                    searchable: true,
+                    onChange: { viewModel.selectedMilestoneKey = $0.first }
+                )
             }
-            .accessibilityLabel("Filter issues by label")
+        }
+        if viewModel.filter != .open || !viewModel.selectedLabels.isEmpty || viewModel.selectedMilestoneKey != nil {
+            ToolbarItem { ClearFiltersButton(action: viewModel.clearFilters) }
         }
         ToolbarItem {
             Button {

@@ -16,6 +16,7 @@ final class TasksViewModel {
     }
 
     var filter: Filter = .active
+    var selectedTags: Set<String> = []
 
     // ─── State ────────────────────────────────────────────────────────────────
 
@@ -44,15 +45,34 @@ final class TasksViewModel {
 
     var filteredRootTasks: [CalDavTask] {
         let roots = allTasks.filter { $0.parentUid == nil }
-        switch filter {
-        case .all:       return roots
-        case .active:    return roots.filter { $0.status != .completed && $0.status != .cancelled }
-        case .completed: return roots.filter { $0.status == .completed }
+        return roots.filter(matchesStatus).filter { task in
+            selectedTags.allSatisfy { task.categories.contains($0) }
         }
     }
 
     func subtasks(of parentUid: String) -> [CalDavTask] {
         container.taskRepository.subtasks(of: parentUid)
+            .filter(matchesStatus)
+            .filter { task in selectedTags.allSatisfy { task.categories.contains($0) } }
+    }
+
+    var allTags: [String] {
+        Array(Set(allTasks.flatMap(\.categories))).sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
+    }
+
+    func clearFilters() {
+        filter = .active
+        selectedTags = []
+    }
+
+    private func matchesStatus(_ task: CalDavTask) -> Bool {
+        switch filter {
+        case .all: return true
+        case .active: return task.status != .completed && task.status != .cancelled
+        case .completed: return task.status == .completed
+        }
     }
 
     var selectedTask: CalDavTask? {

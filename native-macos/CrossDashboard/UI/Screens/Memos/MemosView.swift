@@ -13,24 +13,38 @@ struct MemosView: View {
     var body: some View {
         VStack(spacing: 0) {
             // ── Filter toolbar ────────────────────────────────────────────────
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    filterChip("Normal", isSelected: viewModel.stateFilter == .normal) {
-                        viewModel.stateFilter = viewModel.stateFilter == .normal ? nil : .normal
-                    }
-                    filterChip("Archived", isSelected: viewModel.stateFilter == .archived) {
-                        viewModel.stateFilter = viewModel.stateFilter == .archived ? nil : .archived
-                    }
-                    Divider().frame(height: 20)
-                    ForEach(viewModel.allTags, id: \.self) { tag in
-                        filterChip("#\(tag)", isSelected: viewModel.selectedTag == tag) {
-                            viewModel.selectedTag = viewModel.selectedTag == tag ? nil : tag
+            HStack(spacing: 8) {
+                SearchableFilterMenu(
+                    title: "Status",
+                    options: [
+                        FilterMenuOption(id: "normal", label: "Normal"),
+                        FilterMenuOption(id: "archived", label: "Archived"),
+                        FilterMenuOption(id: "all", label: "All"),
+                    ],
+                    selected: [viewModel.stateFilter?.rawValue.lowercased() ?? "all"],
+                    onChange: { keys in
+                        switch keys.first {
+                        case "normal": viewModel.stateFilter = .normal
+                        case "archived": viewModel.stateFilter = .archived
+                        default: viewModel.stateFilter = nil
                         }
                     }
+                )
+                SearchableFilterMenu(
+                    title: "Tags",
+                    options: viewModel.allTags.map { FilterMenuOption(id: $0, label: "#\($0)") },
+                    selected: viewModel.selectedTags,
+                    allowsMultiple: true,
+                    searchable: true,
+                    onChange: { viewModel.selectedTags = $0 }
+                )
+                if viewModel.stateFilter != .normal || !viewModel.selectedTags.isEmpty {
+                    ClearFiltersButton(action: viewModel.clearFilters)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                Spacer()
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             Divider()
 
             if viewModel.isLoading {

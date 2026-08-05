@@ -32,6 +32,8 @@ data class TasksUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val kanbanColumns: List<String> = listOf("backlog", "planned", "inprogress", "done"),
+    val availableTags: List<String> = emptyList(),
+    val selectedTags: Set<String> = emptySet(),
     val defaultCalendarHref: String? = null,
     /** uid → expanded state for the subtask tree */
     val expandedUids: Set<String> = emptySet(),
@@ -49,6 +51,7 @@ class TasksViewModel @Inject constructor(
     val state: StateFlow<TasksUiState> = _state.asStateFlow()
 
     private val _filter = MutableStateFlow(TaskFilter.ACTIVE)
+    private val _selectedTags = MutableStateFlow<Set<String>>(emptySet())
 
     /** Map of parentUid → subtask list (loaded lazily when a node is expanded) */
     private val subtaskCache = mutableMapOf<String, List<CalDavTask>>()
@@ -56,16 +59,24 @@ class TasksViewModel @Inject constructor(
     init {
         // Combine filter with the appropriate task flow
         viewModelScope.launch {
-            _filter.flatMapLatest { filter ->
-                when (filter) {
-                    TaskFilter.ALL -> taskRepo.allTasks
-                    TaskFilter.ACTIVE -> taskRepo.activeTasks
-                    TaskFilter.COMPLETED -> taskRepo.completedTasks
-                }
-            }.collect { tasks ->
+            combine(taskRepo.allTasks, _filter, _selectedTags) { allTasks, filter, selectedTags ->
+                val tasks = allTasks
+                    .filter { it.matchesStatus(filter) }
+                    .filter { task -> selectedTags.all { it in task.categories } }
                 // Only root tasks (no parent) form the tree roots
                 val roots = tasks.filter { it.parentUid == null }
-                _state.update { it.copy(tasks = tasks, rootTasks = roots, filter = _filter.value) }
+                Triple(allTasks, roots, selectedTags)
+            }.collect { (allTasks, roots, selectedTags) ->
+                _state.update {
+                    it.copy(
+                        tasks = allTasks,
+                        rootTasks = roots,
+                        filter = _filter.value,
+                        availableTags = allTasks.flatMap { task -> task.categories }
+                            .distinct().sortedBy { tag -> tag.lowercase() },
+                        selectedTags = selectedTags,
+                    )
+                }
             }
         }
 
@@ -86,6 +97,15 @@ class TasksViewModel @Inject constructor(
 
     fun setFilter(filter: TaskFilter) {
         _filter.value = filter
+    }
+
+    fun setTagFilters(tags: Set<String>) {
+        _selectedTags.value = tags
+    }
+
+    fun clearFilters() {
+        _filter.value = TaskFilter.ACTIVE
+        _selectedTags.value = emptySet()
     }
 
     // ─── Quick input ──────────────────────────────────────────────────────────
@@ -162,7 +182,17 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    fun subtasksOf(uid: String): Flow<List<CalDavTask>> = taskRepo.subtasksOf(uid)
+    fun subtasksOf(uid: String): Flow<List<CalDavTask>> =
+        combine(taskRepo.subtasksOf(uid), _filter, _selectedTags) { tasks, filter, selectedTags ->
+            tasks.filter { it.matchesStatus(filter) }
+                .filter { task -> selectedTags.all { it in task.categories } }
+        }
+
+    private fun CalDavTask.matchesStatus(filter: TaskFilter): Boolean = when (filter) {
+        TaskFilter.ALL -> true
+        TaskFilter.ACTIVE -> status != TaskStatus.COMPLETED && status != TaskStatus.CANCELLED
+        TaskFilter.COMPLETED -> status == TaskStatus.COMPLETED
+    }
 
     // ─── CRUD ─────────────────────────────────────────────────────────────────
 

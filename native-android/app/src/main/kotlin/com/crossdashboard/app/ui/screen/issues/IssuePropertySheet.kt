@@ -225,6 +225,7 @@ internal fun IssueReadContent(
 
             item {
                 ReadField(label = "Repository", value = issue.repository)
+                issue.milestoneTitle?.let { ReadField(label = "Milestone", value = it) }
                 ReadField(label = "Created", value = dtFmt.format(issue.createdAt))
                 ReadField(label = "Updated", value = dtFmt.format(issue.updatedAt))
             }

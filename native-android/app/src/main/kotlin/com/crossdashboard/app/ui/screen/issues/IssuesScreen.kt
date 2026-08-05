@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.GiteaIssue
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.component.TagFlow
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -108,38 +111,49 @@ fun IssuesScreen(
             listPane = {
                 AnimatedPane {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // ── State filter chips ────────────────────────────────
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            IssueStateFilter.entries.forEach { filter ->
-                                item {
-                                    FilterChip(
-                                        selected = state.filter == filter,
-                                        onClick = { viewModel.setFilter(filter) },
-                                        label = {
-                                            Text(
-                                                text = filter.name.lowercase()
-                                                    .replaceFirstChar { it.uppercase() },
-                                                style = MaterialTheme.typography.labelMedium,
-                                            )
-                                        },
-                                    )
-                                }
-                            }
-                            items(state.availableLabels, key = { "label-$it" }) { label ->
-                                FilterChip(
-                                    selected = state.selectedLabel == label,
-                                    onClick = {
-                                        viewModel.setLabelFilter(
-                                            if (state.selectedLabel == label) null else label
-                                        )
+                        val issueFilters = buildList {
+                            add(
+                                AdaptiveFilterSpec(
+                                    title = "Status",
+                                    choices = IssueStateFilter.entries.map {
+                                        FilterChoice(it.name, it.name.lowercase().replaceFirstChar { char -> char.uppercase() })
                                     },
-                                    label = { Text("#$label") },
+                                    selectedKeys = setOf(state.filter.name),
+                                    onSelectionChange = { selected ->
+                                        selected.firstOrNull()?.let { viewModel.setFilter(IssueStateFilter.valueOf(it)) }
+                                    },
+                                )
+                            )
+                            add(
+                                AdaptiveFilterSpec(
+                                    title = "Tags",
+                                    choices = state.availableLabels.map { FilterChoice(it, "#$it") },
+                                    selectedKeys = state.selectedLabels,
+                                    multiSelect = true,
+                                    searchable = true,
+                                    onSelectionChange = viewModel::setLabelFilters,
+                                )
+                            )
+                            if (state.availableMilestones.isNotEmpty()) {
+                                add(
+                                    AdaptiveFilterSpec(
+                                        title = "Milestone",
+                                        choices = state.availableMilestones.map {
+                                            FilterChoice(it.key, "${it.title} · ${it.repository.substringAfterLast('/')}")
+                                        },
+                                        selectedKeys = state.selectedMilestoneKey?.let(::setOf) ?: emptySet(),
+                                        searchable = true,
+                                        onSelectionChange = { viewModel.setMilestoneFilter(it.firstOrNull()) },
+                                    )
                                 )
                             }
                         }
+                        AdaptiveFilterBar(
+                            filters = issueFilters,
+                            hasActiveFilters = state.filter != IssueStateFilter.OPEN ||
+                                state.selectedLabels.isNotEmpty() || state.selectedMilestoneKey != null,
+                            onClear = viewModel::clearFilters,
+                        )
 
                         if (state.issues.isEmpty()) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

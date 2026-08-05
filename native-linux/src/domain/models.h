@@ -135,6 +135,9 @@ struct GiteaIssue final {
     EpochMillis updated_at{};
     std::string repository;
     std::string html_url;
+    std::optional<std::int64_t> milestone_id;
+    std::optional<std::string> milestone_title;
+    std::optional<EpochMillis> milestone_due_on;
 };
 
 struct GiteaComment final {
@@ -201,11 +204,7 @@ struct InboxIssue final {
     GiteaIssue issue;
     std::optional<int> estimated_minutes;
 };
-struct InboxMilestone final {
-    GiteaMilestone milestone;
-};
-
-using InboxItem = std::variant<InboxEvent, InboxTask, InboxIssue, InboxMilestone>;
+using InboxItem = std::variant<InboxEvent, InboxTask, InboxIssue>;
 
 // ─── Pomodoro ──────────────────────────────────────────────────────────────
 

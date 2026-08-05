@@ -8,6 +8,7 @@
 #include "extract_tasks_dialog.h"
 #include "memo_detail_view.h"
 #include "background/sync_scheduler.h"
+#include "components/searchable_filter_menu.h"
 #include "components/tag_flow.h"
 #include "data/db/memo_dao.h"
 #include "data/prefs/prefs.h"
@@ -97,22 +98,32 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     , vm_(vm)
     , sync_(sync)
     , toolbar_(Gtk::ORIENTATION_HORIZONTAL, 8)
-    , tag_bar_(Gtk::ORIENTATION_HORIZONTAL, 6)
     , paned_(Gtk::ORIENTATION_HORIZONTAL)
 {
-    normal_btn_.set_active(true);
-    normal_btn_.signal_toggled().connect([this] {
-        if (normal_btn_.get_active()) {
-            archived_btn_.set_active(false);
-            refresh_visible_rows();
-        }
+    status_filter_ = Gtk::manage(new SearchableFilterMenu("Status", false, false));
+    status_filter_->set_options({{"normal", "Normal"}, {"archived", "Archived"}, {"all", "All"}});
+    status_filter_->set_selected({selected_state_});
+    status_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) selected_state_ = *selected.begin();
+        refresh_visible_rows();
     });
-    archived_btn_.signal_toggled().connect([this] {
-        if (archived_btn_.get_active()) {
-            normal_btn_.set_active(false);
-            refresh_visible_rows();
-        }
+    tag_filter_ = Gtk::manage(new SearchableFilterMenu("Tags", true, true));
+    tag_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        selected_tags_ = selected;
+        refresh_visible_rows();
     });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_tooltip_text("Clear capture filters");
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.signal_clicked().connect([this] {
+        selected_state_ = "normal";
+        selected_tags_.clear();
+        status_filter_->set_selected({selected_state_});
+        tag_filter_->set_selected({});
+        refresh_visible_rows();
+    });
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(clear_filters_btn_.gobj())))
+        atk_object_set_name(a, "Clear capture filters");
     search_.set_placeholder_text("Search capture…");
     search_.signal_changed().connect([this] { refresh_visible_rows(); });
 
@@ -129,15 +140,12 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
         atk_object_set_name(a, "New capture");
     new_btn_.signal_clicked().connect([this] { open_create_dialog({}); });
 
-    // Toolbar: [Normal][Archived linked] | [search expanding] | [+]
+    // Toolbar: compact searchable filters, search, and actions.
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
 
-    auto* state_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
-    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(state_box->gobj())), "linked");
-    state_box->pack_start(normal_btn_, false, false);
-    state_box->pack_start(archived_btn_, false, false);
-    toolbar_.pack_start(*state_box, false, false);
-
+    toolbar_.pack_start(*status_filter_, false, false);
+    toolbar_.pack_start(*tag_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
     toolbar_.pack_start(search_, true, true);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh captures");
@@ -152,30 +160,6 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     toolbar_.pack_end(new_btn_, false, false);
     toolbar_.pack_end(refresh_btn_, false, false);
     pack_start(toolbar_, false, false);
-
-    tags_.set_selection_mode(Gtk::SELECTION_NONE);
-    tags_.set_max_children_per_line(18);
-    tags_.set_hexpand(true);
-    gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(tags_.gobj())), "cd-memo-tags-flow");
-
-    clear_tag_filters_btn_.set_relief(Gtk::RELIEF_NONE);
-    clear_tag_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
-    clear_tag_filters_btn_.set_tooltip_text("Clear tag filters");
-    clear_tag_filters_btn_.set_visible(false);
-    gtk_style_context_add_class(
-        gtk_widget_get_style_context(GTK_WIDGET(clear_tag_filters_btn_.gobj())), "cd-icon-btn");
-    clear_tag_filters_btn_.signal_clicked().connect([this] {
-        if (selected_tags_.empty())
-            return;
-        selected_tags_.clear();
-        refresh_visible_rows();
-    });
-    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(clear_tag_filters_btn_.gobj())))
-        atk_object_set_name(a, "Clear tag filters");
-
-    tag_bar_.pack_start(tags_, true, true);
-    tag_bar_.pack_end(clear_tag_filters_btn_, false, false);
-    pack_start(tag_bar_, false, false);
 
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(list_.gobj())), "cd-card-list");
@@ -283,91 +267,27 @@ void MemosView::focus_search()
     search_.grab_focus();
 }
 
-void MemosView::sync_clear_tag_filters_ui()
-{
-    bool const any = !selected_tags_.empty();
-    clear_tag_filters_btn_.set_visible(any);
-    clear_tag_filters_btn_.set_sensitive(any);
-}
-
-void MemosView::rebuild_tag_chips(std::vector<MemosMemo> const& memos_for_tag_universe)
-{
-    struct Lock {
-        bool& ref;
-        explicit Lock(bool& b)
-            : ref(b)
-        {
-            ref = true;
-        }
-        ~Lock() { ref = false; }
-    } guard(updating_tag_chips_);
-    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
-
-    for (Gtk::Widget* w : tags_.get_children())
-        tags_.remove(*w);
-
-    std::set<std::string> all_tags;
-    for (auto const& m : memos_for_tag_universe) {
-        for (auto const& t : m.tags)
-            all_tags.insert(t);
-    }
-
-    selected_tags_.erase(
-        std::remove_if(selected_tags_.begin(), selected_tags_.end(),
-            [&all_tags](std::string const& t) { return all_tags.find(t) == all_tags.end(); }),
-        selected_tags_.end());
-
-    for (auto const& tag : all_tags) {
-        auto* child = Gtk::manage(new Gtk::FlowBoxChild());
-        auto* btn = Gtk::manage(new Gtk::ToggleButton("#" + tag));
-        auto* context = gtk_widget_get_style_context(GTK_WIDGET(btn->gobj()));
-        gtk_style_context_add_class(context, "cd-memo-tag-chip");
-        switch (classify_tag(tag, magic_tags)) {
-        case TagKind::Time:
-            gtk_style_context_add_class(context, "cd-memo-tag-chip-time");
-            break;
-        case TagKind::Magic:
-            gtk_style_context_add_class(context, "cd-memo-tag-chip-magic");
-            break;
-        case TagKind::Neutral:
-            gtk_style_context_add_class(context, "cd-memo-tag-chip-neutral");
-            break;
-        }
-        bool const sel =
-            std::find(selected_tags_.begin(), selected_tags_.end(), tag) != selected_tags_.end();
-        btn->set_active(sel);
-        btn->signal_toggled().connect([this, btn, tag] {
-            if (updating_tag_chips_)
-                return;
-            if (btn->get_active()) {
-                if (std::find(selected_tags_.begin(), selected_tags_.end(), tag) == selected_tags_.end())
-                    selected_tags_.push_back(tag);
-            }
-            else {
-                selected_tags_.erase(
-                    std::remove(selected_tags_.begin(), selected_tags_.end(), tag), selected_tags_.end());
-            }
-            sync_clear_tag_filters_ui();
-            refresh_visible_rows();
-        });
-        child->add(*btn);
-        tags_.add(*child);
-    }
-    tags_.show_all();
-    sync_clear_tag_filters_ui();
-}
-
 void MemosView::refresh_visible_rows()
 {
     for (Gtk::Widget* w : list_.get_children())
         list_.remove(*w);
     rows_.clear();
 
-    MemoState const target = archived_btn_.get_active() ? MemoState::Archived : MemoState::Normal;
     std::string const query = search_.get_text();
     MemoDao dao(app_.db());
-    auto const all = dao.get_by_state(target);
+    auto const all = selected_state_ == "all"
+        ? dao.get_all()
+        : dao.get_by_state(selected_state_ == "archived" ? MemoState::Archived : MemoState::Normal);
     auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
+
+    std::set<std::string> all_tags;
+    for (auto const& memo : dao.get_all())
+        all_tags.insert(memo.tags.begin(), memo.tags.end());
+    std::vector<std::pair<std::string, std::string>> tag_options;
+    for (auto const& tag : all_tags) tag_options.emplace_back(tag, "#" + tag);
+    tag_filter_->set_options(std::move(tag_options));
+    tag_filter_->set_selected(selected_tags_);
+    clear_filters_btn_.set_visible(selected_state_ != "normal" || !selected_tags_.empty());
 
     std::vector<MemosMemo> candidates;
     candidates.reserve(all.size());
@@ -435,8 +355,6 @@ void MemosView::refresh_visible_rows()
         list_.append(*row);
     }
     list_.show_all();
-    rebuild_tag_chips(candidates);
-
     if (selected_name_.has_value())
         select_by_name(*selected_name_);
     else

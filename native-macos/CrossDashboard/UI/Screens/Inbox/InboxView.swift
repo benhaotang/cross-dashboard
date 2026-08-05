@@ -75,8 +75,6 @@ struct InboxView: View {
             return { appViewModel.openTask(task.uid) }
         case .issue(let issue, _):
             return { appViewModel.openIssue(issue.id) }
-        case .milestone:
-            return nil
         }
     }
 
@@ -85,16 +83,31 @@ struct InboxView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Picker("Filter", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.filter = $0 }
-            )) {
-                ForEach(InboxViewModel.ItemType.allCases) { type in
-                    Text(type.rawValue).tag(type)
+            SearchableFilterMenu(
+                title: "Type",
+                options: InboxViewModel.ItemType.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.itemType.rawValue],
+                onChange: { selected in
+                    if let raw = selected.first, let value = InboxViewModel.ItemType(rawValue: raw) {
+                        viewModel.itemType = value
+                    }
                 }
-            }
-            .pickerStyle(.menu)
-            .accessibilityLabel("Filter inbox items")
+            )
+        }
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Date",
+                options: InboxViewModel.DateFilter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.dateFilter.rawValue],
+                onChange: { selected in
+                    if let raw = selected.first, let value = InboxViewModel.DateFilter(rawValue: raw) {
+                        viewModel.dateFilter = value
+                    }
+                }
+            )
+        }
+        if viewModel.itemType != .all || viewModel.dateFilter != .all {
+            ToolbarItem { ClearFiltersButton(action: viewModel.clearFilters) }
         }
         ToolbarItem {
             Button {
@@ -177,9 +190,6 @@ private struct InboxItemRow: View {
         case .issue(let i, _):
             Image(systemName: i.state == "open" ? "exclamationmark.bubble" : "checkmark.bubble")
                 .foregroundStyle(i.state == "open" ? .orange : .purple)
-        case .milestone:
-            Image(systemName: "flag")
-                .foregroundStyle(.teal)
         }
     }
 
@@ -188,7 +198,6 @@ private struct InboxItemRow: View {
         case .event(let e, _):  return e.summary
         case .task(let t, _):   return t.summary
         case .issue(let i, _):  return i.title
-        case .milestone(let m): return m.title
         }
     }
 
@@ -205,11 +214,6 @@ private struct InboxItemRow: View {
             return t.calendarHref ?? ""
         case .issue(let i, _):
             return "\(i.repository) #\(i.number)"
-        case .milestone(let m):
-            if let due = m.dueOn {
-                return "Due \(due.formatted(date: .abbreviated, time: .omitted)) · \(m.openIssues) open"
-            }
-            return "\(m.openIssues) open issues"
         }
     }
 
@@ -227,8 +231,6 @@ private struct InboxItemRow: View {
             guard let m, m > 0 else { return nil }
             let h = m / 60; let rem = m % 60
             return h > 0 ? (rem == 0 ? "\(h)h" : "\(h)h\(rem)m") : "\(rem)m"
-        case .milestone:
-            return nil
         }
     }
 }

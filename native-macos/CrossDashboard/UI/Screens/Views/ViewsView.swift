@@ -39,6 +39,30 @@ struct ViewsView: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityLabel("Switch between Kanban and Covey views")
+
+                SearchableFilterMenu(
+                    title: "Type",
+                    options: ViewsViewModel.ItemType.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                    selected: [viewModel.itemType.rawValue],
+                    onChange: { selected in
+                        if let raw = selected.first, let value = ViewsViewModel.ItemType(rawValue: raw) {
+                            viewModel.itemType = value
+                        }
+                    }
+                )
+                SearchableFilterMenu(
+                    title: "Date",
+                    options: ViewsViewModel.DateFilter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                    selected: [viewModel.dateFilter.rawValue],
+                    onChange: { selected in
+                        if let raw = selected.first, let value = ViewsViewModel.DateFilter(rawValue: raw) {
+                            viewModel.dateFilter = value
+                        }
+                    }
+                )
+                if viewModel.itemType != .all || viewModel.dateFilter != .all {
+                    ClearFiltersButton(action: viewModel.clearFilters)
+                }
             }
         }
         // Assign single task to a column

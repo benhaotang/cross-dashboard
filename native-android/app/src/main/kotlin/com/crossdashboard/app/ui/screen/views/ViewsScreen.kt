@@ -27,6 +27,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -99,6 +102,25 @@ fun ViewsScreen(
                     },
                 )
             }
+
+            AdaptiveFilterBar(
+                filters = listOf(
+                    AdaptiveFilterSpec(
+                        title = "Type",
+                        choices = ViewTypeFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                        selectedKeys = setOf(state.typeFilter.name),
+                        onSelectionChange = { keys -> keys.firstOrNull()?.let { vm.setTypeFilter(ViewTypeFilter.valueOf(it)) } },
+                    ),
+                    AdaptiveFilterSpec(
+                        title = "Date",
+                        choices = ViewDateFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                        selectedKeys = setOf(state.dateFilter.name),
+                        onSelectionChange = { keys -> keys.firstOrNull()?.let { vm.setDateFilter(ViewDateFilter.valueOf(it)) } },
+                    ),
+                ),
+                hasActiveFilters = state.typeFilter != ViewTypeFilter.ALL || state.dateFilter != ViewDateFilter.ALL,
+                onClear = vm::clearFilters,
+            )
 
             // ── Board content ─────────────────────────────────────────────────
             when (state.viewMode) {

@@ -140,6 +140,12 @@ struct IssueDetailView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
 
+                    if let milestone = issue.milestoneTitle {
+                        Label(milestone, systemImage: "flag")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if !issue.labels.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {

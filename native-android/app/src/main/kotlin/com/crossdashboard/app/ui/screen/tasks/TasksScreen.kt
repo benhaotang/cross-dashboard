@@ -40,6 +40,9 @@ import com.crossdashboard.app.domain.model.CalDavTask
 import com.crossdashboard.app.domain.model.TaskStatus
 import com.crossdashboard.app.ui.component.CalendarColorDot
 import com.crossdashboard.app.ui.component.CalendarColorResolver
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.component.PriorityChip
 import com.crossdashboard.app.ui.component.TagFlow
 import com.crossdashboard.app.ui.navigation.Destination
@@ -136,8 +139,10 @@ fun TasksScreenContent(
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // ── Filter chips ────────────────────────────
                                 FilterRow(
-                                    selected = state.filter,
-                                    onSelect = viewModel::setFilter,
+                                    state = state,
+                                    onSelectStatus = viewModel::setFilter,
+                                    onSelectTags = viewModel::setTagFilters,
+                                    onClear = viewModel::clearFilters,
                                 )
 
                                 // ── Quick input bar ─────────────────────────
@@ -294,30 +299,35 @@ private fun TasksTopBar(onRefresh: () -> Unit, isLoading: Boolean = false) {
 
 @Composable
 private fun FilterRow(
-    selected: TaskFilter,
-    onSelect: (TaskFilter) -> Unit,
+    state: TasksUiState,
+    onSelectStatus: (TaskFilter) -> Unit,
+    onSelectTags: (Set<String>) -> Unit,
+    onClear: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        TaskFilter.entries.forEach { filter ->
-            val label = filter.name.lowercase().replaceFirstChar { it.uppercase() }
-            FilterChip(
-                selected = selected == filter,
-                onClick = { onSelect(filter) },
-                label = {
-                    Text(label, style = MaterialTheme.typography.labelMedium)
+    AdaptiveFilterBar(
+        filters = listOf(
+            AdaptiveFilterSpec(
+                title = "Status",
+                choices = TaskFilter.entries.map {
+                    FilterChoice(it.name, it.name.lowercase().replaceFirstChar { char -> char.uppercase() })
                 },
-                modifier = Modifier.semantics {
-                    contentDescription = "$label tasks filter"
-                    stateDescription = if (selected == filter) "selected" else "not selected"
+                selectedKeys = setOf(state.filter.name),
+                onSelectionChange = { selected ->
+                    selected.firstOrNull()?.let { onSelectStatus(TaskFilter.valueOf(it)) }
                 },
-            )
-        }
-    }
+            ),
+            AdaptiveFilterSpec(
+                title = "Tags",
+                choices = state.availableTags.map { FilterChoice(it, "#$it") },
+                selectedKeys = state.selectedTags,
+                multiSelect = true,
+                searchable = true,
+                onSelectionChange = onSelectTags,
+            ),
+        ),
+        hasActiveFilters = state.filter != TaskFilter.ACTIVE || state.selectedTags.isNotEmpty(),
+        onClear = onClear,
+    )
 }
 
 // ─── Quick input bar ──────────────────────────────────────────────────────────

@@ -9,11 +9,14 @@
 #include <gtkmm/radiobutton.h>
 #include <gtkmm/scrolledwindow.h>
 
+#include <set>
+
 namespace cd {
 
 class AppContainer;
 class AppViewModel;
 class SyncScheduler;
+class SearchableFilterMenu;
 
 /** Task list + quick input (nested subtasks rendered with indentation). */
 class TasksView final : public Gtk::Box {
@@ -31,12 +34,11 @@ private:
     AppViewModel& vm_;
     SyncScheduler& sync_;
     Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
-    Gtk::Box filter_box_{Gtk::ORIENTATION_HORIZONTAL, 0};
-    Gtk::RadioButton::Group filter_group_{};
-    Gtk::RadioButton filter_active_{};
-    Gtk::RadioButton filter_completed_{};
-    Gtk::RadioButton filter_all_{};
+    SearchableFilterMenu* status_filter_{};
+    SearchableFilterMenu* tag_filter_{};
+    Gtk::Button clear_filters_btn_{};
     TaskListFilter task_filter_{TaskListFilter::Active};
+    std::set<std::string> selected_tags_{};
     Gtk::Button refresh_btn_{};
     Gtk::ScrolledWindow scroll_;
     Gtk::ListBox list_;

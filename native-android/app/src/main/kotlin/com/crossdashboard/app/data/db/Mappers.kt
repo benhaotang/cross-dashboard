@@ -116,6 +116,9 @@ fun GiteaIssue.toEntity() = IssueEntity(
     updatedAtEpoch = updatedAt.toEpochMilli(),
     repository = repository,
     htmlUrl = htmlUrl,
+    milestoneId = milestoneId,
+    milestoneTitle = milestoneTitle,
+    milestoneDueOnEpoch = milestoneDueOn?.toEpochMilli(),
 )
 
 fun IssueEntity.toDomain() = GiteaIssue(
@@ -130,6 +133,9 @@ fun IssueEntity.toDomain() = GiteaIssue(
     updatedAt = Instant.ofEpochMilli(updatedAtEpoch),
     repository = repository,
     htmlUrl = htmlUrl,
+    milestoneId = milestoneId,
+    milestoneTitle = milestoneTitle,
+    milestoneDueOn = milestoneDueOnEpoch?.let(Instant::ofEpochMilli),
 )
 
 // ─── MemosMemo ────────────────────────────────────────────────────────────────

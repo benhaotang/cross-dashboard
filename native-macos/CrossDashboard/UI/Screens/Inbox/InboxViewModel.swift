@@ -10,14 +10,20 @@ final class InboxViewModel {
         case all       = "All"
         case events    = "Events"
         case tasks     = "Tasks"
-        case tasksToday = "Today"
-        case tasksTomorrow = "Tomorrow"
-        case tasksThisWeek = "This Week"
         case issues    = "Issues"
         var id: String { rawValue }
     }
 
-    var filter: ItemType = .all
+    enum DateFilter: String, CaseIterable, Identifiable {
+        case all = "Any date"
+        case today = "Today"
+        case tomorrow = "Tomorrow"
+        case thisWeek = "This Week"
+        var id: String { rawValue }
+    }
+
+    var itemType: ItemType = .all
+    var dateFilter: DateFilter = .all
     var searchText: String = ""
     var isLoading: Bool = false
 
@@ -71,36 +77,45 @@ final class InboxViewModel {
 
     var filteredItems: [InboxItem] {
         let base: [InboxItem]
-        switch filter {
+        switch itemType {
         case .all:    base = allItems
         case .events: base = allItems.filter { if case .event = $0 { return true }; return false }
         case .tasks:  base = allItems.filter { if case .task = $0 { return true }; return false }
-        case .tasksToday:
-            base = tasksDue { Calendar.current.isDateInToday($0) }
-        case .tasksTomorrow:
-            base = tasksDue { Calendar.current.isDateInTomorrow($0) }
-        case .tasksThisWeek:
-            let interval = Calendar.current.dateInterval(of: .weekOfYear, for: Date())
-            base = tasksDue { due in interval?.contains(due) == true }
         case .issues: base = allItems.filter { if case .issue = $0 { return true }; return false }
         }
-        guard !searchText.isEmpty else { return base }
+        let dated = base.filter(matchesDateFilter)
+        guard !searchText.isEmpty else { return dated }
         let q = searchText.lowercased()
-        return base.filter { item in
+        return dated.filter { item in
             switch item {
             case .event(let e, _):  return e.summary.lowercased().contains(q)
             case .task(let t, _):   return t.summary.lowercased().contains(q)
             case .issue(let i, _):  return i.title.lowercased().contains(q)
-            case .milestone(let m): return m.title.lowercased().contains(q)
             }
         }
     }
 
-    private func tasksDue(where predicate: (Date) -> Bool) -> [InboxItem] {
-        allItems.filter { item in
-            guard case .task(let task, _) = item, let due = task.due else { return false }
-            return predicate(due)
+    private func matchesDateFilter(_ item: InboxItem) -> Bool {
+        guard dateFilter != .all else { return true }
+        let date: Date?
+        switch item {
+        case .event(let event, _): date = event.start
+        case .task(let task, _): date = task.due
+        case .issue(let issue, _): date = issue.milestoneDueOn
         }
+        guard let date else { return false }
+        switch dateFilter {
+        case .all: return true
+        case .today: return Calendar.current.isDateInToday(date)
+        case .tomorrow: return Calendar.current.isDateInTomorrow(date)
+        case .thisWeek:
+            return Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.contains(date) == true
+        }
+    }
+
+    func clearFilters() {
+        itemType = .all
+        dateFilter = .all
     }
 
     /// Total estimated minutes across all filtered items that have a value.
@@ -110,7 +125,6 @@ final class InboxViewModel {
             case .event(_, let d): return sum + d
             case .task(_, let m):  return sum + (m ?? 0)
             case .issue(_, let m): return sum + (m ?? 0)
-            case .milestone:       return sum
             }
         }
     }

@@ -2,6 +2,7 @@
 
 #include "app_container.h"
 #include "background/sync_scheduler.h"
+#include "components/searchable_filter_menu.h"
 #include "components/tag_flow.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
@@ -105,13 +106,33 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
     , total_line_("")
 {
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
-    for (auto const* label : {"All", "Events", "Tasks", "Today", "Tomorrow", "This Week", "Issues"})
-        filter_combo_.append(label);
-    filter_combo_.set_active(0);
-    filter_combo_.signal_changed().connect(sigc::mem_fun(*this, &InboxView::on_filter_changed));
-    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(filter_combo_.gobj())))
-        atk_object_set_name(a, "Filter inbox items");
-    toolbar_.pack_start(filter_combo_, false, false);
+    type_filter_ = Gtk::manage(new SearchableFilterMenu("Type", false, false));
+    type_filter_->set_options({{"all", "All"}, {"events", "Events"}, {"tasks", "Tasks"}, {"issues", "Issues"}});
+    type_filter_->set_selected({type_filter_key_});
+    type_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) type_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    date_filter_ = Gtk::manage(new SearchableFilterMenu("Date", false, false));
+    date_filter_->set_options({{"all", "Any date"}, {"today", "Today"}, {"tomorrow", "Tomorrow"}, {"week", "This Week"}});
+    date_filter_->set_selected({date_filter_key_});
+    date_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) date_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_tooltip_text("Clear inbox filters");
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.signal_clicked().connect([this] {
+        type_filter_key_ = "all";
+        date_filter_key_ = "all";
+        type_filter_->set_selected({type_filter_key_});
+        date_filter_->set_selected({date_filter_key_});
+        rebuild();
+    });
+    toolbar_.pack_start(*type_filter_, false, false);
+    toolbar_.pack_start(*date_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh inbox");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -145,7 +166,6 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
 
 void InboxView::on_filter_changed()
 {
-    filter_index_ = filter_combo_.get_active_row_number();
     rebuild();
 }
 
@@ -255,21 +275,22 @@ void InboxView::rebuild()
         bool const is_event = std::holds_alternative<CalendarEvent>(row.data);
         bool const is_task = std::holds_alternative<CalDavTask>(row.data);
         bool const is_issue = std::holds_alternative<GiteaIssue>(row.data);
-        if (filter_index_ == 1) return !is_event;
-        if (filter_index_ == 2) return !is_task;
-        if (filter_index_ == 6) return !is_issue;
-        if (filter_index_ >= 3 && filter_index_ <= 5) {
-            if (!is_task) return true;
-            auto const& task = std::get<CalDavTask>(row.data);
-            if (!task.due) return true;
-            if (filter_index_ == 3)
-                return *task.due < bounds.today_start || *task.due >= bounds.tomorrow_start;
-            if (filter_index_ == 4)
-                return *task.due < bounds.tomorrow_start || *task.due >= bounds.day_after_tomorrow_start;
-            return *task.due < bounds.week_start || *task.due >= bounds.next_week_start;
-        }
-        return false;
+        if (type_filter_key_ == "events" && !is_event) return true;
+        if (type_filter_key_ == "tasks" && !is_task) return true;
+        if (type_filter_key_ == "issues" && !is_issue) return true;
+        if (date_filter_key_ == "all") return false;
+        std::optional<EpochMillis> date;
+        if (is_event) date = std::get<CalendarEvent>(row.data).start;
+        else if (is_task) date = std::get<CalDavTask>(row.data).due;
+        else if (is_issue) date = std::get<GiteaIssue>(row.data).milestone_due_on;
+        if (!date) return true;
+        if (date_filter_key_ == "today")
+            return *date < bounds.today_start || *date >= bounds.tomorrow_start;
+        if (date_filter_key_ == "tomorrow")
+            return *date < bounds.tomorrow_start || *date >= bounds.day_after_tomorrow_start;
+        return *date < bounds.week_start || *date >= bounds.next_week_start;
     }), rows_.end());
+    clear_filters_btn_.set_visible(type_filter_key_ != "all" || date_filter_key_ != "all");
 
     int sum_min = 0;
     for (auto const& r : rows_) sum_min += r.estimated_minutes;

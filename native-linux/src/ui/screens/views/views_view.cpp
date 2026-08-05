@@ -2,6 +2,7 @@
 
 #include "app_container.h"
 #include "background/sync_scheduler.h"
+#include "components/searchable_filter_menu.h"
 #include "data/db/task_dao.h"
 #include "data/db/issue_dao.h"
 #include "data/prefs/prefs.h"
@@ -32,6 +33,31 @@ EpochMillis millis_now_wall()
 {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+bool matches_date_filter(std::optional<EpochMillis> date, std::string const& filter)
+{
+    if (filter == "all") return true;
+    if (!date) return false;
+    GDateTime* now = g_date_time_new_now_local();
+    if (!now) return false;
+    GDateTime* today = g_date_time_new_local(
+        g_date_time_get_year(now), g_date_time_get_month(now), g_date_time_get_day_of_month(now), 0, 0, 0);
+    GDateTime* tomorrow = g_date_time_add_days(today, 1);
+    GDateTime* day_after = g_date_time_add_days(today, 2);
+    GDateTime* week = g_date_time_add_days(today, -(g_date_time_get_day_of_week(today) - 1));
+    GDateTime* next_week = g_date_time_add_days(week, 7);
+    auto ms = [](GDateTime* value) { return static_cast<EpochMillis>(g_date_time_to_unix(value)) * 1000; };
+    bool match = filter == "today" ? *date >= ms(today) && *date < ms(tomorrow)
+        : filter == "tomorrow" ? *date >= ms(tomorrow) && *date < ms(day_after)
+        : *date >= ms(week) && *date < ms(next_week);
+    g_date_time_unref(next_week);
+    g_date_time_unref(week);
+    g_date_time_unref(day_after);
+    g_date_time_unref(tomorrow);
+    g_date_time_unref(today);
+    g_date_time_unref(now);
+    return match;
 }
 
 bool ci_eq(std::string a, std::string b)
@@ -119,6 +145,33 @@ ViewsView::ViewsView(AppContainer& app, SyncScheduler& sync)
     , sync_(sync)
 {
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+    type_filter_ = Gtk::manage(new SearchableFilterMenu("Type", false, false));
+    type_filter_->set_options({{"all", "All"}, {"tasks", "Tasks"}, {"issues", "Issues"}});
+    type_filter_->set_selected({type_filter_key_});
+    type_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) type_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    date_filter_ = Gtk::manage(new SearchableFilterMenu("Date", false, false));
+    date_filter_->set_options({{"all", "Any date"}, {"today", "Today"}, {"tomorrow", "Tomorrow"}, {"week", "This Week"}});
+    date_filter_->set_selected({date_filter_key_});
+    date_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) date_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_tooltip_text("Clear view filters");
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.signal_clicked().connect([this] {
+        type_filter_key_ = "all";
+        date_filter_key_ = "all";
+        type_filter_->set_selected({type_filter_key_});
+        date_filter_->set_selected({date_filter_key_});
+        rebuild();
+    });
+    toolbar_.pack_start(*type_filter_, false, false);
+    toolbar_.pack_start(*date_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh views");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -298,7 +351,11 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
     AppSettings const cfg = merged_app_preferences(app_.prefs());
     std::vector<std::string> const& cols = cfg.kanban_columns;
     IssueDao issue_dao(app_.db());
-    auto const open_issues = issue_dao.get_by_state("open");
+    auto open_issues = issue_dao.get_by_state("open");
+    if (type_filter_key_ == "tasks") open_issues.clear();
+    else open_issues.erase(std::remove_if(open_issues.begin(), open_issues.end(), [this](GiteaIssue const& issue) {
+        return !matches_date_filter(issue.milestone_due_on, date_filter_key_);
+    }), open_issues.end());
 
     auto make_column = [&](std::string const& title, int col_code, std::vector<CalDavTask> const& tasks_in_col,
                            std::vector<GiteaIssue> const& issues_in_col) {
@@ -450,7 +507,11 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
 
     auto ctags = covey_tag_strings();
     IssueDao issue_dao(app_.db());
-    auto const open_issues = issue_dao.get_by_state("open");
+    auto open_issues = issue_dao.get_by_state("open");
+    if (type_filter_key_ == "tasks") open_issues.clear();
+    else open_issues.erase(std::remove_if(open_issues.begin(), open_issues.end(), [this](GiteaIssue const& issue) {
+        return !matches_date_filter(issue.milestone_due_on, date_filter_key_);
+    }), open_issues.end());
     std::vector<CalDavTask> unassigned;
     for (auto const& t : open_tasks) {
         if (!has_any_ci(t.categories, ctags)) unassigned.push_back(t);
@@ -621,13 +682,16 @@ void ViewsView::rebuild()
     auto all = dao.get_all();
     std::vector<CalDavTask> open;
     for (auto const& t : all) {
-        if (t.status != TaskStatus::Completed && t.status != TaskStatus::Cancelled) open.push_back(t);
+        if (t.status != TaskStatus::Completed && t.status != TaskStatus::Cancelled
+            && type_filter_key_ != "issues" && matches_date_filter(t.due, date_filter_key_))
+            open.push_back(t);
     }
     std::stable_sort(open.begin(), open.end(),
         [](CalDavTask const& a, CalDavTask const& b) { return a.summary < b.summary; });
 
     fill_kanban(open);
     fill_covey(open);
+    clear_filters_btn_.set_visible(type_filter_key_ != "all" || date_filter_key_ != "all");
 }
 
 } // namespace cd

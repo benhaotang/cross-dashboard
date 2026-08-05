@@ -109,18 +109,30 @@ struct TasksView: View {
             }
         }
 
-        ToolbarItem(placement: .principal) {
-            Picker("Filter", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.filter = $0 }
-            )) {
-                ForEach(TasksViewModel.Filter.allCases) { f in
-                    Text(f.rawValue).tag(f)
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Status",
+                options: TasksViewModel.Filter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.filter.rawValue],
+                onChange: { keys in
+                    if let value = keys.first, let filter = TasksViewModel.Filter(rawValue: value) {
+                        viewModel.filter = filter
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 280)
-            .accessibilityLabel("Task filter")
+            )
+        }
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Tags",
+                options: viewModel.allTags.map { FilterMenuOption(id: $0, label: "#\($0)") },
+                selected: viewModel.selectedTags,
+                allowsMultiple: true,
+                searchable: true,
+                onChange: { viewModel.selectedTags = $0 }
+            )
+        }
+        if viewModel.filter != .active || !viewModel.selectedTags.isEmpty {
+            ToolbarItem { ClearFiltersButton(action: viewModel.clearFilters) }
         }
     }
 

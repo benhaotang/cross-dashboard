@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ namespace cd {
 
 class AppContainer;
 class ReadMarkdownField;
+class SearchableFilterMenu;
 class SyncScheduler;
 
 /** Issue list, detail, Gitea comments, issue/comment attachments, create-issue dialog. */
@@ -45,8 +47,10 @@ private:
 
     Gtk::Box toolbar_;
     Gtk::Button refresh_btn_{};
-    Gtk::ComboBoxText state_combo_;
-    Gtk::ComboBoxText label_combo_;
+    SearchableFilterMenu* status_filter_{};
+    SearchableFilterMenu* label_filter_menu_{};
+    SearchableFilterMenu* milestone_filter_{};
+    Gtk::Button clear_filters_btn_{};
     Gtk::Button new_issue_btn_;
     Gtk::Button toggle_state_btn_;
     Gtk::Button edit_labels_btn_{"Edit labels"};
@@ -70,8 +74,8 @@ private:
     Gtk::Button send_comment_btn_;
 
     std::string state_filter_{"open"};
-    std::string label_filter_{};
-    bool rebuilding_{};
+    std::set<std::string> selected_labels_{};
+    std::optional<std::string> selected_milestone_key_{};
     std::vector<std::int64_t> list_ids_;
     std::optional<GiteaIssue> selected_issue_;
 };

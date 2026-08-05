@@ -14,6 +14,7 @@
 namespace cd {
 
 class AppContainer;
+class SearchableFilterMenu;
 class SyncScheduler;
 
 /** Kanban (per Android: category tags per column) + Covey quadrants (`kCoveyQuadrantTags`). */
@@ -39,6 +40,9 @@ private:
     AppContainer& app_;
     SyncScheduler& sync_;
     Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
+    SearchableFilterMenu* type_filter_{};
+    SearchableFilterMenu* date_filter_{};
+    Gtk::Button clear_filters_btn_{};
     Gtk::Button refresh_btn_{};
     Gtk::Notebook tabs_{};
     Gtk::ScrolledWindow kanban_scroll_{};
@@ -47,6 +51,8 @@ private:
     Gtk::Box covey_unassigned_box_{Gtk::ORIENTATION_VERTICAL, 4};
     Gtk::Box covey_unassigned_slot_{Gtk::ORIENTATION_VERTICAL, 2};
     Gtk::Grid covey_grid_{};
+    std::string type_filter_key_{"all"};
+    std::string date_filter_key_{"all"};
 };
 
 } // namespace cd
