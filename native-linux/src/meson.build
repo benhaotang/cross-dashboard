@@ -55,6 +55,7 @@ gui_sources = core_sources + files(
   'ui/components/markdown_view.cpp',
   'ui/components/pomodoro_bar.cpp',
   'ui/components/pomodoro_modal.cpp',
+  'ui/components/tag_flow.cpp',
   'ui/screens/dashboard/dashboard_view.cpp',
   'ui/screens/tasks/tasks_view.cpp',
   'ui/screens/tasks/task_edit_dialog.cpp',

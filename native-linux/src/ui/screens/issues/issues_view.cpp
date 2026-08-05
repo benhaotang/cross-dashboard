@@ -4,6 +4,7 @@
 #include "background/sync_scheduler.h"
 #include "components/attachment_row.h"
 #include "components/read_markdown_field.h"
+#include "components/tag_flow.h"
 #include "data/db/issue_dao.h"
 #include "data/prefs/prefs.h"
 #include "data/repository/repo_utils.h"
@@ -235,6 +236,7 @@ void IssuesView::rebuild()
 
     IssueDao dao(app_.db());
     auto issues = dao.get_by_state(state_filter_);
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     std::set<std::string> sorted_labels;
     for (auto const& issue : dao.get_all())
@@ -285,11 +287,7 @@ void IssuesView::rebuild()
         card->pack_start(*tlab, false, false);
         card->pack_start(*mlab, false, false);
         if (!iss.labels.empty()) {
-            auto* labels = Gtk::manage(new Gtk::Label(join_labels(iss.labels)));
-            labels->set_halign(Gtk::ALIGN_START);
-            labels->set_line_wrap(true);
-            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(labels->gobj())), "dim-label");
-            card->pack_start(*labels, false, false);
+            card->pack_start(*make_tag_flow(iss.labels, magic_tags), false, false);
         }
         row->add(*card);
         row->set_tooltip_text(iss.title + "\n" + meta);

@@ -29,6 +29,14 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+private val TIME_ESTIMATE_TAG = Regex("""^#?(\d+)(m|h)$""", RegexOption.IGNORE_CASE)
+
+private fun CalDavTask.withTimeEstimate(amount: String, unit: String): CalDavTask {
+    val nonTimeTags = categories.filterNot { TIME_ESTIMATE_TAG.matches(it.trim()) }
+    val value = amount.toIntOrNull()?.takeIf { it > 0 }
+    return copy(categories = if (value == null) nonTimeTags else nonTimeTags + "$value$unit")
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun TaskPropertySheet(
@@ -303,6 +311,15 @@ private fun TaskEditForm(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    val initialEstimate = remember(task.uid) {
+        task.categories.firstNotNullOfOrNull { TIME_ESTIMATE_TAG.matchEntire(it.trim()) }
+    }
+    var estimateAmount by remember(task.uid) {
+        mutableStateOf(initialEstimate?.groupValues?.get(1).orEmpty())
+    }
+    var estimateUnit by remember(task.uid) {
+        mutableStateOf(initialEstimate?.groupValues?.get(2)?.lowercase() ?: "m")
+    }
 
     Column(
         modifier = Modifier.padding(horizontal = 20.dp),
@@ -397,6 +414,50 @@ private fun TaskEditForm(
                     onClick = { onTaskChange(task.copy(priority = value)) },
                     label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                 )
+            }
+        }
+
+        // ── Inbox time estimate ───────────────────────────────────────────────
+        Text(
+            text = "Time estimate",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            OutlinedTextField(
+                value = estimateAmount,
+                onValueChange = { value ->
+                    estimateAmount = value.filter(Char::isDigit)
+                    onTaskChange(task.withTimeEstimate(estimateAmount, estimateUnit))
+                },
+                label = { Text("Amount") },
+                placeholder = { Text("30") },
+                singleLine = true,
+                modifier = Modifier.width(112.dp),
+            )
+            listOf("m" to "Minutes", "h" to "Hours").forEach { (unit, label) ->
+                FilterChip(
+                    selected = estimateUnit == unit,
+                    onClick = {
+                        estimateUnit = unit
+                        onTaskChange(task.withTimeEstimate(estimateAmount, estimateUnit))
+                    },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+            if (estimateAmount.isNotEmpty()) {
+                IconButton(
+                    onClick = {
+                        estimateAmount = ""
+                        onTaskChange(task.withTimeEstimate("", estimateUnit))
+                    },
+                    modifier = Modifier.semantics { contentDescription = "Clear time estimate" },
+                ) {
+                    Icon(Icons.Outlined.Clear, contentDescription = null)
+                }
             }
         }
 

@@ -3,6 +3,7 @@
 #include "app_container.h"
 #include "app_viewmodel.h"
 #include "background/sync_scheduler.h"
+#include "components/tag_flow.h"
 #include "data/db/task_dao.h"
 #include "data/parser/task_input_parser.h"
 #include "data/prefs/prefs.h"
@@ -150,7 +151,8 @@ void TasksView::focus_quick_input()
     input_.grab_entry_focus();
 }
 
-Gtk::ListBoxRow* TasksView::make_row(CalDavTask const& task, int depth)
+Gtk::ListBoxRow* TasksView::make_row(
+    CalDavTask const& task, int depth, std::vector<std::string> const& magic_tags)
 {
     auto* row = Gtk::manage(new Gtk::ListBoxRow);
     auto* hb = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 8));
@@ -181,8 +183,15 @@ Gtk::ListBoxRow* TasksView::make_row(CalDavTask const& task, int depth)
         pch->set_margin_start(depth * 20);
         hb->pack_start(*pch, false, false);
     }
+    auto* text_col = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
+    text_col->pack_start(*lbl, false, false);
+    if (!task.categories.empty()) {
+        auto* tags = make_tag_flow(task.categories, magic_tags);
+        tags->set_margin_start(8 + depth * 20);
+        text_col->pack_start(*tags, false, false);
+    }
     hb->pack_start(*chk, false, false);
-    hb->pack_start(*lbl, true, true);
+    hb->pack_start(*text_col, true, true);
 
     atk_object_set_name(gtk_widget_get_accessible(GTK_WIDGET(chk->gobj())), "Task complete checkbox");
 
@@ -271,6 +280,7 @@ void TasksView::rebuild()
 
     TaskDao dao(app_.db());
     auto const all_tasks = dao.get_all();
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     std::multimap<std::string, CalDavTask const*> children{};
     std::vector<CalDavTask const*> roots{};
@@ -286,7 +296,7 @@ void TasksView::rebuild()
     std::function<void(CalDavTask const&, int)> visit = [&](CalDavTask const& t, int depth) {
         bool const show = task_matches_filter(t, task_filter_);
         if (show)
-            list_.append(*make_row(t, depth));
+            list_.append(*make_row(t, depth, magic_tags));
 
         auto range = children.equal_range(t.uid);
 

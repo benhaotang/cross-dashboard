@@ -8,7 +8,9 @@
 #include "extract_tasks_dialog.h"
 #include "memo_detail_view.h"
 #include "background/sync_scheduler.h"
+#include "components/tag_flow.h"
 #include "data/db/memo_dao.h"
+#include "data/prefs/prefs.h"
 #include "domain/models.h"
 
 #include <glib.h>
@@ -299,6 +301,7 @@ void MemosView::rebuild_tag_chips(std::vector<MemosMemo> const& memos_for_tag_un
         }
         ~Lock() { ref = false; }
     } guard(updating_tag_chips_);
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     for (Gtk::Widget* w : tags_.get_children())
         tags_.remove(*w);
@@ -316,8 +319,20 @@ void MemosView::rebuild_tag_chips(std::vector<MemosMemo> const& memos_for_tag_un
 
     for (auto const& tag : all_tags) {
         auto* child = Gtk::manage(new Gtk::FlowBoxChild());
-        auto* btn = Gtk::manage(new Gtk::ToggleButton(tag));
-        gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(btn->gobj())), "cd-memo-tag-chip");
+        auto* btn = Gtk::manage(new Gtk::ToggleButton("#" + tag));
+        auto* context = gtk_widget_get_style_context(GTK_WIDGET(btn->gobj()));
+        gtk_style_context_add_class(context, "cd-memo-tag-chip");
+        switch (classify_tag(tag, magic_tags)) {
+        case TagKind::Time:
+            gtk_style_context_add_class(context, "cd-memo-tag-chip-time");
+            break;
+        case TagKind::Magic:
+            gtk_style_context_add_class(context, "cd-memo-tag-chip-magic");
+            break;
+        case TagKind::Neutral:
+            gtk_style_context_add_class(context, "cd-memo-tag-chip-neutral");
+            break;
+        }
         bool const sel =
             std::find(selected_tags_.begin(), selected_tags_.end(), tag) != selected_tags_.end();
         btn->set_active(sel);
@@ -352,6 +367,7 @@ void MemosView::refresh_visible_rows()
     std::string const query = search_.get_text();
     MemoDao dao(app_.db());
     auto const all = dao.get_by_state(target);
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     std::vector<MemosMemo> candidates;
     candidates.reserve(all.size());
@@ -399,6 +415,8 @@ void MemosView::refresh_visible_rows()
         }
 
         text_col->pack_start(*prev_lab, false, false);
+        if (!memo.tags.empty())
+            text_col->pack_start(*make_tag_flow(memo.tags, magic_tags), false, false);
         if (!ds.empty())
             text_col->pack_start(*date_lab, false, false);
 

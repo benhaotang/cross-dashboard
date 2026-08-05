@@ -2,9 +2,11 @@
 
 #include "app_container.h"
 #include "background/sync_scheduler.h"
+#include "components/tag_flow.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
 #include "data/db/task_dao.h"
+#include "data/prefs/prefs.h"
 
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -199,6 +201,7 @@ void InboxView::populate_rows(std::vector<Row>& out)
         else r.subtitle = "Task";
         std::string blob = t.summary + " ";
         if (t.description) blob += *t.description;
+        for (auto const& category : t.categories) blob += " #" + category;
         r.estimated_minutes = estimate_from_tags(blob);
         out.push_back(std::move(r));
     }
@@ -210,6 +213,7 @@ void InboxView::populate_rows(std::vector<Row>& out)
         r.title = iss.title;
         r.subtitle = "Issue · " + iss.repository;
         std::string blob = iss.title + " " + iss.body;
+        for (auto const& label : iss.labels) blob += " #" + label;
         r.estimated_minutes = estimate_from_tags(blob);
         out.push_back(std::move(r));
     }
@@ -224,6 +228,7 @@ void InboxView::rebuild()
     rows_.clear();
 
     populate_rows(rows_);
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
 
     auto const bounds = local_day_bounds();
     rows_.erase(std::remove_if(rows_.begin(), rows_.end(), [this, &bounds](Row const& row) {
@@ -253,6 +258,7 @@ void InboxView::rebuild()
 
     for (auto const& r : rows_) {
         auto* row = Gtk::manage(new Gtk::ListBoxRow);
+        auto* content = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
         auto* lab = Gtk::manage(new Gtk::Label());
         gchar* e1 = g_markup_escape_text(r.title.c_str(), -1);
         gchar* e2 = g_markup_escape_text(r.subtitle.c_str(), -1);
@@ -261,7 +267,17 @@ void InboxView::rebuild()
         if (e1) g_free(e1);
         if (e2) g_free(e2);
         lab->set_halign(Gtk::ALIGN_START);
-        row->add(*lab);
+        content->pack_start(*lab, false, false);
+
+        std::vector<std::string> tags;
+        if (std::holds_alternative<CalDavTask>(r.data))
+            tags = std::get<CalDavTask>(r.data).categories;
+        else if (std::holds_alternative<GiteaIssue>(r.data))
+            tags = std::get<GiteaIssue>(r.data).labels;
+        if (!tags.empty())
+            content->pack_start(*make_tag_flow(std::move(tags), magic_tags), false, false);
+
+        row->add(*content);
         list_.append(*row);
     }
     list_.show_all();

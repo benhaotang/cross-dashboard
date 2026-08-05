@@ -61,7 +61,8 @@ final class InboxViewModel {
         // Open issues
         let issues = container.issueRepository.openIssues
         for issue in issues.prefix(20) {
-            let estimated = extractEstimatedMinutes(fromBody: issue.body)
+            let labelTokens = issue.labels.map { "#\($0)" }.joined(separator: " ")
+            let estimated = extractEstimatedMinutes(fromBody: issue.body + " " + labelTokens)
             items.append(.issue(issue, estimatedMinutes: estimated))
         }
 
@@ -144,9 +145,8 @@ final class InboxViewModel {
 
     private func extractEstimatedMinutes(fromTokens text: String) -> Int? {
         var total = 0
-        // Match #Xh or #Xm
-        let pattern = #/#(\d+)(h|m)/#
-        for match in text.matches(of: pattern) {
+        for token in text.split(whereSeparator: { $0.isWhitespace }) {
+            guard let match = String(token).wholeMatch(of: /#?(\d+)(h|m)/) else { continue }
             let value = Int(match.1) ?? 0
             let unit  = match.2
             total += unit == "h" ? value * 60 : value

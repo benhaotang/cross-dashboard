@@ -46,7 +46,8 @@ private:
     void on_row_activated(Gtk::ListBoxRow* row);
     bool task_matches_filter(CalDavTask const&, TaskListFilter);
 
-    Gtk::ListBoxRow* make_row(CalDavTask const& task, int depth);
+    Gtk::ListBoxRow* make_row(
+        CalDavTask const& task, int depth, std::vector<std::string> const& magic_tags);
 };
 
 } // namespace cd

@@ -28,6 +28,8 @@ private:
     Gtk::CheckButton due_toggle_{"Has due date"};
     Gtk::Entry due_entry_{};
     Gtk::Entry categories_{};
+    Gtk::Entry estimate_amount_{};
+    Gtk::ComboBoxText estimate_unit_{};
 };
 
 } // namespace cd
