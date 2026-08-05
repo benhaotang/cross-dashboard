@@ -97,10 +97,10 @@ class InboxViewModel @Inject constructor(
             }
             .sortedBy { it.event.start }
 
-        val taskItems: List<InboxItem> = tasks
+        val taskItems: List<InboxItem.Task> = tasks
             .filter { it.status != TaskStatus.COMPLETED && it.status != TaskStatus.CANCELLED }
             .map { task -> InboxItem.Task(task, parseTimeEstimate(task.categories)) }
-            .sortedWith(compareBy(nullsLast()) { (it as InboxItem.Task).task.due })
+            .sortedWith(compareBy(nullsLast()) { it.task.due })
 
         val issueItems: List<InboxItem> = issues
             .filter { it.state == "open" }
