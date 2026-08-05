@@ -25,6 +25,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.crossdashboard.app.domain.model.CalDavCalendar
 import com.crossdashboard.app.domain.model.TaskStatus
+import com.crossdashboard.app.background.WallpaperUpdateNotifier
 
 /**
  * WorkManager [CoroutineWorker] that syncs all repositories in parallel,
@@ -106,6 +107,9 @@ class SyncWorker @AssistedInject constructor(
             updateWidgetState()
             prefs.setLastSync(System.currentTimeMillis())
         }.onFailure { e -> Log.e(TAG, "Widget/lastSync update failed", e) }
+
+        // The wallpaper reads Room independently, so a widget failure must not prevent its redraw.
+        WallpaperUpdateNotifier.notify(context)
 
         return Result.success()
     }

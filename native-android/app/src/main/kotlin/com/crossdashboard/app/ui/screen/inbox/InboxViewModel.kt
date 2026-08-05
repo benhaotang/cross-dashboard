@@ -7,6 +7,7 @@ import com.crossdashboard.app.data.repository.EventRepository
 import com.crossdashboard.app.data.repository.IssueRepository
 import com.crossdashboard.app.data.repository.TaskRepository
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.background.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -77,6 +78,19 @@ class InboxViewModel @Inject constructor(
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
+
+    fun snapshotBackground(profiles: List<WallpaperProfile>, onSaved: () -> Unit = {}) {
+        val s = state.value
+        viewModelScope.launch {
+            val template = BackgroundTemplate(
+                source = BackgroundSource.INBOX,
+                inboxTypeFilter = s.typeFilter.name,
+                inboxDateFilter = s.dateFilter.name,
+            )
+            profiles.forEach { prefs.setBackgroundTemplate(it, template) }
+            onSaved()
+        }
+    }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 

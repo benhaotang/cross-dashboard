@@ -189,6 +189,8 @@ private struct AppearanceSettingsTab: View {
                 .pickerStyle(.segmented)
             }
 
+            DesktopBackgroundSettingsSection()
+
             Section("Date & time") {
                 TextField("Timezone override", text: $viewModel.timeZoneOverride,
                           prompt: Text("Automatic (\(viewModel.systemTimeZone))"))
@@ -278,6 +280,28 @@ private struct AppearanceSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+}
+
+private struct DesktopBackgroundSettingsSection: View {
+    @State private var manager = DesktopBackgroundManager.shared
+    var body: some View {
+        Section("Desktop background") {
+            if let definition = manager.definition {
+                LabeledContent("Snapshot", value: definition.summary)
+                LabeledContent("Status", value: manager.lastMessage)
+                Toggle("Update automatically", isOn: Binding(
+                    get: { definition.enabled },
+                    set: { $0 ? manager.enable() : manager.disable() }
+                ))
+                Button("Update now") { Task { await manager.refreshIfEnabled() } }
+            } else {
+                Text("Use the camera button in Inbox or Views to create a background snapshot.")
+                    .foregroundStyle(.secondary)
+            }
+            Text("Light and dark variants follow the current system appearance. macOS updates the current desktop on each connected display; other Spaces may retain their existing wallpaper.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 

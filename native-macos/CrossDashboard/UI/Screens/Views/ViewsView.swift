@@ -20,6 +20,10 @@ struct ViewsView: View {
         .navigationTitle("Views")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button { DesktopBackgroundManager.shared.captureViews(viewModel) } label: {
+                    Label("Snapshot current view as background", systemImage: "camera.viewfinder")
+                }
+                .help("Snapshot current view as background")
                 // Kanban column config (only shown in kanban mode)
                 if viewModel.mode == .kanban {
                     Button {

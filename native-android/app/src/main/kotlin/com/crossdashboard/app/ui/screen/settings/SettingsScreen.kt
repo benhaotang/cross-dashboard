@@ -1,5 +1,7 @@
 package com.crossdashboard.app.ui.screen.settings
 
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.BuildConfig
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.background.*
 import com.nextcloud.android.sso.AccountImporter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,6 +131,9 @@ fun SettingsScreen(
             item { SectionHeader("Appearance") }
             item { AppearanceSection(state = state, vm = vm) }
 
+            item { SectionHeader("Background") }
+            item { BackgroundSection(state = state, vm = vm) }
+
             // ── Navigation ───────────────────────────────────────────────────
             item { SectionHeader("Navigation") }
             item { NavigationSection(state = state, vm = vm) }
@@ -158,6 +164,70 @@ fun SettingsScreen(
             // ── About ────────────────────────────────────────────────────────
             item { SectionHeader("About") }
             item { AboutSection() }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
+    val context = LocalContext.current
+    val wallpaperInfo = WallpaperManager.getInstance(context).wallpaperInfo
+    val isActive = wallpaperInfo?.component == ComponentName(context, DashboardWallpaperService::class.java)
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            if (isActive) "Cross-Dashboard live wallpaper is active" else "Cross-Dashboard live wallpaper is not active",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Preferred tablet orientation", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            PreferredWallpaperOrientation.entries.forEachIndexed { index, value ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index, PreferredWallpaperOrientation.entries.size),
+                    selected = state.wallpaperOrientation == value,
+                    onClick = { vm.setWallpaperOrientation(value) },
+                    label = { Text(value.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                )
+            }
+        }
+        listOf(
+            Triple("Standard", WallpaperProfile.STANDARD, state.backgroundStandard),
+            Triple("Cover", WallpaperProfile.FOLD_COVER, state.backgroundCover),
+            Triple("Opened", WallpaperProfile.FOLD_INNER, state.backgroundInner),
+        ).forEach { (label, profile, template) ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = template?.let {
+                            if (it.source == BackgroundSource.INBOX) {
+                                "Inbox · ${it.inboxTypeFilter.lowercase()} · ${it.inboxDateFilter.lowercase()}"
+                            } else {
+                                "Views · ${it.viewsMode.lowercase()} · ${it.viewsTypeFilter.lowercase()} · ${it.viewsDateFilter.lowercase()}"
+                            }
+                        } ?: "Not configured",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (template != null) IconButton(onClick = { vm.clearBackground(profile) }) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Clear $label background snapshot")
+                }
+            }
+        }
+        Button(onClick = {
+            context.startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    ComponentName(context, DashboardWallpaperService::class.java))
+            })
+        }) {
+            Icon(Icons.Outlined.Wallpaper, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Open wallpaper preview")
         }
     }
 }

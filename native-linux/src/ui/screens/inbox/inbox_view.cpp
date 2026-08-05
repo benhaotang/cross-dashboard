@@ -8,6 +8,7 @@
 #include "data/db/issue_dao.h"
 #include "data/db/task_dao.h"
 #include "data/prefs/prefs.h"
+#include "background/background_definition.h"
 
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -144,6 +145,15 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
         rebuild();
     });
     toolbar_.pack_end(refresh_btn_, false, false);
+    snapshot_btn_.set_image_from_icon_name("camera-photo-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    snapshot_btn_.set_tooltip_text("Snapshot current view as background");
+    snapshot_btn_.set_relief(Gtk::RELIEF_NONE);
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(snapshot_btn_.gobj()))) atk_object_set_name(a, "Snapshot current view as background");
+    snapshot_btn_.signal_clicked().connect([this] {
+        BackgroundTemplate value; value.source=BackgroundSource::Inbox; value.inbox_type=type_filter_key_; value.inbox_date=date_filter_key_; value.captured_at=millis_now_wall();
+        (void)app_.prefs().set_background_template_json(background_template_json(value)); sync_.refresh_background();
+    });
+    toolbar_.pack_end(snapshot_btn_, false, false);
     pack_start(toolbar_, false, false);
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);

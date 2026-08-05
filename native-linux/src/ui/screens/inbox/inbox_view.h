@@ -45,6 +45,7 @@ private:
     SyncScheduler& sync_;
     Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
     Gtk::Button refresh_btn_{};
+    Gtk::Button snapshot_btn_{};
     SearchableFilterMenu* type_filter_{};
     SearchableFilterMenu* date_filter_{};
     Gtk::Button clear_filters_btn_{};

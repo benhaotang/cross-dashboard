@@ -4,6 +4,8 @@ gio_dep = dependency('gio-2.0')
 secret_dep = dependency('libsecret-1')
 soup_dep = dependency('libsoup-3.0', required: true)
 json_dep = dependency('nlohmann_json')
+cairo_dep = dependency('cairo')
+pangocairo_dep = dependency('pangocairo')
 notify_dep = dependency('libnotify')
 appindicator_dep = dependency('appindicator3-0.1', required: false)
 appindicator_is_ayatana = false
@@ -41,6 +43,11 @@ core_sources = files(
   'data/repository/operation_lock.cpp',
   'data/repository/repositories.cpp',
   'background/sync_runner.cpp',
+  'background/background_definition.cpp',
+  'background/background_content_builder.cpp',
+  'background/background_renderer.cpp',
+  'background/background_command.cpp',
+  'background/background_manager.cpp',
   'background/pomodoro_session.cpp',
   'app_container.cpp',
 )
@@ -85,6 +92,8 @@ core_deps = [
   secret_dep,
   soup_dep,
   json_dep,
+  cairo_dep,
+  pangocairo_dep,
 ]
 
 gui_deps = core_deps + [
@@ -188,6 +197,15 @@ cli_fuzzel_test_exe = executable(
   install: false,
 )
 test('cli_fuzzel', cli_fuzzel_test_exe, args: [cli_exe.full_path()])
+
+background_command_test_exe = executable(
+  'background_command_test',
+  files('../tests/background_command_test.cpp', 'background/background_command.cpp'),
+  include_directories: src_inc,
+  dependencies: [glib_dep],
+  install: false,
+)
+test('background_command', background_command_test_exe)
 
 dbus_run_session = find_program('dbus-run-session')
 service_pomodoro_test = find_program('../tests/service_pomodoro_test.sh')

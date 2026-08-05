@@ -102,6 +102,9 @@ private:
 
     Gtk::Entry kanban_columns_csv_;
     Gtk::Button save_kanban_btn_{"Save Kanban column tags"};
+    Gtk::ComboBoxText background_provider_;
+    Gtk::Entry background_command_;
+    Gtk::Label background_status_;
 
     Gtk::Box top_bar_{Gtk::ORIENTATION_HORIZONTAL, 8};
     Gtk::Button refresh_btn_{};

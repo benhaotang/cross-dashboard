@@ -6,6 +6,7 @@ import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.repository.IssueRepository
 import com.crossdashboard.app.data.repository.TaskRepository
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.background.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -275,4 +276,18 @@ class ViewsViewModel @Inject constructor(
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
+
+    fun snapshotBackground(profiles: List<WallpaperProfile>, onSaved: () -> Unit = {}) {
+        val s = state.value
+        viewModelScope.launch {
+            val template = BackgroundTemplate(
+                source = BackgroundSource.VIEWS,
+                viewsTypeFilter = s.typeFilter.name,
+                viewsDateFilter = s.dateFilter.name,
+                viewsMode = s.viewMode.name,
+            )
+            profiles.forEach { prefs.setBackgroundTemplate(it, template) }
+            onSaved()
+        }
+    }
 }

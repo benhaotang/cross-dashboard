@@ -44,6 +44,7 @@ private:
     SearchableFilterMenu* date_filter_{};
     Gtk::Button clear_filters_btn_{};
     Gtk::Button refresh_btn_{};
+    Gtk::Button snapshot_btn_{};
     Gtk::Notebook tabs_{};
     Gtk::ScrolledWindow kanban_scroll_{};
     Gtk::Box kanban_board_{Gtk::ORIENTATION_HORIZONTAL, 8};

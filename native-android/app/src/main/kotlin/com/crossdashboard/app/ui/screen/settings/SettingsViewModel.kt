@@ -16,6 +16,7 @@ import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.domain.model.*
 import com.crossdashboard.app.ui.component.CalendarColorResolver
 import com.crossdashboard.app.worker.SyncWorker
+import com.crossdashboard.app.background.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -67,6 +68,10 @@ data class SettingsUiState(
 
     // ── Appearance ────────────────────────────────────────────────────────────
     val theme: ThemePreference = ThemePreference.SYSTEM,
+    val backgroundStandard: BackgroundTemplate? = null,
+    val backgroundCover: BackgroundTemplate? = null,
+    val backgroundInner: BackgroundTemplate? = null,
+    val wallpaperOrientation: PreferredWallpaperOrientation = PreferredWallpaperOrientation.PORTRAIT,
     val timeZoneOverride: String? = null,
     val systemTimeZone: String = AppTimeZone.systemZoneId.id,
 
@@ -227,6 +232,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             prefs.systemCredentialFlow.collect { b -> _state.update { it.copy(systemCredentialEnabled = b) } }
         }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.STANDARD).collect { v -> _state.update { it.copy(backgroundStandard = v) } } }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_COVER).collect { v -> _state.update { it.copy(backgroundCover = v) } } }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_INNER).collect { v -> _state.update { it.copy(backgroundInner = v) } } }
+        viewModelScope.launch { prefs.preferredWallpaperOrientationFlow.collect { v -> _state.update { it.copy(wallpaperOrientation = v) } } }
+    }
+
+    fun setWallpaperOrientation(value: PreferredWallpaperOrientation) = viewModelScope.launch {
+        prefs.setPreferredWallpaperOrientation(value)
+    }
+
+    fun clearBackground(profile: WallpaperProfile) = viewModelScope.launch {
+        prefs.setBackgroundTemplate(profile, null)
+        _state.update { it.copy(infoMessage = "Background snapshot cleared") }
     }
 
     // ─── CalDAV section ───────────────────────────────────────────────────────

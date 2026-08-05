@@ -23,6 +23,9 @@
 		31133399F744D25AF005AB6E /* MemosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD28C03C68C4B62C59435754 /* MemosView.swift */; };
 		323A071FB565D646FCF13B97 /* CrossDashboardKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 311E4E7D80C394DA195D7FAD /* CrossDashboardKit.framework */; };
 		3736999581794A9D433E7757 /* SyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8081A02CDB2975117B4B90A /* SyncScheduler.swift */; };
+		A1B2C3D40000000000000001 /* DesktopBackgroundDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000011 /* DesktopBackgroundDefinition.swift */; };
+		A1B2C3D40000000000000002 /* DesktopBackgroundRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000012 /* DesktopBackgroundRenderer.swift */; };
+		A1B2C3D40000000000000003 /* DesktopBackgroundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000013 /* DesktopBackgroundManager.swift */; };
 		376AD8B5A2C7569BF64C5706 /* PomodoroBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A905388D0594811F78934D82 /* PomodoroBar.swift */; };
 		38C980829D29F567E0D0117F /* PropertyDetailShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DE544EE88CAD4E7E8F654B /* PropertyDetailShell.swift */; };
 		3BEE8DCBD1EB812CE2611B85 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15C4B07371FCB5B50F3B1C0 /* NotesViewModel.swift */; };
@@ -214,6 +217,9 @@
 		F2F2D4FCE9E9E3C592E10719 /* GiteaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiteaClient.swift; sourceTree = "<group>"; };
 		F4435E04964FCEE31197528E /* IssuesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssuesViewModel.swift; sourceTree = "<group>"; };
 		F8081A02CDB2975117B4B90A /* SyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncScheduler.swift; sourceTree = "<group>"; };
+		A1B2C3D40000000000000011 /* DesktopBackgroundDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBackgroundDefinition.swift; sourceTree = "<group>"; };
+		A1B2C3D40000000000000012 /* DesktopBackgroundRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBackgroundRenderer.swift; sourceTree = "<group>"; };
+		A1B2C3D40000000000000013 /* DesktopBackgroundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopBackgroundManager.swift; sourceTree = "<group>"; };
 		FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataStore.swift; sourceTree = "<group>"; };
 		FD28C03C68C4B62C59435754 /* MemosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosView.swift; sourceTree = "<group>"; };
 		FF73B89CAFCE5200B4D69DAC /* MemosShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MemosShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -442,6 +448,9 @@
 		A08D8AD9287BB54AFE28A2CA /* Background */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D40000000000000011 /* DesktopBackgroundDefinition.swift */,
+				A1B2C3D40000000000000012 /* DesktopBackgroundRenderer.swift */,
+				A1B2C3D40000000000000013 /* DesktopBackgroundManager.swift */,
 				EB1F97B94C3A272728D9E350 /* NotificationScheduler.swift */,
 				F8081A02CDB2975117B4B90A /* SyncScheduler.swift */,
 			);
@@ -749,6 +758,9 @@
 				750FF831C1C4F601579209A3 /* StatsRepository.swift in Sources */,
 				85233EDB04EBC1A877A9D28F /* StatusBadge.swift in Sources */,
 				3736999581794A9D433E7757 /* SyncScheduler.swift in Sources */,
+				A1B2C3D40000000000000001 /* DesktopBackgroundDefinition.swift in Sources */,
+				A1B2C3D40000000000000002 /* DesktopBackgroundRenderer.swift in Sources */,
+				A1B2C3D40000000000000003 /* DesktopBackgroundManager.swift in Sources */,
 				08A0AFB5AD12CDEDC1C6F97E /* TagChip.swift in Sources */,
 				4CD9CFB7677104044D5E71D2 /* TaskDetailView.swift in Sources */,
 				A934781E9F310E509DBE722B /* TaskInputParser.swift in Sources */,

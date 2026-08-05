@@ -105,4 +105,18 @@ systemctl --user status crossdashboard.service
 journalctl --user -u crossdashboard.service
 ```
 
+### Filtered backgrounds
+
+Inbox and Views include a camera button that snapshots the current filters and layout as the
+background template. Android exposes it as a light/dark live wallpaper, macOS maintains matching
+light/dark desktop images per connected display, and native Linux renders
+`$XDG_CACHE_HOME/crossdashboard/background.png` from the systemd user service.
+
+Linux accepts any direct command template containing `%f`, which is replaced by the rendered file
+path. Presets are provided for `xwallpaper --zoom %f` and `swaybg -o "*" -i %f -m fill`. Commands
+are parsed as arguments and are never run through a shell, so pipes, redirects, and shell expansion
+are intentionally unsupported. Automatic Linux backgrounds are unavailable in the Flatpak build.
+Backgrounds can expose item titles behind desktop icons or on an Android lock screen; choose the
+captured filters with the same care as other lock-screen content.
+
 Shared under the MIT license. (If AI code is licensable:))

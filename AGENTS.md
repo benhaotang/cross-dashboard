@@ -193,6 +193,24 @@ Three-column `NavigationSplitView`: sidebar (screen list) → content (list view
 
 ## Key Architecture Decisions
 
+### Filtered Background Snapshots
+
+Inbox and Views expose a camera/capture action that persists the current filters (and Views mode)
+as a background template. Data is re-filtered from the local source of truth after each existing
+background sync; later UI filter changes do not mutate the saved template.
+
+- Android registers `DashboardWallpaperService`; it redraws light/dark palettes for system
+  appearance and stores separate standard, fold-cover, and fold-inner templates.
+- macOS renders light/dark PNG pairs per `NSScreen` and applies the current appearance with
+  `NSWorkspace`. Only the currently addressable Space per screen can be updated.
+- Native Linux renders `$XDG_CACHE_HOME/crossdashboard/background.png` in the systemd user service
+  and invokes a direct argv command containing `%f`. xwallpaper and swaybg are presets, not special
+  integrations. Flatpak does not support automatic host wallpaper commands.
+
+Backgrounds render titles, dates, types, tags, and counts only. Never add descriptions, issue
+bodies, credentials, or attachment data to a background render model. User-facing documentation
+must warn that visible titles can appear behind desktop icons or on the Android lock screen.
+
 ### Data Layer
 - **Room is the source of truth.** UI observes `Flow<List<T>>` from DAOs and renders immediately from cache.
 - `SyncWorker` runs in the background (WorkManager) and does `clearAll() + upsert(freshData)` into Room.

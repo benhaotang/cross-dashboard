@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Cross Dashboard</string>
     <string name="widget_description">Shows upcoming events, tasks, and issues</string>
+    <string name="dashboard_wallpaper_description">Filtered Inbox and Views snapshots from Cross-Dashboard</string>
+    <string name="dashboard_wallpaper_name">Cross-Dashboard background</string>
 
     <!-- Navigation -->
     <string name="nav_dashboard">Dashboard</string>

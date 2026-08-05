@@ -71,6 +71,7 @@ final class AppContainer {
         preferences.lastSyncDate = Date()
         writeWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
+        await DesktopBackgroundManager.shared.refreshIfEnabled()
     }
 
     private func writeWidgetSnapshot() {

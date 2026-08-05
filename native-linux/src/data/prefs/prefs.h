@@ -49,6 +49,8 @@ public:
     [[nodiscard]] std::optional<std::string> kanban_columns_json() const;
     /** Comma-separated Kanban column tag names, e.g. `backlog,planned,inprogress,done` — matches Android. */
     [[nodiscard]] std::optional<std::string> kanban_column_tags_csv() const;
+    [[nodiscard]] std::optional<std::string> background_command() const;
+    [[nodiscard]] std::optional<std::string> background_template_json() const;
 
     [[nodiscard]] bool set_theme(std::string const&);
     [[nodiscard]] bool set_visible_screens_ordered(std::string const&);
@@ -59,6 +61,8 @@ public:
     [[nodiscard]] bool set_notifications_enabled(bool);
     [[nodiscard]] bool set_kanban_columns_json(std::string const&);
     [[nodiscard]] bool set_kanban_column_tags_csv(std::string const&);
+    [[nodiscard]] bool set_background_command(std::string const&);
+    [[nodiscard]] bool set_background_template_json(std::string const&);
 
 private:
     std::string ini_path_;
