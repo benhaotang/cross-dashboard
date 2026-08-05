@@ -1,12 +1,12 @@
 package com.crossdashboard.app.ui.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.window.core.layout.WindowSizeClass
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 
@@ -25,6 +26,7 @@ data class AdaptiveFilterSpec(
     val selectedKeys: Set<String>,
     val multiSelect: Boolean = false,
     val searchable: Boolean = false,
+    val defaultKeys: Set<String>? = null,
     val onSelectionChange: (Set<String>) -> Unit,
 )
 
@@ -98,12 +100,31 @@ private fun FilterDropdown(spec: AdaptiveFilterSpec) {
     val selectedLabels = spec.choices.filter { it.key in spec.selectedKeys }.map { it.label }
     val buttonLabel = when {
         selectedLabels.isEmpty() -> spec.title
-        selectedLabels.size == 1 -> selectedLabels.first()
-        else -> "${spec.title} (${selectedLabels.size})"
+        selectedLabels.size == 1 -> "${spec.title} – ${selectedLabels.first()}"
+        else -> "${spec.title} – ${selectedLabels.size} selected"
     }
+    val defaultKeys = spec.defaultKeys ?: if (spec.multiSelect) emptySet()
+        else spec.choices.firstOrNull()?.let { setOf(it.key) }.orEmpty()
+    val isActive = spec.selectedKeys != defaultKeys
 
     Box {
-        OutlinedButton(onClick = { expanded = true }) { Text(buttonLabel) }
+        OutlinedButton(
+            onClick = { expanded = true },
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isActive) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surface,
+                contentColor = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer
+                    else MaterialTheme.colorScheme.onSurface,
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
+            ),
+        ) {
+            Icon(filterIcon(spec.title), contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(buttonLabel)
+        }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = {
@@ -126,10 +147,15 @@ private fun FilterDropdown(spec: AdaptiveFilterSpec) {
                 DropdownMenuItem(
                     text = { Text(choice.label) },
                     leadingIcon = {
-                        if (spec.multiSelect) {
-                            Checkbox(checked = choice.key in spec.selectedKeys, onCheckedChange = null)
-                        } else {
-                            RadioButton(selected = choice.key in spec.selectedKeys, onClick = null)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (spec.multiSelect) {
+                                Checkbox(checked = choice.key in spec.selectedKeys, onCheckedChange = null)
+                            } else {
+                                RadioButton(selected = choice.key in spec.selectedKeys, onClick = null)
+                            }
+                            choiceIcon(spec.title, choice.key)?.let {
+                                Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
                         }
                     },
                     onClick = {
@@ -146,7 +172,11 @@ private fun FilterDropdown(spec: AdaptiveFilterSpec) {
 private fun FilterSheetSection(spec: AdaptiveFilterSpec) {
     var query by remember(spec.title) { mutableStateOf("") }
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Text(spec.title, style = MaterialTheme.typography.titleSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(filterIcon(spec.title), contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(spec.title, style = MaterialTheme.typography.titleSmall)
+        }
         if (spec.searchable) {
             OutlinedTextField(
                 value = query,
@@ -169,10 +199,53 @@ private fun FilterSheetSection(spec: AdaptiveFilterSpec) {
                 } else {
                     RadioButton(selected = choice.key in spec.selectedKeys, onClick = null)
                 }
+                choiceIcon(spec.title, choice.key)?.let {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(choice.label)
             }
         }
+    }
+}
+
+private fun filterIcon(title: String): ImageVector = when (title) {
+    "Tags" -> Icons.Outlined.LocalOffer
+    "Time range" -> Icons.Outlined.DateRange
+    "Type" -> Icons.Outlined.Category
+    "Status" -> Icons.Outlined.CheckCircle
+    "Milestone" -> Icons.Outlined.Flag
+    else -> Icons.Outlined.FilterList
+}
+
+private fun choiceIcon(title: String, key: String): ImageVector? {
+    val value = key.lowercase()
+    return when (title) {
+        "Status" -> when (value) {
+            "open" -> Icons.Outlined.RadioButtonUnchecked
+            "closed", "completed" -> Icons.Outlined.CheckCircle
+            "archived" -> Icons.Outlined.Archive
+            "active", "normal" -> Icons.Outlined.Bolt
+            "all" -> Icons.Outlined.List
+            else -> null
+        }
+        "Type" -> when (value) {
+            "events" -> Icons.Outlined.CalendarMonth
+            "tasks" -> Icons.Outlined.Checklist
+            "issues" -> Icons.Outlined.ErrorOutline
+            "all" -> Icons.Outlined.Category
+            else -> null
+        }
+        "Time range" -> when (value) {
+            "today" -> Icons.Outlined.Today
+            "tomorrow" -> Icons.Outlined.Event
+            "this_week", "week" -> Icons.Outlined.DateRange
+            "all" -> Icons.Outlined.AllInclusive
+            else -> null
+        }
+        "Milestone" -> Icons.Outlined.Flag
+        else -> null
     }
 }
 

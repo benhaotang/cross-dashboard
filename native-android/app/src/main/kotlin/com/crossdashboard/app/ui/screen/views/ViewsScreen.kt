@@ -112,7 +112,7 @@ fun ViewsScreen(
                         onSelectionChange = { keys -> keys.firstOrNull()?.let { vm.setTypeFilter(ViewTypeFilter.valueOf(it)) } },
                     ),
                     AdaptiveFilterSpec(
-                        title = "Date",
+                        title = "Time range",
                         choices = ViewDateFilter.entries.map { FilterChoice(it.name, it.displayName) },
                         selectedKeys = setOf(state.dateFilter.name),
                         onSelectionChange = { keys -> keys.firstOrNull()?.let { vm.setDateFilter(ViewDateFilter.valueOf(it)) } },

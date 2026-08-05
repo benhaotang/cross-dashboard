@@ -116,6 +116,7 @@ struct IssuesView: View {
                     options: viewModel.allMilestones,
                     selected: viewModel.selectedMilestoneKey.map { [$0] } ?? [],
                     searchable: true,
+                    defaultSelected: [],
                     onChange: { viewModel.selectedMilestoneKey = $0.first }
                 )
             }

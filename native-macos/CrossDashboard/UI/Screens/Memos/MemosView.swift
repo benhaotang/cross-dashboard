@@ -17,9 +17,9 @@ struct MemosView: View {
                 SearchableFilterMenu(
                     title: "Status",
                     options: [
-                        FilterMenuOption(id: "normal", label: "Normal"),
-                        FilterMenuOption(id: "archived", label: "Archived"),
-                        FilterMenuOption(id: "all", label: "All"),
+                        FilterMenuOption(id: "normal", label: "Active captures"),
+                        FilterMenuOption(id: "archived", label: "Archived captures"),
+                        FilterMenuOption(id: "all", label: "All captures"),
                     ],
                     selected: [viewModel.stateFilter?.rawValue.lowercased() ?? "all"],
                     onChange: { keys in

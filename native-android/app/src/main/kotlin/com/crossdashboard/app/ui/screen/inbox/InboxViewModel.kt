@@ -25,7 +25,7 @@ enum class InboxTypeFilter(val displayName: String) {
 }
 
 enum class InboxDateFilter(val displayName: String) {
-    ALL("Any date"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This Week")
+    ALL("All"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This week")
 }
 
 data class InboxUiState(

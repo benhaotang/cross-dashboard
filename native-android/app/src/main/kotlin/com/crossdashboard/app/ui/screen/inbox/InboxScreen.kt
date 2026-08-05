@@ -168,7 +168,7 @@ private fun FilterRow(
                 onSelectionChange = { keys -> keys.firstOrNull()?.let { onTypeChange(InboxTypeFilter.valueOf(it)) } },
             ),
             AdaptiveFilterSpec(
-                title = "Date",
+                title = "Time range",
                 choices = InboxDateFilter.entries.map { FilterChoice(it.name, it.displayName) },
                 selectedKeys = setOf(dateFilter.name),
                 onSelectionChange = { keys -> keys.firstOrNull()?.let { onDateChange(InboxDateFilter.valueOf(it)) } },

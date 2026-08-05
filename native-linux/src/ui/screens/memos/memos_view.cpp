@@ -101,7 +101,7 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     , paned_(Gtk::ORIENTATION_HORIZONTAL)
 {
     status_filter_ = Gtk::manage(new SearchableFilterMenu("Status", false, false));
-    status_filter_->set_options({{"normal", "Normal"}, {"archived", "Archived"}, {"all", "All"}});
+    status_filter_->set_options({{"normal", "Active captures"}, {"archived", "Archived captures"}, {"all", "All captures"}});
     status_filter_->set_selected({selected_state_});
     status_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
         if (!selected.empty()) selected_state_ = *selected.begin();

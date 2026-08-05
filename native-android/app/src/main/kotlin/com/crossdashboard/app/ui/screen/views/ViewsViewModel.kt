@@ -14,7 +14,7 @@ import javax.inject.Inject
 enum class ViewMode { KANBAN, COVEY }
 enum class ViewTypeFilter(val displayName: String) { ALL("All"), TASKS("Tasks"), ISSUES("Issues") }
 enum class ViewDateFilter(val displayName: String) {
-    ALL("Any date"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This Week")
+    ALL("All"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This week")
 }
 
 /** Covey four-quadrant tag names (fixed). */

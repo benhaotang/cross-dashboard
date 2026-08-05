@@ -18,7 +18,7 @@ final class ViewsViewModel {
     }
 
     enum DateFilter: String, CaseIterable, Identifiable {
-        case all = "Any date", today = "Today", tomorrow = "Tomorrow", thisWeek = "This Week"
+        case all = "All", today = "Today", tomorrow = "Tomorrow", thisWeek = "This week"
         var id: String { rawValue }
     }
 

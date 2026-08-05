@@ -15,10 +15,10 @@ final class InboxViewModel {
     }
 
     enum DateFilter: String, CaseIterable, Identifiable {
-        case all = "Any date"
+        case all = "All"
         case today = "Today"
         case tomorrow = "Tomorrow"
-        case thisWeek = "This Week"
+        case thisWeek = "This week"
         var id: String { rawValue }
     }
 

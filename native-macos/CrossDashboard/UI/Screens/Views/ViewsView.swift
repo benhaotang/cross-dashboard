@@ -51,7 +51,7 @@ struct ViewsView: View {
                     }
                 )
                 SearchableFilterMenu(
-                    title: "Date",
+                    title: "Time range",
                     options: ViewsViewModel.DateFilter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
                     selected: [viewModel.dateFilter.rawValue],
                     onChange: { selected in

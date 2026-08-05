@@ -141,8 +141,9 @@ fun IssuesScreen(
                                         choices = state.availableMilestones.map {
                                             FilterChoice(it.key, "${it.title} · ${it.repository.substringAfterLast('/')}")
                                         },
-                                        selectedKeys = state.selectedMilestoneKey?.let(::setOf) ?: emptySet(),
-                                        searchable = true,
+                                    selectedKeys = state.selectedMilestoneKey?.let(::setOf) ?: emptySet(),
+                                    searchable = true,
+                                    defaultKeys = emptySet(),
                                         onSelectionChange = { viewModel.setMilestoneFilter(it.firstOrNull()) },
                                     )
                                 )

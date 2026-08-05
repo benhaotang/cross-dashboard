@@ -113,8 +113,8 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
         if (!selected.empty()) type_filter_key_ = *selected.begin();
         rebuild();
     });
-    date_filter_ = Gtk::manage(new SearchableFilterMenu("Date", false, false));
-    date_filter_->set_options({{"all", "Any date"}, {"today", "Today"}, {"tomorrow", "Tomorrow"}, {"week", "This Week"}});
+    date_filter_ = Gtk::manage(new SearchableFilterMenu("Time range", false, false));
+    date_filter_->set_options({{"all", "All"}, {"today", "Today"}, {"tomorrow", "Tomorrow"}, {"week", "This week"}});
     date_filter_->set_selected({date_filter_key_});
     date_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
         if (!selected.empty()) date_filter_key_ = *selected.begin();

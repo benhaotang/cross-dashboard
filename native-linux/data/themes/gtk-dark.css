@@ -78,6 +78,13 @@ headerbar {
     background-color: transparent;
 }
 
+/* Selected filters read like active planning controls, not generic buttons. */
+button.cd-filter-active {
+    background-color: alpha(@theme_selected_bg_color, 0.28);
+    border-color: alpha(@theme_selected_bg_color, 0.75);
+    color: @theme_selected_fg_color;
+}
+
 /* Linked button groups */
 .linked > button,
 .linked > togglebutton,

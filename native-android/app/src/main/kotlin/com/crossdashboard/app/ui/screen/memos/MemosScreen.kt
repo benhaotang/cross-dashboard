@@ -161,9 +161,11 @@ private fun MemosListPane(
             filters = listOf(
                 AdaptiveFilterSpec(
                     title = "Status",
-                    choices = MemoStateFilter.entries.map {
-                        FilterChoice(it.name, it.name.lowercase().replaceFirstChar { char -> char.uppercase() })
-                    },
+                    choices = listOf(
+                        FilterChoice(MemoStateFilter.NORMAL.name, "Active captures"),
+                        FilterChoice(MemoStateFilter.ARCHIVED.name, "Archived captures"),
+                        FilterChoice(MemoStateFilter.ALL.name, "All captures"),
+                    ),
                     selectedKeys = setOf(state.stateFilter.name),
                     onSelectionChange = { selected ->
                         selected.firstOrNull()?.let { onSetStateFilter(MemoStateFilter.valueOf(it)) }

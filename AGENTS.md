@@ -441,9 +441,13 @@ Property sheets: `ModalBottomSheet` on phone; inline detail pane (`NavigableList
   screen's defaults.
 - Android filter controls use `AdaptiveFilterBar`: medium/expanded widths show dropdowns, compact
   widths show one modal filter sheet. macOS uses `SearchableFilterMenu` popovers; Linux uses the
-  reusable GTK `SearchableFilterMenu` popover.
+  reusable GTK `SearchableFilterMenu` popover. Filter buttons retain their category in the visible
+  label (`Status – Open`, `Type – All`, `Time range – Today`), use native semantic icons, and receive
+  an accent treatment only when their selection differs from the screen default. Linux popovers use
+  a 360px content width and a taller option viewport; do not shrink them back to compact menu size.
 - Inbox and Views have independent Type and Date filters, so selections compose (for example,
-  `Tasks + This Week`). Date choices are Any date, Today, Tomorrow, and This Week. Inbox Events use
+  `Tasks + This week`). The visible Date control is named **Time range** and its choices are All,
+  Today, Tomorrow, and This week. Inbox Events use
   event start, Tasks use due date, and Issues use milestone due date; undated items are excluded only
   while a date filter is active. Views supports Task and Issue types and uses the same Task/Issue date
   rules.

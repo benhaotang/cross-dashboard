@@ -9,6 +9,7 @@
 #include <gtkmm/scrolledwindow.h>
 
 #include <set>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,6 +38,7 @@ private:
     bool rebuilding_{};
     std::vector<std::pair<std::string, std::string>> options_;
     std::set<std::string> selected_;
+    std::optional<std::set<std::string>> default_selected_;
     Gtk::Popover popover_{};
     Gtk::Box content_{Gtk::ORIENTATION_VERTICAL, 6};
     Gtk::Entry search_{};
