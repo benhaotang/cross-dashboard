@@ -79,7 +79,7 @@ struct InboxView: View {
                     Text(type.rawValue).tag(type)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .accessibilityLabel("Filter inbox items")
         }
         ToolbarItem {

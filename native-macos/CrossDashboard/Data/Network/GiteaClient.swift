@@ -79,14 +79,19 @@ final class GiteaClient: Sendable {
 
     func fetchLabels(repo: String) async -> [GiteaLabel] {
         guard let base = instanceUrl() else { return [] }
-        guard let data = await get("\(base)/api/v1/repos/\(repo)/labels") else { return [] }
-        return (try? decoder.decode([GiteaLabelDto].self, from: data))?
-            .map { GiteaLabel(id: $0.id, name: $0.name, color: $0.color) } ?? []
+        var labels: [GiteaLabel] = []
+        for page in 1...100 {
+            guard let data = await get("\(base)/api/v1/repos/\(repo)/labels?page=\(page)&limit=50"),
+                  let batch = try? decoder.decode([GiteaLabelDto].self, from: data),
+                  !batch.isEmpty else { break }
+            labels.append(contentsOf: batch.map { GiteaLabel(id: $0.id, name: $0.name, color: $0.color) })
+        }
+        return labels
     }
 
     func createRepoLabel(repo: String, name: String, color: String = "0075ca") async throws -> GiteaLabel {
         guard let base = instanceUrl() else { throw GiteaError.noInstance }
-        let payload = "{\"name\":\"\(name)\",\"color\":\"#\(color)\"}"
+        let payload = #"{"name":\#(jsonString(name)),"color":\#(jsonString("#" + color))}"#
         guard let data = await post("\(base)/api/v1/repos/\(repo)/labels", body: payload)
         else { throw GiteaError.requestFailed }
         let dto = try decoder.decode(GiteaLabelDto.self, from: data)
@@ -96,7 +101,8 @@ final class GiteaClient: Sendable {
     func replaceIssueLabels(repo: String, number: Int, labelIds: [Int64]) async throws {
         guard let base = instanceUrl() else { throw GiteaError.noInstance }
         let payload = #"{"labels":[\#(labelIds.map(String.init).joined(separator: ","))]}"#
-        _ = await put("\(base)/api/v1/repos/\(repo)/issues/\(number)/labels", body: payload)
+        guard await put("\(base)/api/v1/repos/\(repo)/issues/\(number)/labels", body: payload) != nil
+        else { throw GiteaError.requestFailed }
     }
 
     func fetchIssueAttachments(repo: String, issueNumber: Int) async -> [GiteaAttachment] {
@@ -331,4 +337,3 @@ enum GiteaError: LocalizedError {
         }
     }
 }
-

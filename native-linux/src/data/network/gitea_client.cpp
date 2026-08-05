@@ -263,19 +263,21 @@ std::vector<GiteaLabel> GiteaClient::fetch_labels(std::string const& repo)
     auto base = instance_url();
     std::vector<GiteaLabel> out;
     if (!base.has_value()) return out;
-    std::ostringstream url;
-    url << *base << "/api/v1/repos/" << repo << "/labels";
-    auto resp = get(url.str());
-    if (!resp.has_value()) return out;
-    auto arr = nlohmann::json::parse(*resp, nullptr, false);
-    if (!arr.is_array()) return out;
-    for (auto const& el : arr) {
-        if (!el.is_object()) continue;
-        GiteaLabel l;
-        l.id = el.value("id", std::int64_t{});
-        l.name = el.value("name", std::string{});
-        l.color = el.value("color", std::string{});
-        out.push_back(std::move(l));
+    for (int page = 1; page <= 100; ++page) {
+        std::ostringstream url;
+        url << *base << "/api/v1/repos/" << repo << "/labels?page=" << page << "&limit=50";
+        auto resp = get(url.str());
+        if (!resp.has_value()) break;
+        auto arr = nlohmann::json::parse(*resp, nullptr, false);
+        if (!arr.is_array() || arr.empty()) break;
+        for (auto const& el : arr) {
+            if (!el.is_object()) continue;
+            GiteaLabel l;
+            l.id = el.value("id", std::int64_t{});
+            l.name = el.value("name", std::string{});
+            l.color = el.value("color", std::string{});
+            out.push_back(std::move(l));
+        }
     }
     return out;
 }

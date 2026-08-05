@@ -10,6 +10,9 @@ final class InboxViewModel {
         case all       = "All"
         case events    = "Events"
         case tasks     = "Tasks"
+        case tasksToday = "Today"
+        case tasksTomorrow = "Tomorrow"
+        case tasksThisWeek = "This Week"
         case issues    = "Issues"
         var id: String { rawValue }
     }
@@ -71,6 +74,13 @@ final class InboxViewModel {
         case .all:    base = allItems
         case .events: base = allItems.filter { if case .event = $0 { return true }; return false }
         case .tasks:  base = allItems.filter { if case .task = $0 { return true }; return false }
+        case .tasksToday:
+            base = tasksDue { Calendar.current.isDateInToday($0) }
+        case .tasksTomorrow:
+            base = tasksDue { Calendar.current.isDateInTomorrow($0) }
+        case .tasksThisWeek:
+            let interval = Calendar.current.dateInterval(of: .weekOfYear, for: Date())
+            base = tasksDue { due in interval?.contains(due) == true }
         case .issues: base = allItems.filter { if case .issue = $0 { return true }; return false }
         }
         guard !searchText.isEmpty else { return base }
@@ -82,6 +92,13 @@ final class InboxViewModel {
             case .issue(let i, _):  return i.title.lowercased().contains(q)
             case .milestone(let m): return m.title.lowercased().contains(q)
             }
+        }
+    }
+
+    private func tasksDue(where predicate: (Date) -> Bool) -> [InboxItem] {
+        allItems.filter { item in
+            guard case .task(let task, _) = item, let due = task.due else { return false }
+            return predicate(due)
         }
     }
 

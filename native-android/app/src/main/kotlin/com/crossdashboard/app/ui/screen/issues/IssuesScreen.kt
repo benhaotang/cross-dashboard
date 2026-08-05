@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.issues
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -87,23 +88,34 @@ fun IssuesScreen(
                 AnimatedPane {
                     Column(modifier = Modifier.fillMaxSize()) {
                         // ── State filter chips ────────────────────────────────
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             IssueStateFilter.entries.forEach { filter ->
+                                item {
+                                    FilterChip(
+                                        selected = state.filter == filter,
+                                        onClick = { viewModel.setFilter(filter) },
+                                        label = {
+                                            Text(
+                                                text = filter.name.lowercase()
+                                                    .replaceFirstChar { it.uppercase() },
+                                                style = MaterialTheme.typography.labelMedium,
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+                            items(state.availableLabels, key = { "label-$it" }) { label ->
                                 FilterChip(
-                                    selected = state.filter == filter,
-                                    onClick = { viewModel.setFilter(filter) },
-                                    label = {
-                                        Text(
-                                            text = filter.name.lowercase()
-                                                .replaceFirstChar { it.uppercase() },
-                                            style = MaterialTheme.typography.labelMedium,
+                                    selected = state.selectedLabel == label,
+                                    onClick = {
+                                        viewModel.setLabelFilter(
+                                            if (state.selectedLabel == label) null else label
                                         )
                                     },
+                                    label = { Text("#$label") },
                                 )
                             }
                         }
@@ -146,8 +158,8 @@ fun IssuesScreen(
                             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
                             commentAttachments = state.commentAttachments,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
-                            onSave = { title, body ->
-                                viewModel.saveIssue(issue, title, body)
+                            onSave = { title, body, labels ->
+                                viewModel.saveIssue(issue, title, body, labels)
                                 scope.launch { navigator.navigateBack() }
                             },
                             onToggleState = {
@@ -186,8 +198,8 @@ fun IssuesScreen(
             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
             commentAttachments = state.commentAttachments,
             onDismiss = { selectedIssue = null },
-            onSave = { title, body ->
-                viewModel.saveIssue(issue, title, body)
+            onSave = { title, body, labels ->
+                viewModel.saveIssue(issue, title, body, labels)
                 selectedIssue = null
             },
             onToggleState = {
@@ -272,11 +284,11 @@ private fun IssueListRow(
                     )
                 }
                 if (issue.labels.isNotEmpty()) {
-                    Row(
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(top = 4.dp),
                     ) {
-                        issue.labels.take(3).forEach { label ->
+                        issue.labels.forEach { label ->
                             SuggestionChip(
                                 onClick = {},
                                 label = { Text(label, style = MaterialTheme.typography.labelSmall) },

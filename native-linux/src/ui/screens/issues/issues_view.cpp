@@ -14,6 +14,9 @@
 
 #include <fstream>
 #include <iterator>
+#include <algorithm>
+#include <set>
+#include <sstream>
 
 #include <gtkmm/dialog.h>
 #include <gtkmm/label.h>
@@ -35,6 +38,32 @@ std::vector<std::uint8_t> read_file_bytes(std::string const& path)
     std::ifstream f(path, std::ios::binary);
     if (!f) return {};
     return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(f), {});
+}
+
+std::string join_labels(std::vector<std::string> const& labels)
+{
+    std::ostringstream out;
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+        if (i) out << ", ";
+        out << labels[i];
+    }
+    return out.str();
+}
+
+std::vector<std::string> split_labels(std::string const& value)
+{
+    std::vector<std::string> labels;
+    std::set<std::string> seen;
+    std::stringstream input(value);
+    std::string label;
+    while (std::getline(input, label, ',')) {
+        auto const first = label.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) continue;
+        auto const last = label.find_last_not_of(" \t\r\n");
+        label = label.substr(first, last - first + 1);
+        if (seen.insert(label).second) labels.push_back(label);
+    }
+    return labels;
 }
 
 } // namespace
@@ -66,6 +95,9 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     state_combo_.append("closed");
     state_combo_.set_active(0);
     state_combo_.signal_changed().connect(sigc::mem_fun(*this, &IssuesView::on_filter_changed));
+    label_combo_.append("All labels");
+    label_combo_.set_active(0);
+    label_combo_.signal_changed().connect(sigc::mem_fun(*this, &IssuesView::on_filter_changed));
 
     // New issue: icon + label button
     new_issue_btn_.set_image_from_icon_name("list-add-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
@@ -78,9 +110,14 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     toggle_state_btn_.set_label("Close issue");
     toggle_state_btn_.set_sensitive(false);
     toggle_state_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_toggle_issue_state));
+    edit_labels_btn_.signal_clicked().connect(sigc::mem_fun(*this, &IssuesView::on_edit_labels));
+    edit_labels_btn_.set_sensitive(false);
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(edit_labels_btn_.gobj())))
+        atk_object_set_name(a, "Edit issue labels");
 
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
     toolbar_.pack_start(state_combo_, false, false);
+    toolbar_.pack_start(label_combo_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh issues");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -139,6 +176,7 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
     toggle_state_btn_.set_always_show_image(true);
     detail_hdr->pack_start(detail_meta_, true, true);
     detail_hdr->pack_end(toggle_state_btn_, false, false);
+    detail_hdr->pack_end(edit_labels_btn_, false, false);
 
     detail_inner_.pack_start(*detail_hdr, false, false);
     auto* detail_sep = Gtk::manage(new Gtk::Separator(Gtk::ORIENTATION_HORIZONTAL));
@@ -169,8 +207,11 @@ IssuesView::IssuesView(AppContainer& app, SyncScheduler& sync)
 
 void IssuesView::on_filter_changed()
 {
+    if (rebuilding_) return;
     int a = state_combo_.get_active_row_number();
     state_filter_ = a == 1 ? "closed" : "open";
+    auto selected = label_combo_.get_active_text();
+    label_filter_ = selected == "All labels" ? "" : selected.raw();
     rebuild();
 }
 
@@ -181,6 +222,7 @@ void IssuesView::clear_detail_panels()
     detail_meta_.set_text("");
     if (body_) body_->set_markdown("");
     toggle_state_btn_.set_sensitive(false);
+    edit_labels_btn_.set_sensitive(false);
 }
 
 void IssuesView::rebuild()
@@ -193,6 +235,29 @@ void IssuesView::rebuild()
 
     IssueDao dao(app_.db());
     auto issues = dao.get_by_state(state_filter_);
+
+    std::set<std::string> sorted_labels;
+    for (auto const& issue : dao.get_all())
+        sorted_labels.insert(issue.labels.begin(), issue.labels.end());
+    rebuilding_ = true;
+    label_combo_.remove_all();
+    label_combo_.append("All labels");
+    int active_label = 0;
+    int label_index = 1;
+    for (auto const& label : sorted_labels) {
+        label_combo_.append(label);
+        if (label == label_filter_) active_label = label_index;
+        ++label_index;
+    }
+    if (active_label == 0) label_filter_.clear();
+    label_combo_.set_active(active_label);
+    rebuilding_ = false;
+
+    if (!label_filter_.empty()) {
+        issues.erase(std::remove_if(issues.begin(), issues.end(), [this](GiteaIssue const& issue) {
+            return std::find(issue.labels.begin(), issue.labels.end(), label_filter_) == issue.labels.end();
+        }), issues.end());
+    }
 
     std::stable_sort(issues.begin(), issues.end(),
         [](auto const& a, auto const& b) { return a.updated_at > b.updated_at; });
@@ -219,6 +284,13 @@ void IssuesView::rebuild()
 
         card->pack_start(*tlab, false, false);
         card->pack_start(*mlab, false, false);
+        if (!iss.labels.empty()) {
+            auto* labels = Gtk::manage(new Gtk::Label(join_labels(iss.labels)));
+            labels->set_halign(Gtk::ALIGN_START);
+            labels->set_line_wrap(true);
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(labels->gobj())), "dim-label");
+            card->pack_start(*labels, false, false);
+        }
         row->add(*card);
         row->set_tooltip_text(iss.title + "\n" + meta);
         list_.append(*row);
@@ -239,6 +311,7 @@ void IssuesView::load_detail_from_network()
     else
         toggle_state_btn_.set_label("Reopen issue");
     toggle_state_btn_.set_sensitive(true);
+    edit_labels_btn_.set_sensitive(true);
     body_->set_markdown(iss.body.empty() ? "_No description_" : iss.body);
 
     for (Gtk::Widget* w : attachments_box_.get_children()) attachments_box_.remove(*w);
@@ -418,6 +491,41 @@ void IssuesView::on_toggle_issue_state()
             Gtk::MessageDialog dlg(*top, err.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
             dlg.run();
         }
+    }
+}
+
+void IssuesView::on_edit_labels()
+{
+    if (!selected_issue_.has_value()) return;
+    Gtk::Window* top = dynamic_cast<Gtk::Window*>(get_toplevel());
+    if (!top) return;
+
+    Gtk::Dialog dialog("Issue labels", *top, true);
+    dialog.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+    dialog.add_button("_Save", Gtk::RESPONSE_OK);
+    auto* entry = Gtk::manage(new Gtk::Entry());
+    entry->set_text(join_labels(selected_issue_->labels));
+    entry->set_placeholder_text("bug, planned, do");
+    entry->set_activates_default(true);
+    auto* help = Gtk::manage(new Gtk::Label(
+        "Comma-separated. New labels are created in Gitea; existing Kanban and Covey labels are retained unless removed."));
+    help->set_line_wrap(true);
+    help->set_halign(Gtk::ALIGN_START);
+    dialog.get_content_area()->pack_start(*entry, false, false);
+    dialog.get_content_area()->pack_start(*help, false, false);
+    dialog.set_default_response(Gtk::RESPONSE_OK);
+    dialog.set_default_size(520, 160);
+    dialog.show_all_children();
+    if (dialog.run() != Gtk::RESPONSE_OK) return;
+
+    try {
+        auto const issue = *selected_issue_;
+        app_.issues().replace_labels(issue.repository, issue.number, split_labels(entry->get_text()));
+        rebuild();
+    }
+    catch (std::exception const& err) {
+        Gtk::MessageDialog error(*top, err.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+        error.run();
     }
 }
 

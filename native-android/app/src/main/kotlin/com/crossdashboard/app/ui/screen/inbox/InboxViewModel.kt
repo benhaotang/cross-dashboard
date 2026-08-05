@@ -11,9 +11,20 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.time.DayOfWeek
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
-enum class InboxFilter { ALL, EVENTS, TASKS, ISSUES }
+enum class InboxFilter(val displayName: String) {
+    ALL("All"),
+    EVENTS("Events"),
+    TASKS("Tasks"),
+    TASKS_TODAY("Today"),
+    TASKS_TOMORROW("Tomorrow"),
+    TASKS_THIS_WEEK("This Week"),
+    ISSUES("Issues"),
+}
 
 data class InboxUiState(
     val items: List<InboxItem> = emptyList(),
@@ -66,6 +77,15 @@ class InboxViewModel @Inject constructor(
     ): InboxUiState {
         val now = Instant.now()
         val cutoff = now.minus(Duration.ofDays(1))
+        val zone = ZoneId.systemDefault()
+        val today = now.atZone(zone).toLocalDate()
+        val todayStart = today.atStartOfDay(zone).toInstant()
+        val tomorrowStart = today.plusDays(1).atStartOfDay(zone).toInstant()
+        val dayAfterTomorrowStart = today.plusDays(2).atStartOfDay(zone).toInstant()
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .atStartOfDay(zone).toInstant()
+        val nextWeekStart = today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+            .atStartOfDay(zone).toInstant()
 
         val eventItems: List<InboxItem> = events
             .filter { it.end.isAfter(cutoff) }
@@ -91,6 +111,15 @@ class InboxViewModel @Inject constructor(
             InboxFilter.ALL -> eventItems + taskItems + issueItems
             InboxFilter.EVENTS -> eventItems
             InboxFilter.TASKS -> taskItems
+            InboxFilter.TASKS_TODAY -> taskItems.filter {
+                it.task.due?.let { due -> due >= todayStart && due < tomorrowStart } == true
+            }
+            InboxFilter.TASKS_TOMORROW -> taskItems.filter {
+                it.task.due?.let { due -> due >= tomorrowStart && due < dayAfterTomorrowStart } == true
+            }
+            InboxFilter.TASKS_THIS_WEEK -> taskItems.filter {
+                it.task.due?.let { due -> due >= weekStart && due < nextWeekStart } == true
+            }
             InboxFilter.ISSUES -> issueItems
         }
 

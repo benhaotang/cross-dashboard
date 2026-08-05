@@ -9,6 +9,8 @@ struct IssueDetailView: View {
     @Environment(PomodoroViewModel.self) private var pomodoroVM
     let issueID: Int64?
     @State private var viewModel = IssuesViewModel()
+    @State private var showLabelEditor = false
+    @State private var labelDraft = ""
 
     private var issue: GiteaIssue? {
         guard let id = issueID else { return nil }
@@ -37,6 +39,15 @@ struct IssueDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .secondaryAction) {
                     Button {
+                        labelDraft = issue.labels.joined(separator: ", ")
+                        showLabelEditor = true
+                    } label: {
+                        Label("Edit Labels", systemImage: "tag")
+                    }
+                    .accessibilityLabel("Edit issue labels")
+                }
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
                         pomodoroVM.startForIssue(title: issue.title)
                     } label: {
                         Label("Start Pomodoro", systemImage: "timer")
@@ -62,6 +73,35 @@ struct IssueDetailView: View {
                     }
                     .accessibilityLabel(issue.state == "open" ? "Close issue" : "Reopen issue")
                 }
+            }
+            .sheet(isPresented: $showLabelEditor) {
+                NavigationStack {
+                    Form {
+                        TextField("Comma-separated labels", text: $labelDraft)
+                        Text("New labels are created in Gitea. Existing Kanban and Covey labels are retained unless removed here.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .formStyle(.grouped)
+                    .navigationTitle("Issue Labels")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showLabelEditor = false }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") {
+                                let labels = Array(Set(
+                                    labelDraft.split(separator: ",")
+                                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                        .filter { !$0.isEmpty }
+                                )).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+                                viewModel.replaceLabels(for: issue, labels: labels)
+                                showLabelEditor = false
+                            }
+                        }
+                    }
+                }
+                .frame(minWidth: 460, minHeight: 220)
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -101,8 +141,10 @@ struct IssueDetailView: View {
                         .fontWeight(.semibold)
 
                     if !issue.labels.isEmpty {
-                        HStack(spacing: 6) {
-                            ForEach(issue.labels, id: \.self) { TagChip(tag: $0) }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(issue.labels, id: \.self) { TagChip(tag: $0) }
+                            }
                         }
                     }
 

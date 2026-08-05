@@ -37,6 +37,7 @@ private:
     void on_send_comment();
     void on_attach_with_comment();
     void on_toggle_issue_state();
+    void on_edit_labels();
 
     AppContainer& app_;
     SyncScheduler& sync_;
@@ -44,8 +45,10 @@ private:
     Gtk::Box toolbar_;
     Gtk::Button refresh_btn_{};
     Gtk::ComboBoxText state_combo_;
+    Gtk::ComboBoxText label_combo_;
     Gtk::Button new_issue_btn_;
     Gtk::Button toggle_state_btn_;
+    Gtk::Button edit_labels_btn_{"Edit labels"};
 
     Gtk::Paned paned_;
     Gtk::ScrolledWindow scroll_;
@@ -66,6 +69,8 @@ private:
     Gtk::Button send_comment_btn_;
 
     std::string state_filter_{"open"};
+    std::string label_filter_{};
+    bool rebuilding_{};
     std::vector<std::int64_t> list_ids_;
     std::optional<GiteaIssue> selected_issue_;
 };

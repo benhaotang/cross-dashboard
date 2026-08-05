@@ -45,7 +45,7 @@ fun IssuePropertySheet(
     issueAttachments: List<GiteaAttachment> = emptyList(),
     commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, List<String>) -> Unit,
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     /** When true, renders content inline (no ModalBottomSheet wrapper) for tablet detail pane. */
@@ -55,6 +55,7 @@ fun IssuePropertySheet(
     var editing by remember(issue.id) { mutableStateOf(false) }
     var editTitle by remember(issue.id) { mutableStateOf(issue.title) }
     var editBody by remember(issue.id) { mutableStateOf(issue.body) }
+    var editLabels by remember(issue.id) { mutableStateOf(issue.labels.joinToString(", ")) }
 
     @Composable
     fun SheetContent() {
@@ -70,6 +71,7 @@ fun IssuePropertySheet(
                     if (editing) {
                         editTitle = issue.title
                         editBody = issue.body
+                        editLabels = issue.labels.joinToString(", ")
                     }
                     editing = !editing
                 },
@@ -98,8 +100,24 @@ fun IssuePropertySheet(
                         minLines = 4,
                         maxLines = 10,
                     )
+                    OutlinedTextField(
+                        value = editLabels,
+                        onValueChange = { editLabels = it },
+                        label = { Text("Labels") },
+                        supportingText = { Text("Comma-separated; new labels are created in Gitea") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Button(
-                        onClick = { onSave(editTitle.trim(), editBody.trim()) },
+                        onClick = {
+                            onSave(
+                                editTitle.trim(),
+                                editBody.trim(),
+                                editLabels.split(',')
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                    .distinct(),
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .semantics { contentDescription = "Save issue changes" },
@@ -389,7 +407,7 @@ fun IssueDetailContent(
     commentLoading: Boolean,
     issueAttachments: List<GiteaAttachment> = emptyList(),
     commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, List<String>) -> Unit,
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     onDismiss: () -> Unit = {},

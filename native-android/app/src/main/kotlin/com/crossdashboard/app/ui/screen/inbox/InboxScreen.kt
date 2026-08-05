@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.inbox
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -128,14 +129,12 @@ fun InboxScreen(
 
 @Composable
 private fun FilterRow(filter: InboxFilter, onFilterChange: (InboxFilter) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        InboxFilter.entries.forEach { f ->
-            val label = f.name.lowercase().replaceFirstChar { it.uppercaseChar() }
+        items(InboxFilter.entries) { f ->
+            val label = f.displayName
             FilterChip(
                 selected = filter == f,
                 onClick = { onFilterChange(f) },

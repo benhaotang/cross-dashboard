@@ -90,10 +90,11 @@ private struct KanbanBoard: View {
             HStack(alignment: .top, spacing: 16) {
                 // Unassigned column — tasks that don't match any configured column
                 let unassigned = viewModel.unassignedTasks
-                if !unassigned.isEmpty {
+                if !unassigned.isEmpty || !viewModel.unassignedIssues.isEmpty {
                     KanbanColumn(
                         title: "Unassigned",
                         tasks: unassigned,
+                        issues: viewModel.unassignedIssues,
                         isUnassigned: true,
                         allColumns: viewModel.kanbanColumns,
                         onMove: { task, col in viewModel.moveTask(task, toColumn: col) },
@@ -106,6 +107,7 @@ private struct KanbanBoard: View {
                     KanbanColumn(
                         title: column,
                         tasks: viewModel.tasks(inColumn: column),
+                        issues: viewModel.issues(inColumn: column),
                         isUnassigned: false,
                         allColumns: viewModel.kanbanColumns,
                         onMove: { task, col in viewModel.moveTask(task, toColumn: col) },
@@ -124,6 +126,7 @@ private struct KanbanBoard: View {
 private struct KanbanColumn: View {
     let title: String
     let tasks: [CalDavTask]
+    let issues: [GiteaIssue]
     let isUnassigned: Bool
     let allColumns: [String]
     let onMove: (CalDavTask, String) -> Void
@@ -137,7 +140,7 @@ private struct KanbanColumn: View {
                 Text(title.capitalized)
                     .font(.headline)
                     .fontWeight(.semibold)
-                Text("\(tasks.count)")
+                Text("\(tasks.count + issues.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
@@ -161,7 +164,7 @@ private struct KanbanColumn: View {
             .padding(.vertical, 10)
             .background(Color(.windowBackgroundColor))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(title) column, \(tasks.count) tasks")
+            .accessibilityLabel("\(title) column, \(tasks.count + issues.count) items")
 
             Divider()
 
@@ -177,8 +180,27 @@ private struct KanbanColumn: View {
                             onAssign: { onAssign(task) }
                         )
                     }
-                    if tasks.isEmpty {
-                        Text("No tasks")
+                    ForEach(issues) { issue in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Label(issue.title, systemImage: "exclamationmark.bubble")
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(2)
+                            Text("\(issue.repository) #\(issue.number)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(.windowBackgroundColor))
+                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color(.separatorColor), lineWidth: 0.5))
+                        )
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Issue: \(issue.title)")
+                    }
+                    if tasks.isEmpty && issues.isEmpty {
+                        Text("No items")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, minHeight: 48, alignment: .center)
@@ -289,6 +311,7 @@ private struct CoveyQuadrants: View {
                     subtitle: "Important & Urgent",
                     color: .red,
                     tasks: viewModel.importantUrgent,
+                    issues: viewModel.issues(withLabel: "do"),
                     onAssign: { viewModel.showAssignModal(for: $0) }
                 )
                 CoveyQuadrant(
@@ -296,6 +319,7 @@ private struct CoveyQuadrants: View {
                     subtitle: "Important & Not Urgent",
                     color: .blue,
                     tasks: viewModel.importantNotUrgent,
+                    issues: viewModel.issues(withLabel: "delay"),
                     onAssign: { viewModel.showAssignModal(for: $0) }
                 )
             }
@@ -305,6 +329,7 @@ private struct CoveyQuadrants: View {
                     subtitle: "Not Important & Urgent",
                     color: .orange,
                     tasks: viewModel.notImportantUrgent,
+                    issues: viewModel.issues(withLabel: "delegate"),
                     onAssign: { viewModel.showAssignModal(for: $0) }
                 )
                 CoveyQuadrant(
@@ -312,6 +337,7 @@ private struct CoveyQuadrants: View {
                     subtitle: "Not Important & Not Urgent",
                     color: .gray,
                     tasks: viewModel.notImportantNotUrgent,
+                    issues: viewModel.issues(withLabel: "eliminate"),
                     onAssign: { viewModel.showAssignModal(for: $0) }
                 )
             }
@@ -325,6 +351,7 @@ private struct CoveyQuadrant: View {
     let subtitle: String
     let color: Color
     let tasks: [CalDavTask]
+    let issues: [GiteaIssue]
     let onAssign: (CalDavTask) -> Void
 
     var body: some View {
@@ -369,8 +396,23 @@ private struct CoveyQuadrant: View {
                         .accessibilityLabel(task.summary)
                         .accessibilityHint("Click to assign to a kanban column")
                     }
-                    if tasks.isEmpty {
-                        Text("No tasks")
+                    ForEach(issues) { issue in
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.bubble")
+                                .font(.caption2)
+                            Text(issue.title)
+                                .font(.caption)
+                                .lineLimit(2)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.08)))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Issue: \(issue.title)")
+                    }
+                    if tasks.isEmpty && issues.isEmpty {
+                        Text("No items")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -388,7 +430,7 @@ private struct CoveyQuadrant: View {
                 )
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(label): \(tasks.count) tasks")
+        .accessibilityLabel("\(label): \(tasks.count + issues.count) items")
     }
 }
 

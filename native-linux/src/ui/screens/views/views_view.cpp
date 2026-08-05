@@ -3,6 +3,7 @@
 #include "app_container.h"
 #include "background/sync_scheduler.h"
 #include "data/db/task_dao.h"
+#include "data/db/issue_dao.h"
 #include "data/prefs/prefs.h"
 
 #include <glib.h>
@@ -296,8 +297,11 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
 
     AppSettings const cfg = merged_app_preferences(app_.prefs());
     std::vector<std::string> const& cols = cfg.kanban_columns;
+    IssueDao issue_dao(app_.db());
+    auto const open_issues = issue_dao.get_by_state("open");
 
-    auto make_column = [&](std::string const& title, int col_code, std::vector<CalDavTask> const& tasks_in_col) {
+    auto make_column = [&](std::string const& title, int col_code, std::vector<CalDavTask> const& tasks_in_col,
+                           std::vector<GiteaIssue> const& issues_in_col) {
         // Outer column container — styled card
         auto* col_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0));
         gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(col_box->gobj())), "cd-kanban-col");
@@ -316,7 +320,8 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
         title_l->set_halign(Gtk::ALIGN_START);
         title_l->set_hexpand(true);
 
-        auto* badge = Gtk::manage(new Gtk::Label(std::to_string(tasks_in_col.size()).c_str()));
+        auto* badge = Gtk::manage(new Gtk::Label(
+            std::to_string(tasks_in_col.size() + issues_in_col.size()).c_str()));
         gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(badge->gobj())), "cd-count-badge");
 
         hdr->pack_start(*title_l, true, true);
@@ -377,9 +382,27 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
             g_signal_connect(rw, "drag-data-get", G_CALLBACK(views_drag_data_get), nullptr);
         }
 
-        if (tasks_in_col.empty()) {
+        for (auto const& issue : issues_in_col) {
+            auto* row = Gtk::manage(new Gtk::ListBoxRow);
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(row->gobj())), "cd-kanban-card");
+            auto* card = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 3));
+            auto* title = Gtk::manage(new Gtk::Label(issue.title));
+            title->set_halign(Gtk::ALIGN_START);
+            title->set_line_wrap(true);
+            title->set_xalign(0.0f);
+            auto* meta = Gtk::manage(new Gtk::Label(
+                "Issue · " + issue.repository + " #" + std::to_string(issue.number)));
+            meta->set_halign(Gtk::ALIGN_START);
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(meta->gobj())), "dim-label");
+            card->pack_start(*title, false, false);
+            card->pack_start(*meta, false, false);
+            row->add(*card);
+            lb->append(*row);
+        }
+
+        if (tasks_in_col.empty() && issues_in_col.empty()) {
             auto* empty_row = Gtk::manage(new Gtk::ListBoxRow());
-            auto* empty_lab = Gtk::manage(new Gtk::Label("No tasks"));
+            auto* empty_lab = Gtk::manage(new Gtk::Label("No items"));
             gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(empty_lab->gobj())), "dim-label");
             empty_lab->set_margin_top(16);
             empty_lab->set_margin_bottom(16);
@@ -397,16 +420,24 @@ void ViewsView::fill_kanban(std::vector<CalDavTask> const& open_tasks)
     for (auto const& t : open_tasks) {
         if (!has_any_ci(t.categories, cols)) untagged.push_back(t);
     }
-    if (!untagged.empty()) make_column("Untagged", -1, untagged);
+    std::vector<GiteaIssue> untagged_issues;
+    for (auto const& issue : open_issues) {
+        if (!has_any_ci(issue.labels, cols)) untagged_issues.push_back(issue);
+    }
+    if (!untagged.empty() || !untagged_issues.empty()) make_column("Untagged", -1, untagged, untagged_issues);
 
     for (std::size_t i = 0; i < cols.size(); ++i) {
         std::vector<CalDavTask> col_tasks;
         for (auto const& t : open_tasks) {
             if (has_any_ci(t.categories, {cols[i]})) col_tasks.push_back(t);
         }
+        std::vector<GiteaIssue> col_issues;
+        for (auto const& issue : open_issues) {
+            if (has_any_ci(issue.labels, {cols[i]})) col_issues.push_back(issue);
+        }
         std::string hdr = cols[i];
         if (!hdr.empty()) hdr.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(hdr.front())));
-        make_column(hdr, static_cast<int>(i), col_tasks);
+        make_column(hdr, static_cast<int>(i), col_tasks, col_issues);
     }
 
     kanban_board_.show_all();
@@ -418,6 +449,8 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
     for (Gtk::Widget* w : covey_grid_.get_children()) covey_grid_.remove(*w);
 
     auto ctags = covey_tag_strings();
+    IssueDao issue_dao(app_.db());
+    auto const open_issues = issue_dao.get_by_state("open");
     std::vector<CalDavTask> unassigned;
     for (auto const& t : open_tasks) {
         if (!has_any_ci(t.categories, ctags)) unassigned.push_back(t);
@@ -542,9 +575,29 @@ void ViewsView::fill_covey(std::vector<CalDavTask> const& open_tasks)
                 g_signal_connect(rw, "drag-data-get", G_CALLBACK(views_drag_data_get), nullptr);
             }
         }
+        for (auto const& issue : open_issues) {
+            if (!has_any_ci(issue.labels, {qtag})) continue;
+            has_tasks = true;
+            auto* row = Gtk::manage(new Gtk::ListBoxRow);
+            auto* vb_issue = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 2));
+            vb_issue->set_margin_start(8);
+            vb_issue->set_margin_end(4);
+            vb_issue->set_margin_top(4);
+            vb_issue->set_margin_bottom(4);
+            auto* title = Gtk::manage(new Gtk::Label(issue.title));
+            title->set_halign(Gtk::ALIGN_START);
+            title->set_line_wrap(true);
+            auto* meta = Gtk::manage(new Gtk::Label("Issue · " + issue.repository));
+            meta->set_halign(Gtk::ALIGN_START);
+            gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(meta->gobj())), "dim-label");
+            vb_issue->pack_start(*title, false, false);
+            vb_issue->pack_start(*meta, false, false);
+            row->add(*vb_issue);
+            lb->append(*row);
+        }
         if (!has_tasks) {
             auto* empty_row = Gtk::manage(new Gtk::ListBoxRow());
-            auto* empty_lab = Gtk::manage(new Gtk::Label("No tasks"));
+            auto* empty_lab = Gtk::manage(new Gtk::Label("No items"));
             gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(empty_lab->gobj())), "dim-label");
             empty_lab->set_margin_top(12);
             empty_lab->set_margin_bottom(12);

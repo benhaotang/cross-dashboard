@@ -43,6 +43,28 @@ final class ViewsViewModel {
         }
     }
 
+    var allIssues: [GiteaIssue] { container.issueRepository.openIssues }
+
+    func issues(inColumn column: String) -> [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.contains { $0.lowercased() == column.lowercased() }
+        }
+    }
+
+    var unassignedIssues: [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.none(where: { label in
+                kanbanColumns.contains { $0.lowercased() == label.lowercased() }
+            })
+        }
+    }
+
+    func issues(withLabel label: String) -> [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.contains { $0.lowercased() == label.lowercased() }
+        }
+    }
+
     func tasks(inColumn column: String) -> [CalDavTask] {
         allTasks.filter { task in
             task.categories.contains(where: { $0.lowercased() == column.lowercased() })

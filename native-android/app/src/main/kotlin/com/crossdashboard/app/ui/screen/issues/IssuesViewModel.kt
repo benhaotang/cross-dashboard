@@ -30,6 +30,8 @@ data class PendingAttachment(
 data class IssuesUiState(
     val issues: List<GiteaIssue> = emptyList(),
     val filter: IssueStateFilter = IssueStateFilter.OPEN,
+    val availableLabels: List<String> = emptyList(),
+    val selectedLabel: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     /** Comments keyed by issue id — loaded lazily on sheet open */
@@ -51,6 +53,7 @@ class IssuesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(IssueStateFilter.OPEN)
+    private val _selectedLabel = MutableStateFlow<String?>(null)
     private val _state = MutableStateFlow(IssuesUiState())
     val state: StateFlow<IssuesUiState> = _state.asStateFlow()
 
@@ -61,20 +64,38 @@ class IssuesViewModel @Inject constructor(
         _state.update { it.copy(configuredRepos = repos) }
 
         viewModelScope.launch {
-            combine(issueRepo.allIssues, _filter) { issues, filter ->
-                when (filter) {
+            combine(issueRepo.allIssues, _filter, _selectedLabel) { issues, filter, selectedLabel ->
+                val stateFiltered = when (filter) {
                     IssueStateFilter.OPEN -> issues.filter { it.state == "open" }
                     IssueStateFilter.CLOSED -> issues.filter { it.state == "closed" }
                     IssueStateFilter.ALL -> issues
-                }.sortedByDescending { it.updatedAt }
-            }.collect { filtered ->
-                _state.update { it.copy(issues = filtered, filter = _filter.value) }
+                }
+                Triple(
+                    stateFiltered
+                        .filter { selectedLabel == null || selectedLabel in it.labels }
+                        .sortedByDescending { it.updatedAt },
+                    issues.flatMap { it.labels }.distinct().sortedBy { it.lowercase() },
+                    selectedLabel,
+                )
+            }.collect { (filtered, labels, selectedLabel) ->
+                _state.update {
+                    it.copy(
+                        issues = filtered,
+                        filter = _filter.value,
+                        availableLabels = labels,
+                        selectedLabel = selectedLabel,
+                    )
+                }
             }
         }
     }
 
     fun setFilter(filter: IssueStateFilter) {
         _filter.value = filter
+    }
+
+    fun setLabelFilter(label: String?) {
+        _selectedLabel.value = label
     }
 
     fun sync() {
@@ -232,10 +253,13 @@ class IssuesViewModel @Inject constructor(
 
     // ─── Edit ─────────────────────────────────────────────────────────────────
 
-    fun saveIssue(issue: GiteaIssue, title: String, body: String) {
+    fun saveIssue(issue: GiteaIssue, title: String, body: String, labels: List<String>) {
         viewModelScope.launch {
             try {
                 issueRepo.update(issue.repository, issue.number, title = title, body = body)
+                if (labels != issue.labels) {
+                    issueRepo.replaceLabels(issue.repository, issue.number, labels)
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }

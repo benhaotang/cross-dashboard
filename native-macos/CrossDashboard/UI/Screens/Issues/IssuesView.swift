@@ -94,6 +94,26 @@ struct IssuesView: View {
             .accessibilityLabel("Filter by state")
         }
         ToolbarItem {
+            Menu {
+                Button("All labels") { viewModel.selectedLabel = nil }
+                Divider()
+                ForEach(viewModel.allLabels, id: \.self) { label in
+                    Button {
+                        viewModel.selectedLabel = viewModel.selectedLabel == label ? nil : label
+                    } label: {
+                        if viewModel.selectedLabel == label {
+                            Label(label, systemImage: "checkmark")
+                        } else {
+                            Text(label)
+                        }
+                    }
+                }
+            } label: {
+                Label(viewModel.selectedLabel.map { "#\($0)" } ?? "Labels", systemImage: "tag")
+            }
+            .accessibilityLabel("Filter issues by label")
+        }
+        ToolbarItem {
             Button {
                 Task { await viewModel.sync() }
             } label: {
@@ -120,16 +140,22 @@ private struct IssueRow: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
 
-                HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
                     Text(issue.repository)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("#\(issue.number)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
                     if !issue.labels.isEmpty {
-                        ForEach(issue.labels.prefix(2), id: \.self) { label in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                ForEach(issue.labels, id: \.self) { label in
                             TagChip(tag: label)
+                                }
+                            }
                         }
                     }
                 }

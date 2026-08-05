@@ -25,6 +25,7 @@ final class IssuesViewModel {
     }
 
     var filter: Filter = .open
+    var selectedLabel: String?
     var searchText: String = ""
     var selectedIssueID: Int64?
     var isLoading: Bool = false
@@ -71,9 +72,22 @@ final class IssuesViewModel {
         case .closed: base = allIssues.filter { $0.state == "closed" }
         case .all:    base = allIssues
         }
-        guard !searchText.isEmpty else { return base }
+        let labelFiltered = selectedLabel.map { label in
+            base.filter { $0.labels.contains(label) }
+        } ?? base
+        guard !searchText.isEmpty else { return labelFiltered }
         let q = searchText.lowercased()
-        return base.filter { $0.title.lowercased().contains(q) || $0.body.lowercased().contains(q) }
+        return labelFiltered.filter {
+            $0.title.lowercased().contains(q) ||
+            $0.body.lowercased().contains(q) ||
+            $0.labels.contains { $0.lowercased().contains(q) }
+        }
+    }
+
+    var allLabels: [String] {
+        Array(Set(allIssues.flatMap(\.labels))).sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
     }
 
     var selectedIssue: GiteaIssue? {
@@ -128,6 +142,20 @@ final class IssuesViewModel {
                     repo: issue.repository,
                     number: issue.number,
                     state: newState
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func replaceLabels(for issue: GiteaIssue, labels: [String]) {
+        Task {
+            do {
+                try await container.issueRepository.replaceLabels(
+                    repo: issue.repository,
+                    number: issue.number,
+                    labelNames: labels
                 )
             } catch {
                 errorMessage = error.localizedDescription

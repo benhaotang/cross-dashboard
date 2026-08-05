@@ -13,6 +13,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 namespace cd {
 
@@ -51,6 +52,46 @@ std::string fmt_time(int total_minutes)
     return o.str();
 }
 
+struct LocalDayBounds final {
+    EpochMillis today_start{};
+    EpochMillis tomorrow_start{};
+    EpochMillis day_after_tomorrow_start{};
+    EpochMillis week_start{};
+    EpochMillis next_week_start{};
+};
+
+LocalDayBounds local_day_bounds()
+{
+    LocalDayBounds bounds{};
+    GDateTime* now = g_date_time_new_now_local();
+    if (!now) return bounds;
+    GDateTime* today = g_date_time_new_local(
+        g_date_time_get_year(now), g_date_time_get_month(now), g_date_time_get_day_of_month(now), 0, 0, 0);
+    if (!today) {
+        g_date_time_unref(now);
+        return bounds;
+    }
+    GDateTime* tomorrow = g_date_time_add_days(today, 1);
+    GDateTime* day_after = g_date_time_add_days(today, 2);
+    GDateTime* week = g_date_time_add_days(today, -(g_date_time_get_day_of_week(today) - 1));
+    GDateTime* next_week = g_date_time_add_days(week, 7);
+    auto millis = [](GDateTime* value) -> EpochMillis {
+        return value ? static_cast<EpochMillis>(g_date_time_to_unix(value)) * 1000 : 0;
+    };
+    bounds.today_start = millis(today);
+    bounds.tomorrow_start = millis(tomorrow);
+    bounds.day_after_tomorrow_start = millis(day_after);
+    bounds.week_start = millis(week);
+    bounds.next_week_start = millis(next_week);
+    if (next_week) g_date_time_unref(next_week);
+    if (week) g_date_time_unref(week);
+    if (day_after) g_date_time_unref(day_after);
+    if (tomorrow) g_date_time_unref(tomorrow);
+    g_date_time_unref(today);
+    g_date_time_unref(now);
+    return bounds;
+}
+
 } // namespace
 
 InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
@@ -62,6 +103,13 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
     , total_line_("")
 {
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+    for (auto const* label : {"All", "Events", "Tasks", "Today", "Tomorrow", "This Week", "Issues"})
+        filter_combo_.append(label);
+    filter_combo_.set_active(0);
+    filter_combo_.signal_changed().connect(sigc::mem_fun(*this, &InboxView::on_filter_changed));
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(filter_combo_.gobj())))
+        atk_object_set_name(a, "Filter inbox items");
+    toolbar_.pack_start(filter_combo_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh inbox");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -87,6 +135,12 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
 
     atk_object_set_name(gtk_widget_get_accessible(GTK_WIDGET(list_.gobj())), "Inbox list");
 
+    rebuild();
+}
+
+void InboxView::on_filter_changed()
+{
+    filter_index_ = filter_combo_.get_active_row_number();
     rebuild();
 }
 
@@ -170,6 +224,27 @@ void InboxView::rebuild()
     rows_.clear();
 
     populate_rows(rows_);
+
+    auto const bounds = local_day_bounds();
+    rows_.erase(std::remove_if(rows_.begin(), rows_.end(), [this, &bounds](Row const& row) {
+        bool const is_event = std::holds_alternative<CalendarEvent>(row.data);
+        bool const is_task = std::holds_alternative<CalDavTask>(row.data);
+        bool const is_issue = std::holds_alternative<GiteaIssue>(row.data);
+        if (filter_index_ == 1) return !is_event;
+        if (filter_index_ == 2) return !is_task;
+        if (filter_index_ == 6) return !is_issue;
+        if (filter_index_ >= 3 && filter_index_ <= 5) {
+            if (!is_task) return true;
+            auto const& task = std::get<CalDavTask>(row.data);
+            if (!task.due) return true;
+            if (filter_index_ == 3)
+                return *task.due < bounds.today_start || *task.due >= bounds.tomorrow_start;
+            if (filter_index_ == 4)
+                return *task.due < bounds.tomorrow_start || *task.due >= bounds.day_after_tomorrow_start;
+            return *task.due < bounds.week_start || *task.due >= bounds.next_week_start;
+        }
+        return false;
+    }), rows_.end());
 
     int sum_min = 0;
     for (auto const& r : rows_) sum_min += r.estimated_minutes;
