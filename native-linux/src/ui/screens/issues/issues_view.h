@@ -27,6 +27,7 @@ public:
     IssuesView(AppContainer&, SyncScheduler&);
 
     void rebuild();
+    bool reveal_issue(std::int64_t id);
 
 private:
     void on_filter_changed();

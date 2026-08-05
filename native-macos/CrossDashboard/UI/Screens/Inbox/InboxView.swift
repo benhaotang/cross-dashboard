@@ -5,6 +5,7 @@ import CrossDashboardKit
 /// Mirrors InboxScreen on Android.
 struct InboxView: View {
 
+    @Environment(AppViewModel.self) private var appViewModel
     @State private var viewModel = InboxViewModel()
 
     var body: some View {
@@ -59,11 +60,24 @@ struct InboxView: View {
     private var itemList: some View {
         List {
             ForEach(viewModel.filteredItems) { item in
-                InboxItemRow(item: item)
+                InboxItemRow(item: item, onOpen: navigationAction(for: item))
                     .listRowSeparator(.visible)
             }
         }
         .listStyle(.inset)
+    }
+
+    private func navigationAction(for item: InboxItem) -> (() -> Void)? {
+        switch item {
+        case .event(let event, _):
+            return { appViewModel.openEvent(event.uid) }
+        case .task(let task, _):
+            return { appViewModel.openTask(task.uid) }
+        case .issue(let issue, _):
+            return { appViewModel.openIssue(issue.id) }
+        case .milestone:
+            return nil
+        }
     }
 
     // ─── Toolbar ──────────────────────────────────────────────────────────────
@@ -97,8 +111,26 @@ struct InboxView: View {
 
 private struct InboxItemRow: View {
     let item: InboxItem
+    let onOpen: (() -> Void)?
 
     var body: some View {
+        Group {
+            if let onOpen {
+                Button(action: onOpen) {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                rowContent
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(itemTitle)
+        .accessibilityValue(itemSubtitle)
+        .accessibilityHint(accessibilityHint)
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             itemIcon
                 .frame(width: 28, height: 28)
@@ -125,10 +157,12 @@ private struct InboxItemRow: View {
             }
         }
         .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(itemTitle)
-        .accessibilityValue(itemSubtitle)
-        .accessibilityHint(estimatedLabel.map { "Estimated \($0)" } ?? "")
+        .contentShape(Rectangle())
+    }
+
+    private var accessibilityHint: String {
+        let estimate = estimatedLabel.map { " Estimated \($0)." } ?? ""
+        return onOpen == nil ? estimate.trimmingCharacters(in: .whitespaces) : "Open item.\(estimate)"
     }
 
     @ViewBuilder

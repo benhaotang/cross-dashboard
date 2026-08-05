@@ -203,11 +203,11 @@ private fun TaskReadView(
     // Categories
     if (task.categories.isNotEmpty()) {
         SheetSectionHeader(title = "Tags")
-        ChipRow {
-            task.categories.forEach { tag ->
-                TagChip(label = "#$tag")
-            }
-        }
+        TagFlow(
+            tags = task.categories,
+            magicTags = kanbanColumns,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
     }
 
     // Kanban quick-tags

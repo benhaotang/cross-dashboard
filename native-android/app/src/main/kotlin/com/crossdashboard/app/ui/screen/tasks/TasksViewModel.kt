@@ -23,6 +23,7 @@ import javax.inject.Inject
 enum class TaskFilter { ALL, ACTIVE, COMPLETED }
 
 data class TasksUiState(
+    val tasks: List<CalDavTask> = emptyList(),
     val rootTasks: List<CalDavTask> = emptyList(),
     val filter: TaskFilter = TaskFilter.ACTIVE,
     val quickInput: String = "",
@@ -64,7 +65,7 @@ class TasksViewModel @Inject constructor(
             }.collect { tasks ->
                 // Only root tasks (no parent) form the tree roots
                 val roots = tasks.filter { it.parentUid == null }
-                _state.update { it.copy(rootTasks = roots, filter = _filter.value) }
+                _state.update { it.copy(tasks = tasks, rootTasks = roots, filter = _filter.value) }
             }
         }
 

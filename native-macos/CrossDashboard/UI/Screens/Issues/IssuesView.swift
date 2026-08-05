@@ -61,6 +61,12 @@ struct IssuesView: View {
         .onChange(of: viewModel.selectedIssueID) { _, id in
             appViewModel.selectedIssueID = id
         }
+        .onAppear {
+            viewModel.selectedIssueID = appViewModel.selectedIssueID
+        }
+        .onChange(of: appViewModel.selectedIssueID) { _, id in
+            viewModel.selectedIssueID = id
+        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }

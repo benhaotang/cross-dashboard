@@ -151,6 +151,27 @@ void TasksView::focus_quick_input()
     input_.grab_entry_focus();
 }
 
+bool TasksView::reveal_task(std::string const& uid)
+{
+    task_filter_ = TaskListFilter::Active;
+    filter_active_.set_active(true);
+    rebuild();
+
+    for (Gtk::Widget* widget : list_.get_children()) {
+        auto* row = dynamic_cast<Gtk::ListBoxRow*>(widget);
+        if (!row)
+            continue;
+        char const* row_uid = static_cast<char const*>(
+            g_object_get_data(G_OBJECT(row->gobj()), "cd-task-uid"));
+        if (row_uid && uid == row_uid) {
+            list_.select_row(*row);
+            row->grab_focus();
+            return true;
+        }
+    }
+    return false;
+}
+
 Gtk::ListBoxRow* TasksView::make_row(
     CalDavTask const& task, int depth, std::vector<std::string> const& magic_tags)
 {

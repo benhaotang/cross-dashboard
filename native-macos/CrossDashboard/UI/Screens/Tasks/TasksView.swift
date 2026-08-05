@@ -47,6 +47,12 @@ struct TasksView: View {
         .onChange(of: viewModel.selectedTaskID) { _, id in
             appViewModel.selectedTaskID = id
         }
+        .onAppear {
+            viewModel.selectedTaskID = appViewModel.selectedTaskID
+        }
+        .onChange(of: appViewModel.selectedTaskID) { _, id in
+            viewModel.selectedTaskID = id
+        }
     }
 
     // ─── Task list ────────────────────────────────────────────────────────────

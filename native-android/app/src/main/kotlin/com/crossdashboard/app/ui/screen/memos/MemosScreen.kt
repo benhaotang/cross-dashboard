@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.crossdashboard.app.domain.model.MemosMemo
 import com.crossdashboard.app.domain.model.MemoState
+import com.crossdashboard.app.ui.component.TagFlow
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -278,14 +279,7 @@ private fun MemoListRow(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (memo.tags.isNotEmpty()) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(memo.tags) { tag ->
-                                    SuggestionChip(
-                                        onClick = {},
-                                        label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
-                                    )
-                                }
-                            }
+                            TagFlow(tags = memo.tags)
                         }
                         Text(
                             relativeTime(memo.displayTime),

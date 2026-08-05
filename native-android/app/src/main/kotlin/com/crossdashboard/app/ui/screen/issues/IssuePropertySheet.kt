@@ -44,6 +44,7 @@ fun IssuePropertySheet(
     commentLoading: Boolean,
     issueAttachments: List<GiteaAttachment> = emptyList(),
     commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
+    magicTags: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (String, String, List<String>) -> Unit,
     onToggleState: () -> Unit,
@@ -132,6 +133,7 @@ fun IssuePropertySheet(
                     commentLoading = commentLoading,
                     issueAttachments = issueAttachments,
                     commentAttachments = commentAttachments,
+                    magicTags = magicTags,
                     onToggleState = onToggleState,
                     onAddComment = onAddComment,
                     onPomodoroStart = { pomodoroVm.start(issue.title) },
@@ -159,6 +161,7 @@ internal fun IssueReadContent(
     commentLoading: Boolean,
     issueAttachments: List<GiteaAttachment> = emptyList(),
     commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
+    magicTags: List<String> = emptyList(),
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
     onPomodoroStart: () -> Unit,
@@ -229,11 +232,11 @@ internal fun IssueReadContent(
             if (issue.labels.isNotEmpty()) {
                 item {
                     SheetSectionHeader(title = "Labels")
-                    ChipRow {
-                        issue.labels.forEach { label ->
-                            TagChip(label = label)
-                        }
-                    }
+                    TagFlow(
+                        tags = issue.labels,
+                        magicTags = magicTags,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
                 }
             }
 
@@ -407,6 +410,7 @@ fun IssueDetailContent(
     commentLoading: Boolean,
     issueAttachments: List<GiteaAttachment> = emptyList(),
     commentAttachments: Map<Long, List<GiteaAttachment>> = emptyMap(),
+    magicTags: List<String> = emptyList(),
     onSave: (String, String, List<String>) -> Unit,
     onToggleState: () -> Unit,
     onAddComment: (body: String, attachments: List<PendingAttachment>) -> Unit,
@@ -419,6 +423,7 @@ fun IssueDetailContent(
         commentLoading = commentLoading,
         issueAttachments = issueAttachments,
         commentAttachments = commentAttachments,
+        magicTags = magicTags,
         onDismiss = onDismiss,
         onSave = onSave,
         onToggleState = onToggleState,

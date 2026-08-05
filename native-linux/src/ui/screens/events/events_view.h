@@ -26,6 +26,7 @@ public:
     EventsView(AppContainer&, SyncScheduler&);
 
     void refresh();
+    bool reveal_event(std::string const& uid);
 
 private:
     void rebuild();

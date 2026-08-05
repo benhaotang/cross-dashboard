@@ -25,6 +25,10 @@ public:
 
     void rebuild();
 
+    sigc::signal<void(std::string const&)> signal_event_requested;
+    sigc::signal<void(std::string const&)> signal_task_requested;
+    sigc::signal<void(std::int64_t)> signal_issue_requested;
+
 private:
     struct Row {
         std::variant<CalendarEvent, CalDavTask, GiteaIssue> data;
@@ -35,6 +39,7 @@ private:
 
     void populate_rows(std::vector<Row>& out);
     void on_filter_changed();
+    void on_row_activated(Gtk::ListBoxRow* row);
 
     AppContainer& app_;
     SyncScheduler& sync_;

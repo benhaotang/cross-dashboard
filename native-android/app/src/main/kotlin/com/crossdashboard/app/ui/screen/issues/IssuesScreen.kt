@@ -26,12 +26,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.GiteaIssue
+import com.crossdashboard.app.ui.component.TagFlow
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun IssuesScreen(
+    initialIssueId: Long? = null,
+    initialRepository: String? = null,
     viewModel: IssuesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -45,6 +48,24 @@ fun IssuesScreen(
         if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
             scope.launch {
                 navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue.id.toString())
+            }
+        }
+    }
+
+    var initialNavigationDone by remember(initialIssueId, initialRepository) { mutableStateOf(false) }
+    LaunchedEffect(initialIssueId, initialRepository, state.issues) {
+        if (!initialNavigationDone && initialIssueId != null && state.issues.isNotEmpty()) {
+            val target = state.issues.find {
+                it.id == initialIssueId &&
+                    (initialRepository == null || it.repository == initialRepository)
+            }
+            if (target != null) {
+                selectedIssue = target
+                viewModel.loadComments(target)
+                if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.id.toString())
+                }
+                initialNavigationDone = true
             }
         }
     }
@@ -136,6 +157,7 @@ fun IssuesScreen(
                                 items(state.issues, key = { it.id }) { issue ->
                                     IssueListRow(
                                         issue = issue,
+                                        magicTags = state.magicTags,
                                         isSelected = navigator.currentDestination?.contentKey == issue.id.toString(),
                                         onClick = { openIssue(issue) },
                                     )
@@ -157,6 +179,7 @@ fun IssuesScreen(
                             commentLoading = commentLoading,
                             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
                             commentAttachments = state.commentAttachments,
+                            magicTags = state.magicTags,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
                             onSave = { title, body, labels ->
                                 viewModel.saveIssue(issue, title, body, labels)
@@ -197,6 +220,7 @@ fun IssuesScreen(
             commentLoading = commentLoading,
             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
             commentAttachments = state.commentAttachments,
+            magicTags = state.magicTags,
             onDismiss = { selectedIssue = null },
             onSave = { title, body, labels ->
                 viewModel.saveIssue(issue, title, body, labels)
@@ -229,6 +253,7 @@ private val updFmt = DateTimeFormatter.ofPattern("d MMM").withZone(ZoneId.system
 @Composable
 private fun IssueListRow(
     issue: GiteaIssue,
+    magicTags: List<String>,
     isSelected: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -284,17 +309,11 @@ private fun IssueListRow(
                     )
                 }
                 if (issue.labels.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    TagFlow(
+                        tags = issue.labels,
+                        magicTags = magicTags,
                         modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        issue.labels.forEach { label ->
-                            SuggestionChip(
-                                onClick = {},
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }

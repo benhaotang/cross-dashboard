@@ -127,6 +127,9 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
+    list_.set_activate_on_single_click(true);
+    list_.signal_row_activated().connect(sigc::mem_fun(*this, &InboxView::on_row_activated));
+    list_.set_tooltip_text("Open this item in its screen");
     scroll_.add(list_);
 
     total_line_.set_halign(Gtk::ALIGN_START);
@@ -144,6 +147,23 @@ void InboxView::on_filter_changed()
 {
     filter_index_ = filter_combo_.get_active_row_number();
     rebuild();
+}
+
+void InboxView::on_row_activated(Gtk::ListBoxRow* row)
+{
+    if (!row)
+        return;
+    int const index = gtk_list_box_row_get_index(GTK_LIST_BOX_ROW(row->gobj()));
+    if (index < 0 || static_cast<std::size_t>(index) >= rows_.size())
+        return;
+
+    Row const& item = rows_[static_cast<std::size_t>(index)];
+    if (std::holds_alternative<CalendarEvent>(item.data))
+        signal_event_requested.emit(std::get<CalendarEvent>(item.data).uid);
+    else if (std::holds_alternative<CalDavTask>(item.data))
+        signal_task_requested.emit(std::get<CalDavTask>(item.data).uid);
+    else if (std::holds_alternative<GiteaIssue>(item.data))
+        signal_issue_requested.emit(std::get<GiteaIssue>(item.data).id);
 }
 
 void InboxView::populate_rows(std::vector<Row>& out)

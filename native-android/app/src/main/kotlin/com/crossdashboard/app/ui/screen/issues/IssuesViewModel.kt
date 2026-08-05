@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.issues
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.data.repository.IssueRepository
@@ -44,12 +45,14 @@ data class IssuesUiState(
     val showCreateSheet: Boolean = false,
     val isCreating: Boolean = false,
     val configuredRepos: List<String> = emptyList(),
+    val magicTags: List<String> = emptyList(),
 )
 
 @HiltViewModel
 class IssuesViewModel @Inject constructor(
     private val issueRepo: IssueRepository,
     private val secureStore: SecureStore,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(IssueStateFilter.OPEN)
@@ -86,6 +89,12 @@ class IssuesViewModel @Inject constructor(
                         selectedLabel = selectedLabel,
                     )
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            prefs.kanbanColumnsFlow.collect { columns ->
+                _state.update { it.copy(magicTags = columns) }
             }
         }
     }

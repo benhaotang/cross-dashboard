@@ -35,6 +35,21 @@ final class AppViewModel {
     var selectedIssueID: Int64?
     var selectedMemoID: String?
 
+    func openTask(_ uid: String) {
+        selectedTaskID = uid
+        selectedScreen = .tasks
+    }
+
+    func openEvent(_ uid: String) {
+        selectedEventID = uid
+        selectedScreen = .events
+    }
+
+    func openIssue(_ id: Int64) {
+        selectedIssueID = id
+        selectedScreen = .issues
+    }
+
     /// Returns visible screens in the user-defined order stored in preferences.
     var visibleScreens: [Screen] {
         preferences.visibleScreens.compactMap { Screen(rawValue: $0) }

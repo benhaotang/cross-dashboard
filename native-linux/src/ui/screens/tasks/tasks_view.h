@@ -22,6 +22,7 @@ public:
 
     void rebuild();
     void focus_quick_input();
+    bool reveal_task(std::string const& uid);
 
 private:
     enum class TaskListFilter { Active, Completed, All };

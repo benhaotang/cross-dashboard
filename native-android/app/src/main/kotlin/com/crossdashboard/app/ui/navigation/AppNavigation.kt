@@ -236,8 +236,11 @@ fun AppNavigation(
                         initialUid = dest.uid,
                     )
                 }
-                entry<Destination.IssueDetail> {
-                    IssuesScreen()
+                entry<Destination.IssueDetail> { dest ->
+                    IssuesScreen(
+                        initialIssueId = dest.id,
+                        initialRepository = dest.repo,
+                    )
                 }
                 entry<Destination.NoteDetail> {
                     NotesScreen(colorResolver = colorResolver)

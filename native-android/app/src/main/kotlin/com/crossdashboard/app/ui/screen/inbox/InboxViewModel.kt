@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.inbox
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.repository.EventRepository
 import com.crossdashboard.app.data.repository.IssueRepository
 import com.crossdashboard.app.data.repository.TaskRepository
@@ -31,6 +32,7 @@ data class InboxUiState(
     val filter: InboxFilter = InboxFilter.ALL,
     /** Sum of all timed items in minutes (0 = nothing timed) */
     val totalMinutes: Int = 0,
+    val magicTags: List<String> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -40,6 +42,7 @@ class InboxViewModel @Inject constructor(
     private val eventRepo: EventRepository,
     private val taskRepo: TaskRepository,
     private val issueRepo: IssueRepository,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(InboxFilter.ALL)
@@ -53,8 +56,9 @@ class InboxViewModel @Inject constructor(
                 taskRepo.allTasks,
                 issueRepo.allIssues,
                 _filter,
-            ) { events, tasks, issues, filter ->
-                buildState(events, tasks, issues, filter)
+                prefs.kanbanColumnsFlow,
+            ) { events, tasks, issues, filter, kanbanColumns ->
+                buildState(events, tasks, issues, filter, kanbanColumns)
             }.collect { newState ->
                 _state.value = newState
             }
@@ -74,6 +78,7 @@ class InboxViewModel @Inject constructor(
         tasks: List<CalDavTask>,
         issues: List<GiteaIssue>,
         filter: InboxFilter,
+        kanbanColumns: List<String>,
     ): InboxUiState {
         val now = Instant.now()
         val cutoff = now.minus(Duration.ofDays(1))
@@ -132,7 +137,12 @@ class InboxViewModel @Inject constructor(
             }
         }
 
-        return InboxUiState(items = filtered, filter = filter, totalMinutes = total)
+        return InboxUiState(
+            items = filtered,
+            filter = filter,
+            totalMinutes = total,
+            magicTags = kanbanColumns,
+        )
     }
 
     companion object {

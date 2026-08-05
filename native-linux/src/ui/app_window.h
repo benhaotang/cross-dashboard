@@ -51,6 +51,7 @@ private:
     bool on_key_press_event(GdkEventKey* event) override;
     void load_theme_css();
     void focus_search_on_current_screen();
+    void navigate_to_screen(std::string const& key);
     void show_main_content();
     void update_sidebar_toggle(bool active);
     /** Reloads visible screen from local DB (after sync, tab change, etc.). */

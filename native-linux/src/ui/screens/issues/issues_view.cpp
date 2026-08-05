@@ -375,6 +375,25 @@ void IssuesView::on_selection_changed()
     load_detail_from_network();
 }
 
+bool IssuesView::reveal_issue(std::int64_t id)
+{
+    state_filter_ = "open";
+    label_filter_.clear();
+    state_combo_.set_active(0);
+    rebuild();
+
+    auto const found = std::find(list_ids_.begin(), list_ids_.end(), id);
+    if (found == list_ids_.end())
+        return false;
+    int const index = static_cast<int>(std::distance(list_ids_.begin(), found));
+    if (auto* row = list_.get_row_at_index(index)) {
+        list_.select_row(*row);
+        row->grab_focus();
+        return true;
+    }
+    return false;
+}
+
 void IssuesView::on_new_issue()
 {
     auto repos = repos_from_cred_string(app_.secrets().get(CredentialKey::GITEA_REPOS));

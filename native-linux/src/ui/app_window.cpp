@@ -326,9 +326,9 @@ void AppWindow::refresh_current_screen()
 
 void AppWindow::build_stack_pages()
 {
-    AppSettings const cfg = merged_app_preferences(app_.prefs());
-
-    for (std::string const& screen : cfg.visible_screens) {
+    // Keep every screen available as a navigation target even when the user
+    // hides it from the sidebar.
+    for (std::string const& screen : default_visible_screens()) {
         if (screen == "Dashboard") {
             dash_ = Gtk::manage(new DashboardView(app_, sync_));
             stack_.add(*dash_, Glib::ustring(screen));
@@ -351,6 +351,18 @@ void AppWindow::build_stack_pages()
         }
         else if (screen == "Inbox") {
             inbox_ = Gtk::manage(new InboxView(app_, sync_));
+            inbox_->signal_task_requested.connect([this](std::string const& uid) {
+                navigate_to_screen("Tasks");
+                if (tasks_) tasks_->reveal_task(uid);
+            });
+            inbox_->signal_event_requested.connect([this](std::string const& uid) {
+                navigate_to_screen("Events");
+                if (events_) events_->reveal_event(uid);
+            });
+            inbox_->signal_issue_requested.connect([this](std::int64_t id) {
+                navigate_to_screen("Issues");
+                if (issues_) issues_->reveal_issue(id);
+            });
             stack_.add(*inbox_, Glib::ustring(screen));
         }
         else if (screen == "Views") {
@@ -438,6 +450,31 @@ void AppWindow::on_screen_row(GtkListBoxRow* row)
     stack_.set_visible_child(Glib::ustring{key});
     hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), key);
 
+    refresh_current_screen();
+    show_main_content();
+}
+
+void AppWindow::navigate_to_screen(std::string const& key)
+{
+    GList* const rows = gtk_container_get_children(GTK_CONTAINER(sidebar_list_));
+    for (GList* item = rows; item; item = item->next) {
+        auto* row = GTK_LIST_BOX_ROW(item->data);
+        char const* screen = static_cast<char const*>(
+            g_object_get_data(G_OBJECT(row), "cd-screen"));
+        if (screen && key == screen) {
+            gtk_list_box_select_row(GTK_LIST_BOX(sidebar_list_), row);
+            g_list_free(rows);
+            return;
+        }
+    }
+    g_list_free(rows);
+
+    // Hidden screens have no sidebar row, but their stack page remains usable
+    // for cross-screen navigation.
+    gtk_list_box_unselect_all(GTK_LIST_BOX(sidebar_list_));
+    current_screen_key_ = key;
+    stack_.set_visible_child(Glib::ustring{key});
+    hdy_header_bar_set_subtitle(HDY_HEADER_BAR(header_bar_), key.c_str());
     refresh_current_screen();
     show_main_content();
 }
