@@ -59,8 +59,11 @@ Gtk::FlowBox* make_tag_flow(
 
     auto* flow = Gtk::manage(new Gtk::FlowBox());
     flow->set_selection_mode(Gtk::SELECTION_NONE);
-    flow->set_halign(Gtk::ALIGN_START);
+    flow->set_orientation(Gtk::ORIENTATION_HORIZONTAL);
+    flow->set_halign(Gtk::ALIGN_FILL);
     flow->set_hexpand(true);
+    flow->set_homogeneous(false);
+    flow->set_min_children_per_line(1);
     flow->set_max_children_per_line(12);
     flow->set_row_spacing(4);
     flow->set_column_spacing(4);
