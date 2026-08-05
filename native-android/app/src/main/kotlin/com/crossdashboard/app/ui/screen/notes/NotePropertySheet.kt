@@ -86,14 +86,10 @@ internal fun NoteReadView(
     colorResolver: CalendarColorResolver?,
 ) {
     if (note.categories.isNotEmpty()) {
-        ChipRow {
-            note.categories.forEach { tag ->
-                TagChip(
-                    label = "#$tag",
-                    modifier = Modifier.semantics { contentDescription = "Tag: $tag" },
-                )
-            }
-        }
+        TagFlow(
+            tags = note.categories,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
     }
 
     if (note.body.isNotBlank()) {

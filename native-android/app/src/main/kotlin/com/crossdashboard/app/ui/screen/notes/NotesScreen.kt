@@ -29,7 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.Note
 import com.crossdashboard.app.ui.component.CalendarColorDot
 import com.crossdashboard.app.ui.component.CalendarColorResolver
-import com.crossdashboard.app.ui.component.TagChip
+import com.crossdashboard.app.ui.component.TagFlow
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -283,11 +283,7 @@ private fun NoteCard(
 
             if (note.categories.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    note.categories.take(3).forEach { tag ->
-                        TagChip(label = "#$tag")
-                    }
-                }
+                TagFlow(tags = note.categories)
             }
 
             Spacer(Modifier.height(6.dp))

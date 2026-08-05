@@ -63,6 +63,9 @@ data class IssueEntity(
     val updatedAtEpoch: Long,
     val repository: String,
     val htmlUrl: String,
+    val milestoneId: Long?,
+    val milestoneTitle: String?,
+    val milestoneDueOnEpoch: Long?,
 )
 
 @Entity(tableName = "daily_stats")

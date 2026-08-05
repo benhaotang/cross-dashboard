@@ -15,7 +15,7 @@ final class MemosViewModel {
     // ─── Filter state ─────────────────────────────────────────────────────────
 
     var stateFilter: MemoState? = .normal    // nil = all
-    var selectedTag: String? = nil
+    var selectedTags: Set<String> = []
     var searchText: String = ""
 
     // ─── Memo data ────────────────────────────────────────────────────────────
@@ -33,9 +33,7 @@ final class MemosViewModel {
         if let state = stateFilter {
             all = all.filter { $0.state == state }
         }
-        if let tag = selectedTag {
-            all = all.filter { $0.tags.contains(tag) }
-        }
+        all = all.filter { memo in selectedTags.allSatisfy { memo.tags.contains($0) } }
         if !searchText.isEmpty {
             all = all.filter { $0.content.localizedCaseInsensitiveContains(searchText) || $0.snippet.localizedCaseInsensitiveContains(searchText) }
         }
@@ -44,6 +42,11 @@ final class MemosViewModel {
 
     var allTags: [String] {
         Array(Set(memoRepo.allMemos.flatMap { $0.tags })).sorted()
+    }
+
+    func clearFilters() {
+        stateFilter = .normal
+        selectedTags = []
     }
 
     var memosHost: String {

@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ namespace cd {
 
 class AppContainer;
 class ReadMarkdownField;
+class SearchableFilterMenu;
 class SyncScheduler;
 
 /** Issue list, detail, Gitea comments, issue/comment attachments, create-issue dialog. */
@@ -27,6 +29,7 @@ public:
     IssuesView(AppContainer&, SyncScheduler&);
 
     void rebuild();
+    bool reveal_issue(std::int64_t id);
 
 private:
     void on_filter_changed();
@@ -37,15 +40,20 @@ private:
     void on_send_comment();
     void on_attach_with_comment();
     void on_toggle_issue_state();
+    void on_edit_labels();
 
     AppContainer& app_;
     SyncScheduler& sync_;
 
     Gtk::Box toolbar_;
     Gtk::Button refresh_btn_{};
-    Gtk::ComboBoxText state_combo_;
+    SearchableFilterMenu* status_filter_{};
+    SearchableFilterMenu* label_filter_menu_{};
+    SearchableFilterMenu* milestone_filter_{};
+    Gtk::Button clear_filters_btn_{};
     Gtk::Button new_issue_btn_;
     Gtk::Button toggle_state_btn_;
+    Gtk::Button edit_labels_btn_{"Edit labels"};
 
     Gtk::Paned paned_;
     Gtk::ScrolledWindow scroll_;
@@ -66,6 +74,8 @@ private:
     Gtk::Button send_comment_btn_;
 
     std::string state_filter_{"open"};
+    std::set<std::string> selected_labels_{};
+    std::optional<std::string> selected_milestone_key_{};
     std::vector<std::int64_t> list_ids_;
     std::optional<GiteaIssue> selected_issue_;
 };

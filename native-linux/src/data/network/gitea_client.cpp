@@ -83,6 +83,12 @@ GiteaIssue issue_dto_to_domain(nlohmann::json const& j, std::string const& repo)
     i.updated_at = parse_iso_ms(j.value("updated_at", std::string{}));
     i.repository = repo;
     i.html_url = j.value("html_url", std::string{});
+    if (auto it = j.find("milestone"); it != j.end() && it->is_object()) {
+        i.milestone_id = it->value("id", std::int64_t{0});
+        i.milestone_title = it->value("title", std::string{});
+        auto const due = it->value("due_on", std::string{});
+        if (!due.empty()) i.milestone_due_on = parse_iso_ms(due);
+    }
     return i;
 }
 
@@ -263,19 +269,21 @@ std::vector<GiteaLabel> GiteaClient::fetch_labels(std::string const& repo)
     auto base = instance_url();
     std::vector<GiteaLabel> out;
     if (!base.has_value()) return out;
-    std::ostringstream url;
-    url << *base << "/api/v1/repos/" << repo << "/labels";
-    auto resp = get(url.str());
-    if (!resp.has_value()) return out;
-    auto arr = nlohmann::json::parse(*resp, nullptr, false);
-    if (!arr.is_array()) return out;
-    for (auto const& el : arr) {
-        if (!el.is_object()) continue;
-        GiteaLabel l;
-        l.id = el.value("id", std::int64_t{});
-        l.name = el.value("name", std::string{});
-        l.color = el.value("color", std::string{});
-        out.push_back(std::move(l));
+    for (int page = 1; page <= 100; ++page) {
+        std::ostringstream url;
+        url << *base << "/api/v1/repos/" << repo << "/labels?page=" << page << "&limit=50";
+        auto resp = get(url.str());
+        if (!resp.has_value()) break;
+        auto arr = nlohmann::json::parse(*resp, nullptr, false);
+        if (!arr.is_array() || arr.empty()) break;
+        for (auto const& el : arr) {
+            if (!el.is_object()) continue;
+            GiteaLabel l;
+            l.id = el.value("id", std::int64_t{});
+            l.name = el.value("name", std::string{});
+            l.color = el.value("color", std::string{});
+            out.push_back(std::move(l));
+        }
     }
     return out;
 }

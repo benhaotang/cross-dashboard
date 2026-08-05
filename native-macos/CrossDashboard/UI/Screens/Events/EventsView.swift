@@ -60,6 +60,12 @@ struct EventsView: View {
         .onChange(of: viewModel.selectedEventID) { _, id in
             appViewModel.selectedEventID = id
         }
+        .onAppear {
+            viewModel.selectedEventID = appViewModel.selectedEventID
+        }
+        .onChange(of: appViewModel.selectedEventID) { _, id in
+            viewModel.selectedEventID = id
+        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }

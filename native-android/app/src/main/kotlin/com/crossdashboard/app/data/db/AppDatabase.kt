@@ -14,7 +14,7 @@ import com.crossdashboard.app.data.db.entity.*
         DailyStatsEntity::class,
         MemoEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

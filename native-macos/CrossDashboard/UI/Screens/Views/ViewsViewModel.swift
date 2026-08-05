@@ -12,7 +12,19 @@ final class ViewsViewModel {
         var id: String { rawValue }
     }
 
+    enum ItemType: String, CaseIterable, Identifiable {
+        case all = "All", tasks = "Tasks", issues = "Issues"
+        var id: String { rawValue }
+    }
+
+    enum DateFilter: String, CaseIterable, Identifiable {
+        case all = "All", today = "Today", tomorrow = "Tomorrow", thisWeek = "This week"
+        var id: String { rawValue }
+    }
+
     var mode: ViewMode = .kanban
+    var itemType: ItemType = .all
+    var dateFilter: DateFilter = .all
 
     var kanbanColumns: [String] { container.preferences.kanbanColumns }
 
@@ -38,8 +50,50 @@ final class ViewsViewModel {
 
     /// All open (non-completed, non-cancelled) tasks — mirrors Android's filter.
     var allTasks: [CalDavTask] {
+        guard itemType != .issues else { return [] }
         container.taskRepository.allTasks.filter {
-            $0.status != .completed && $0.status != .cancelled
+            $0.status != .completed && $0.status != .cancelled && matchesDate($0.due)
+        }
+    }
+
+    var allIssues: [GiteaIssue] {
+        guard itemType != .tasks else { return [] }
+        return container.issueRepository.openIssues.filter { matchesDate($0.milestoneDueOn) }
+    }
+
+    func clearFilters() {
+        itemType = .all
+        dateFilter = .all
+    }
+
+    private func matchesDate(_ date: Date?) -> Bool {
+        switch dateFilter {
+        case .all: return true
+        case .today: return date.map { Calendar.current.isDateInToday($0) } == true
+        case .tomorrow: return date.map { Calendar.current.isDateInTomorrow($0) } == true
+        case .thisWeek:
+            guard let date else { return false }
+            return Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.contains(date) == true
+        }
+    }
+
+    func issues(inColumn column: String) -> [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.contains { $0.lowercased() == column.lowercased() }
+        }
+    }
+
+    var unassignedIssues: [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.none(where: { label in
+                kanbanColumns.contains { $0.lowercased() == label.lowercased() }
+            })
+        }
+    }
+
+    func issues(withLabel label: String) -> [GiteaIssue] {
+        allIssues.filter { issue in
+            issue.labels.contains { $0.lowercased() == label.lowercased() }
         }
     }
 

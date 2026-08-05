@@ -55,9 +55,9 @@ fun EventsScreen(
     // When opened via a notification tap, auto-navigate the detail pane to the target event.
     // Runs whenever events load or the uid changes; the flag prevents double-navigation.
     var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
-    LaunchedEffect(initialUid, state.events) {
-        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.events.isNotEmpty()) {
-            val target = state.events.find { it.uid == initialUid }
+    LaunchedEffect(initialUid, state.allEvents) {
+        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.allEvents.isNotEmpty()) {
+            val target = state.allEvents.find { it.uid == initialUid }
             if (target != null) {
                 selectedEvent = target
                 if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] !=

@@ -216,6 +216,21 @@ struct TaskDetailView: View {
 
 // ─── TaskEditForm ─────────────────────────────────────────────────────────────
 
+private func isTimeEstimateTag(_ tag: String) -> Bool {
+    tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        .wholeMatch(of: /#?\d+(m|h)/) != nil
+}
+
+private func timeEstimateParts(_ categories: [String]) -> (amount: String, unit: String) {
+    for tag in categories {
+        if let match = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            .wholeMatch(of: /#?(\d+)(m|h)/) {
+            return (String(match.1), String(match.2))
+        }
+    }
+    return ("", "m")
+}
+
 private struct TaskEditForm: View {
 
     @State private var summary: String
@@ -225,6 +240,8 @@ private struct TaskEditForm: View {
     @State private var due: Date?
     @State private var hasDue: Bool
     @State private var categoriesRaw: String
+    @State private var estimateAmount: String
+    @State private var estimateUnit: String
 
     private let original: CalDavTask
     let onSave: (CalDavTask) -> Void
@@ -240,7 +257,12 @@ private struct TaskEditForm: View {
         _priority       = State(initialValue: task.priority)
         _due            = State(initialValue: task.due)
         _hasDue         = State(initialValue: task.due != nil)
-        _categoriesRaw  = State(initialValue: task.categories.joined(separator: ", "))
+        _categoriesRaw  = State(initialValue: task.categories
+            .filter { !isTimeEstimateTag($0) }
+            .joined(separator: ", "))
+        let estimate = timeEstimateParts(task.categories)
+        _estimateAmount = State(initialValue: estimate.amount)
+        _estimateUnit = State(initialValue: estimate.unit)
     }
 
     var body: some View {
@@ -274,6 +296,25 @@ private struct TaskEditForm: View {
                 TextField("e.g. work, urgent", text: $categoriesRaw)
             }
 
+            Section("Time estimate") {
+                HStack {
+                    TextField("Amount", text: $estimateAmount)
+                        .frame(width: 90)
+                    Picker("Unit", selection: $estimateUnit) {
+                        Text("Minutes").tag("m")
+                        Text("Hours").tag("h")
+                    }
+                    .pickerStyle(.segmented)
+                    if !estimateAmount.isEmpty {
+                        Button("Clear") { estimateAmount = "" }
+                            .accessibilityLabel("Clear time estimate")
+                    }
+                }
+                Text("Used for the Inbox estimated-time summary.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Description") {
                 TextEditor(text: $description)
                     .frame(minHeight: 80)
@@ -294,10 +335,14 @@ private struct TaskEditForm: View {
     }
 
     private func save() {
-        let cats = categoriesRaw
+        var cats = categoriesRaw
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+            .filter { !$0.isEmpty && !isTimeEstimateTag($0) }
+        let digits = estimateAmount.filter { $0.isNumber }
+        if let amount = Int(digits), amount > 0 {
+            cats.append("\(amount)\(estimateUnit)")
+        }
 
         let updated = CalDavTask(
             uid: original.uid,

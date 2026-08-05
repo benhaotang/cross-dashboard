@@ -1,5 +1,7 @@
 #include "task_edit_dialog.h"
 
+#include "components/tag_flow.h"
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -171,6 +173,30 @@ TaskEditDialog::TaskEditDialog(Gtk::Window& parent, CalDavTask const& task)
     categories_.set_text(join_categories(task.categories));
     categories_.set_placeholder_text("e.g. work, errands");
 
+    estimate_unit_.append("Minutes");
+    estimate_unit_.append("Hours");
+    std::vector<std::string> non_time_categories;
+    for (auto const& category : task.categories) {
+        if (classify_tag(category, {}) != TagKind::Time) {
+            non_time_categories.push_back(category);
+            continue;
+        }
+        std::string normalized = category;
+        if (!normalized.empty() && normalized.front() == '#') normalized.erase(normalized.begin());
+        if (!normalized.empty()) {
+            estimate_unit_.set_active_text(
+                normalized.back() == 'h' || normalized.back() == 'H' ? "Hours" : "Minutes");
+            normalized.pop_back();
+            estimate_amount_.set_text(normalized);
+        }
+    }
+    categories_.set_text(join_categories(non_time_categories));
+    estimate_amount_.set_placeholder_text("30");
+    estimate_amount_.set_width_chars(8);
+    if (estimate_unit_.get_active_row_number() < 0) estimate_unit_.set_active(0);
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(estimate_amount_.gobj())))
+        atk_object_set_name(a, "Task time estimate amount");
+
     auto* desc_scroll = Gtk::manage(new Gtk::ScrolledWindow());
     desc_scroll->set_min_content_height(120);
     desc_scroll->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
@@ -192,6 +218,11 @@ TaskEditDialog::TaskEditDialog(Gtk::Window& parent, CalDavTask const& task)
     grid->attach(priority_, 1, r++, 1, 1);
     grid->attach(*align_start_label("Tags"), 0, r, 1, 1);
     grid->attach(categories_, 1, r++, 1, 1);
+    auto* estimate_box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 6));
+    estimate_box->pack_start(estimate_amount_, false, false);
+    estimate_box->pack_start(estimate_unit_, false, false);
+    grid->attach(*align_start_label("Time estimate"), 0, r, 1, 1);
+    grid->attach(*estimate_box, 1, r++, 1, 1);
     grid->attach(due_toggle_, 1, r++, 1, 1);
     grid->attach(*align_start_label("Due (local)"), 0, r, 1, 1);
     grid->attach(due_entry_, 1, r++, 1, 1);
@@ -232,6 +263,26 @@ std::optional<CalDavTask> TaskEditDialog::result_if_ok()
     out.status = status_from_row(st < 0 ? 0 : st);
     out.priority = priority_from_row(pr < 0 ? 0 : pr);
     out.categories = split_categories(categories_.get_text());
+    out.categories.erase(
+        std::remove_if(out.categories.begin(), out.categories.end(), [](std::string const& category) {
+            return classify_tag(category, {}) == TagKind::Time;
+        }),
+        out.categories.end());
+    std::string amount = estimate_amount_.get_text();
+    trim_inplace(amount);
+    try {
+        bool const numeric = !amount.empty() && std::all_of(amount.begin(), amount.end(), [](unsigned char c) {
+            return std::isdigit(c) != 0;
+        });
+        int const value = numeric ? std::stoi(amount) : 0;
+        if (value > 0) {
+            std::string const unit = estimate_unit_.get_active_row_number() == 1 ? "h" : "m";
+            out.categories.push_back(std::to_string(value) + unit);
+        }
+    }
+    catch (...) {
+        // Invalid or empty estimates are treated as no estimate.
+    }
 
     if (due_toggle_.get_active()) {
         std::string due_s = due_entry_.get_text();

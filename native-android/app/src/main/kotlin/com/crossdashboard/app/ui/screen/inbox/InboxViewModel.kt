@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.inbox
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.repository.EventRepository
 import com.crossdashboard.app.data.repository.IssueRepository
 import com.crossdashboard.app.data.repository.TaskRepository
@@ -11,15 +12,29 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.time.DayOfWeek
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
-enum class InboxFilter { ALL, EVENTS, TASKS, ISSUES }
+enum class InboxTypeFilter(val displayName: String) {
+    ALL("All"),
+    EVENTS("Events"),
+    TASKS("Tasks"),
+    ISSUES("Issues"),
+}
+
+enum class InboxDateFilter(val displayName: String) {
+    ALL("All"), TODAY("Today"), TOMORROW("Tomorrow"), THIS_WEEK("This week")
+}
 
 data class InboxUiState(
     val items: List<InboxItem> = emptyList(),
-    val filter: InboxFilter = InboxFilter.ALL,
+    val typeFilter: InboxTypeFilter = InboxTypeFilter.ALL,
+    val dateFilter: InboxDateFilter = InboxDateFilter.ALL,
     /** Sum of all timed items in minutes (0 = nothing timed) */
     val totalMinutes: Int = 0,
+    val magicTags: List<String> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -29,29 +44,36 @@ class InboxViewModel @Inject constructor(
     private val eventRepo: EventRepository,
     private val taskRepo: TaskRepository,
     private val issueRepo: IssueRepository,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
-    private val _filter = MutableStateFlow(InboxFilter.ALL)
+    private val _typeFilter = MutableStateFlow(InboxTypeFilter.ALL)
+    private val _dateFilter = MutableStateFlow(InboxDateFilter.ALL)
     private val _state = MutableStateFlow(InboxUiState())
     val state: StateFlow<InboxUiState> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
+            val filters = combine(_typeFilter, _dateFilter) { type, date -> type to date }
             combine(
                 eventRepo.events,
                 taskRepo.allTasks,
                 issueRepo.allIssues,
-                _filter,
-            ) { events, tasks, issues, filter ->
-                buildState(events, tasks, issues, filter)
+                filters,
+                prefs.kanbanColumnsFlow,
+            ) { events, tasks, issues, activeFilters, kanbanColumns ->
+                buildState(events, tasks, issues, activeFilters.first, activeFilters.second, kanbanColumns)
             }.collect { newState ->
                 _state.value = newState
             }
         }
     }
 
-    fun setFilter(filter: InboxFilter) {
-        _filter.value = filter
+    fun setTypeFilter(filter: InboxTypeFilter) { _typeFilter.value = filter }
+    fun setDateFilter(filter: InboxDateFilter) { _dateFilter.value = filter }
+    fun clearFilters() {
+        _typeFilter.value = InboxTypeFilter.ALL
+        _dateFilter.value = InboxDateFilter.ALL
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
@@ -62,10 +84,21 @@ class InboxViewModel @Inject constructor(
         events: List<CalendarEvent>,
         tasks: List<CalDavTask>,
         issues: List<GiteaIssue>,
-        filter: InboxFilter,
+        typeFilter: InboxTypeFilter,
+        dateFilter: InboxDateFilter,
+        kanbanColumns: List<String>,
     ): InboxUiState {
         val now = Instant.now()
         val cutoff = now.minus(Duration.ofDays(1))
+        val zone = ZoneId.systemDefault()
+        val today = now.atZone(zone).toLocalDate()
+        val todayStart = today.atStartOfDay(zone).toInstant()
+        val tomorrowStart = today.plusDays(1).atStartOfDay(zone).toInstant()
+        val dayAfterTomorrowStart = today.plusDays(2).atStartOfDay(zone).toInstant()
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .atStartOfDay(zone).toInstant()
+        val nextWeekStart = today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+            .atStartOfDay(zone).toInstant()
 
         val eventItems: List<InboxItem> = events
             .filter { it.end.isAfter(cutoff) }
@@ -77,21 +110,34 @@ class InboxViewModel @Inject constructor(
             }
             .sortedBy { it.event.start }
 
-        val taskItems: List<InboxItem> = tasks
+        val taskItems: List<InboxItem.Task> = tasks
             .filter { it.status != TaskStatus.COMPLETED && it.status != TaskStatus.CANCELLED }
             .map { task -> InboxItem.Task(task, parseTimeEstimate(task.categories)) }
-            .sortedWith(compareBy(nullsLast()) { (it as InboxItem.Task).task.due })
+            .sortedWith(compareBy(nullsLast()) { it.task.due })
 
         val issueItems: List<InboxItem> = issues
             .filter { it.state == "open" }
             .map { issue -> InboxItem.Issue(issue, parseTimeEstimate(issue.labels)) }
             .sortedByDescending { (it as InboxItem.Issue).issue.updatedAt }
 
-        val filtered: List<InboxItem> = when (filter) {
-            InboxFilter.ALL -> eventItems + taskItems + issueItems
-            InboxFilter.EVENTS -> eventItems
-            InboxFilter.TASKS -> taskItems
-            InboxFilter.ISSUES -> issueItems
+        val typeFiltered: List<InboxItem> = when (typeFilter) {
+            InboxTypeFilter.ALL -> eventItems + taskItems + issueItems
+            InboxTypeFilter.EVENTS -> eventItems
+            InboxTypeFilter.TASKS -> taskItems
+            InboxTypeFilter.ISSUES -> issueItems
+        }
+        val filtered = typeFiltered.filter { item ->
+            val date = when (item) {
+                is InboxItem.Event -> item.event.start
+                is InboxItem.Task -> item.task.due
+                is InboxItem.Issue -> item.issue.milestoneDueOn
+            }
+            when (dateFilter) {
+                InboxDateFilter.ALL -> true
+                InboxDateFilter.TODAY -> date?.let { it >= todayStart && it < tomorrowStart } == true
+                InboxDateFilter.TOMORROW -> date?.let { it >= tomorrowStart && it < dayAfterTomorrowStart } == true
+                InboxDateFilter.THIS_WEEK -> date?.let { it >= weekStart && it < nextWeekStart } == true
+            }
         }
 
         val total = filtered.sumOf { item ->
@@ -99,11 +145,16 @@ class InboxViewModel @Inject constructor(
                 is InboxItem.Event -> if (item.durationMinutes > 0) item.durationMinutes else 0
                 is InboxItem.Task -> item.estimatedMinutes ?: 0
                 is InboxItem.Issue -> item.estimatedMinutes ?: 0
-                is InboxItem.Milestone -> 0
             }
         }
 
-        return InboxUiState(items = filtered, filter = filter, totalMinutes = total)
+        return InboxUiState(
+            items = filtered,
+            typeFilter = typeFilter,
+            dateFilter = dateFilter,
+            totalMinutes = total,
+            magicTags = kanbanColumns,
+        )
     }
 
     companion object {

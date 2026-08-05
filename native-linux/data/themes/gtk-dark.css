@@ -6,6 +6,7 @@
 @define-color cd_sidebar_sep #3a3a3a;
 @define-color cd_row_hover   alpha(#ffffff, 0.07);
 @define-color cd_row_active  alpha(#ffffff, 0.12);
+@define-color cd_tag_time    #ffbe6f;
 
 /* ── Window chrome ─────────────────────────────────────────────────────── */
 headerbar {
@@ -75,6 +76,13 @@ headerbar {
     padding: 6px 8px;
     border-bottom: 1px solid @cd_sidebar_sep;
     background-color: transparent;
+}
+
+/* Selected filters read like active planning controls, not generic buttons. */
+button.cd-filter-active {
+    background-color: alpha(@theme_selected_bg_color, 0.28);
+    border-color: alpha(@theme_selected_bg_color, 0.75);
+    color: @theme_selected_fg_color;
 }
 
 /* Linked button groups */
@@ -215,12 +223,57 @@ button.cd-memo-tag-chip {
     padding: 4px 11px;
     border-radius: 14px;
 }
+button.cd-memo-tag-chip-neutral {
+    color: alpha(@theme_fg_color, 0.74);
+}
+button.cd-memo-tag-chip-magic {
+    color: @cd_accent;
+}
+button.cd-memo-tag-chip-time {
+    color: @cd_tag_time;
+    font-feature-settings: "tnum";
+}
 button.cd-memo-tag-chip:checked {
     background-image: none;
     background-color: alpha(@cd_accent, 0.22);
     color: @cd_accent;
     font-weight: 600;
     box-shadow: inset 0 0 0 1px alpha(@cd_accent, 0.45);
+}
+button.cd-memo-tag-chip-time:checked {
+    background-color: alpha(@cd_tag_time, 0.18);
+    color: @cd_tag_time;
+    box-shadow: inset 0 0 0 1px alpha(@cd_tag_time, 0.46);
+}
+
+/* Shared read-only metadata tags (Tasks, Capture, Issues, Inbox). */
+flowbox.cd-tag-flow {
+    padding: 1px 0;
+    background-color: transparent;
+}
+label.cd-tag-chip {
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+label.cd-tag-chip-neutral {
+    border: 1px solid alpha(@theme_fg_color, 0.22);
+    background-color: alpha(@theme_fg_color, 0.08);
+    color: alpha(@theme_fg_color, 0.74);
+}
+label.cd-tag-chip-magic {
+    border: 1px solid alpha(@cd_accent, 0.42);
+    background-color: alpha(@cd_accent, 0.17);
+    color: @cd_accent;
+    font-weight: 700;
+}
+label.cd-tag-chip-time {
+    border: 1px solid alpha(@cd_tag_time, 0.42);
+    background-color: alpha(@cd_tag_time, 0.15);
+    color: @cd_tag_time;
+    font-feature-settings: "tnum";
+    font-weight: 700;
 }
 
 /* Settings: notebook tabs */

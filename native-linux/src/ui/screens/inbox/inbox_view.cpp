@@ -2,9 +2,12 @@
 
 #include "app_container.h"
 #include "background/sync_scheduler.h"
+#include "components/searchable_filter_menu.h"
+#include "components/tag_flow.h"
 #include "data/db/event_dao.h"
 #include "data/db/issue_dao.h"
 #include "data/db/task_dao.h"
+#include "data/prefs/prefs.h"
 
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -13,6 +16,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 namespace cd {
 
@@ -51,6 +55,46 @@ std::string fmt_time(int total_minutes)
     return o.str();
 }
 
+struct LocalDayBounds final {
+    EpochMillis today_start{};
+    EpochMillis tomorrow_start{};
+    EpochMillis day_after_tomorrow_start{};
+    EpochMillis week_start{};
+    EpochMillis next_week_start{};
+};
+
+LocalDayBounds local_day_bounds()
+{
+    LocalDayBounds bounds{};
+    GDateTime* now = g_date_time_new_now_local();
+    if (!now) return bounds;
+    GDateTime* today = g_date_time_new_local(
+        g_date_time_get_year(now), g_date_time_get_month(now), g_date_time_get_day_of_month(now), 0, 0, 0);
+    if (!today) {
+        g_date_time_unref(now);
+        return bounds;
+    }
+    GDateTime* tomorrow = g_date_time_add_days(today, 1);
+    GDateTime* day_after = g_date_time_add_days(today, 2);
+    GDateTime* week = g_date_time_add_days(today, -(g_date_time_get_day_of_week(today) - 1));
+    GDateTime* next_week = g_date_time_add_days(week, 7);
+    auto millis = [](GDateTime* value) -> EpochMillis {
+        return value ? static_cast<EpochMillis>(g_date_time_to_unix(value)) * 1000 : 0;
+    };
+    bounds.today_start = millis(today);
+    bounds.tomorrow_start = millis(tomorrow);
+    bounds.day_after_tomorrow_start = millis(day_after);
+    bounds.week_start = millis(week);
+    bounds.next_week_start = millis(next_week);
+    if (next_week) g_date_time_unref(next_week);
+    if (week) g_date_time_unref(week);
+    if (day_after) g_date_time_unref(day_after);
+    if (tomorrow) g_date_time_unref(tomorrow);
+    g_date_time_unref(today);
+    g_date_time_unref(now);
+    return bounds;
+}
+
 } // namespace
 
 InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
@@ -62,6 +106,33 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
     , total_line_("")
 {
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(toolbar_.gobj())), "cd-toolbar");
+    type_filter_ = Gtk::manage(new SearchableFilterMenu("Type", false, false));
+    type_filter_->set_options({{"all", "All"}, {"events", "Events"}, {"tasks", "Tasks"}, {"issues", "Issues"}});
+    type_filter_->set_selected({type_filter_key_});
+    type_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) type_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    date_filter_ = Gtk::manage(new SearchableFilterMenu("Time range", false, false));
+    date_filter_->set_options({{"all", "All"}, {"today", "Today"}, {"tomorrow", "Tomorrow"}, {"week", "This week"}});
+    date_filter_->set_selected({date_filter_key_});
+    date_filter_->signal_selection_changed.connect([this](std::set<std::string> const& selected) {
+        if (!selected.empty()) date_filter_key_ = *selected.begin();
+        rebuild();
+    });
+    clear_filters_btn_.set_image_from_icon_name("edit-clear-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
+    clear_filters_btn_.set_tooltip_text("Clear inbox filters");
+    clear_filters_btn_.set_relief(Gtk::RELIEF_NONE);
+    clear_filters_btn_.signal_clicked().connect([this] {
+        type_filter_key_ = "all";
+        date_filter_key_ = "all";
+        type_filter_->set_selected({type_filter_key_});
+        date_filter_->set_selected({date_filter_key_});
+        rebuild();
+    });
+    toolbar_.pack_start(*type_filter_, false, false);
+    toolbar_.pack_start(*date_filter_, false, false);
+    toolbar_.pack_start(clear_filters_btn_, false, false);
     refresh_btn_.set_image_from_icon_name("view-refresh-symbolic", Gtk::ICON_SIZE_SMALL_TOOLBAR);
     refresh_btn_.set_tooltip_text("Sync from server and refresh inbox");
     refresh_btn_.set_relief(Gtk::RELIEF_NONE);
@@ -77,6 +148,9 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
 
     scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
     list_.set_selection_mode(Gtk::SELECTION_SINGLE);
+    list_.set_activate_on_single_click(true);
+    list_.signal_row_activated().connect(sigc::mem_fun(*this, &InboxView::on_row_activated));
+    list_.set_tooltip_text("Open this item in its screen");
     scroll_.add(list_);
 
     total_line_.set_halign(Gtk::ALIGN_START);
@@ -88,6 +162,28 @@ InboxView::InboxView(AppContainer& app, SyncScheduler& sync)
     atk_object_set_name(gtk_widget_get_accessible(GTK_WIDGET(list_.gobj())), "Inbox list");
 
     rebuild();
+}
+
+void InboxView::on_filter_changed()
+{
+    rebuild();
+}
+
+void InboxView::on_row_activated(Gtk::ListBoxRow* row)
+{
+    if (!row)
+        return;
+    int const index = gtk_list_box_row_get_index(GTK_LIST_BOX_ROW(row->gobj()));
+    if (index < 0 || static_cast<std::size_t>(index) >= rows_.size())
+        return;
+
+    Row const& item = rows_[static_cast<std::size_t>(index)];
+    if (std::holds_alternative<CalendarEvent>(item.data))
+        signal_event_requested.emit(std::get<CalendarEvent>(item.data).uid);
+    else if (std::holds_alternative<CalDavTask>(item.data))
+        signal_task_requested.emit(std::get<CalDavTask>(item.data).uid);
+    else if (std::holds_alternative<GiteaIssue>(item.data))
+        signal_issue_requested.emit(std::get<GiteaIssue>(item.data).id);
 }
 
 void InboxView::populate_rows(std::vector<Row>& out)
@@ -145,6 +241,7 @@ void InboxView::populate_rows(std::vector<Row>& out)
         else r.subtitle = "Task";
         std::string blob = t.summary + " ";
         if (t.description) blob += *t.description;
+        for (auto const& category : t.categories) blob += " #" + category;
         r.estimated_minutes = estimate_from_tags(blob);
         out.push_back(std::move(r));
     }
@@ -156,6 +253,7 @@ void InboxView::populate_rows(std::vector<Row>& out)
         r.title = iss.title;
         r.subtitle = "Issue · " + iss.repository;
         std::string blob = iss.title + " " + iss.body;
+        for (auto const& label : iss.labels) blob += " #" + label;
         r.estimated_minutes = estimate_from_tags(blob);
         out.push_back(std::move(r));
     }
@@ -170,6 +268,29 @@ void InboxView::rebuild()
     rows_.clear();
 
     populate_rows(rows_);
+    auto const magic_tags = planning_magic_tags(merged_app_preferences(app_.prefs()));
+
+    auto const bounds = local_day_bounds();
+    rows_.erase(std::remove_if(rows_.begin(), rows_.end(), [this, &bounds](Row const& row) {
+        bool const is_event = std::holds_alternative<CalendarEvent>(row.data);
+        bool const is_task = std::holds_alternative<CalDavTask>(row.data);
+        bool const is_issue = std::holds_alternative<GiteaIssue>(row.data);
+        if (type_filter_key_ == "events" && !is_event) return true;
+        if (type_filter_key_ == "tasks" && !is_task) return true;
+        if (type_filter_key_ == "issues" && !is_issue) return true;
+        if (date_filter_key_ == "all") return false;
+        std::optional<EpochMillis> date;
+        if (is_event) date = std::get<CalendarEvent>(row.data).start;
+        else if (is_task) date = std::get<CalDavTask>(row.data).due;
+        else if (is_issue) date = std::get<GiteaIssue>(row.data).milestone_due_on;
+        if (!date) return true;
+        if (date_filter_key_ == "today")
+            return *date < bounds.today_start || *date >= bounds.tomorrow_start;
+        if (date_filter_key_ == "tomorrow")
+            return *date < bounds.tomorrow_start || *date >= bounds.day_after_tomorrow_start;
+        return *date < bounds.week_start || *date >= bounds.next_week_start;
+    }), rows_.end());
+    clear_filters_btn_.set_visible(type_filter_key_ != "all" || date_filter_key_ != "all");
 
     int sum_min = 0;
     for (auto const& r : rows_) sum_min += r.estimated_minutes;
@@ -178,6 +299,7 @@ void InboxView::rebuild()
 
     for (auto const& r : rows_) {
         auto* row = Gtk::manage(new Gtk::ListBoxRow);
+        auto* content = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
         auto* lab = Gtk::manage(new Gtk::Label());
         gchar* e1 = g_markup_escape_text(r.title.c_str(), -1);
         gchar* e2 = g_markup_escape_text(r.subtitle.c_str(), -1);
@@ -186,7 +308,17 @@ void InboxView::rebuild()
         if (e1) g_free(e1);
         if (e2) g_free(e2);
         lab->set_halign(Gtk::ALIGN_START);
-        row->add(*lab);
+        content->pack_start(*lab, false, false);
+
+        std::vector<std::string> tags;
+        if (std::holds_alternative<CalDavTask>(r.data))
+            tags = std::get<CalDavTask>(r.data).categories;
+        else if (std::holds_alternative<GiteaIssue>(r.data))
+            tags = std::get<GiteaIssue>(r.data).labels;
+        if (!tags.empty())
+            content->pack_start(*make_tag_flow(std::move(tags), magic_tags), false, false);
+
+        row->add(*content);
         list_.append(*row);
     }
     list_.show_all();

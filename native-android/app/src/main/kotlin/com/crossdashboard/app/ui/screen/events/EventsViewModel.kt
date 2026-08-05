@@ -18,6 +18,7 @@ import javax.inject.Inject
 enum class EventFilter { DAY, WEEK, MONTH }
 
 data class EventsUiState(
+    val allEvents: List<CalendarEvent> = emptyList(),
     val events: List<CalendarEvent> = emptyList(),
     val filter: EventFilter = EventFilter.WEEK,
     val isLoading: Boolean = false,
@@ -48,11 +49,14 @@ class EventsViewModel @Inject constructor(
                     EventFilter.WEEK -> now.minus(7, ChronoUnit.DAYS)
                     EventFilter.MONTH -> now.minus(31, ChronoUnit.DAYS)
                 }
-                events
+                val filtered = events
                     .filter { it.start.isAfter(startCutoff) && it.start.isBefore(cutoff) }
                     .sortedBy { it.start }
-            }.collect { filtered ->
-                _state.update { it.copy(events = filtered, filter = _filter.value) }
+                Triple(events, filtered, filter)
+            }.collect { (allEvents, filtered, filter) ->
+                _state.update {
+                    it.copy(allEvents = allEvents, events = filtered, filter = filter)
+                }
             }
         }
     }

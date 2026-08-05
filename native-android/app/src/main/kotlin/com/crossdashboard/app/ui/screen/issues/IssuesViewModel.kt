@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.issues
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.crossdashboard.app.data.prefs.AppPreferences
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.data.repository.IssueRepository
@@ -30,6 +31,10 @@ data class PendingAttachment(
 data class IssuesUiState(
     val issues: List<GiteaIssue> = emptyList(),
     val filter: IssueStateFilter = IssueStateFilter.OPEN,
+    val availableLabels: List<String> = emptyList(),
+    val selectedLabels: Set<String> = emptySet(),
+    val availableMilestones: List<IssueMilestoneFilter> = emptyList(),
+    val selectedMilestoneKey: String? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     /** Comments keyed by issue id — loaded lazily on sheet open */
@@ -42,15 +47,25 @@ data class IssuesUiState(
     val showCreateSheet: Boolean = false,
     val isCreating: Boolean = false,
     val configuredRepos: List<String> = emptyList(),
+    val magicTags: List<String> = emptyList(),
+)
+
+data class IssueMilestoneFilter(
+    val key: String,
+    val title: String,
+    val repository: String,
 )
 
 @HiltViewModel
 class IssuesViewModel @Inject constructor(
     private val issueRepo: IssueRepository,
     private val secureStore: SecureStore,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(IssueStateFilter.OPEN)
+    private val _selectedLabels = MutableStateFlow<Set<String>>(emptySet())
+    private val _selectedMilestoneKey = MutableStateFlow<String?>(null)
     private val _state = MutableStateFlow(IssuesUiState())
     val state: StateFlow<IssuesUiState> = _state.asStateFlow()
 
@@ -61,14 +76,48 @@ class IssuesViewModel @Inject constructor(
         _state.update { it.copy(configuredRepos = repos) }
 
         viewModelScope.launch {
-            combine(issueRepo.allIssues, _filter) { issues, filter ->
-                when (filter) {
+            combine(
+                issueRepo.allIssues,
+                _filter,
+                _selectedLabels,
+                _selectedMilestoneKey,
+            ) { issues, filter, selectedLabels, selectedMilestoneKey ->
+                val stateFiltered = when (filter) {
                     IssueStateFilter.OPEN -> issues.filter { it.state == "open" }
                     IssueStateFilter.CLOSED -> issues.filter { it.state == "closed" }
                     IssueStateFilter.ALL -> issues
-                }.sortedByDescending { it.updatedAt }
-            }.collect { filtered ->
-                _state.update { it.copy(issues = filtered, filter = _filter.value) }
+                }
+                Triple(
+                    stateFiltered
+                        .filter { issue -> selectedLabels.all { it in issue.labels } }
+                        .filter { issue ->
+                            selectedMilestoneKey == null || issue.milestoneKey() == selectedMilestoneKey
+                        }
+                        .sortedByDescending { it.updatedAt },
+                    issues.flatMap { it.labels }.distinct().sortedBy { it.lowercase() },
+                    issues.mapNotNull { issue ->
+                        val id = issue.milestoneId ?: return@mapNotNull null
+                        val title = issue.milestoneTitle ?: return@mapNotNull null
+                        IssueMilestoneFilter("${issue.repository}:$id", title, issue.repository)
+                    }.distinctBy { it.key }.sortedBy { it.title.lowercase() },
+                )
+            }.collect { (filtered, labels, milestones) ->
+                _state.update {
+                    it.copy(
+                        issues = filtered,
+                        filter = _filter.value,
+                        availableLabels = labels,
+                        selectedLabels = _selectedLabels.value,
+                        availableMilestones = milestones,
+                        selectedMilestoneKey = _selectedMilestoneKey.value,
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            prefs.kanbanColumnsFlow.collect { columns ->
+                _state.update { it.copy(magicTags = columns) }
             }
         }
     }
@@ -76,6 +125,23 @@ class IssuesViewModel @Inject constructor(
     fun setFilter(filter: IssueStateFilter) {
         _filter.value = filter
     }
+
+    fun setLabelFilters(labels: Set<String>) {
+        _selectedLabels.value = labels
+    }
+
+    fun setMilestoneFilter(key: String?) {
+        _selectedMilestoneKey.value = key
+    }
+
+    fun clearFilters() {
+        _filter.value = IssueStateFilter.OPEN
+        _selectedLabels.value = emptySet()
+        _selectedMilestoneKey.value = null
+    }
+
+    private fun GiteaIssue.milestoneKey(): String? =
+        milestoneId?.let { "$repository:$it" }
 
     fun sync() {
         viewModelScope.launch {
@@ -232,10 +298,13 @@ class IssuesViewModel @Inject constructor(
 
     // ─── Edit ─────────────────────────────────────────────────────────────────
 
-    fun saveIssue(issue: GiteaIssue, title: String, body: String) {
+    fun saveIssue(issue: GiteaIssue, title: String, body: String, labels: List<String>) {
         viewModelScope.launch {
             try {
                 issueRepo.update(issue.repository, issue.number, title = title, body = body)
+                if (labels != issue.labels) {
+                    issueRepo.replaceLabels(issue.repository, issue.number, labels)
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message) }
             }

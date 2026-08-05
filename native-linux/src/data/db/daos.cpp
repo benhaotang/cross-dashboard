@@ -164,6 +164,10 @@ GiteaIssue row_to_issue(sqlite3_stmt* st)
     i.updated_at = epoch_col(st, 8);
     i.repository = text_req(st, 9);
     i.html_url = text_req(st, 10);
+    if (sqlite3_column_type(st, 11) != SQLITE_NULL)
+        i.milestone_id = sqlite3_column_int64(st, 11);
+    i.milestone_title = text_opt(st, 12);
+    i.milestone_due_on = epoch_opt(st, 13);
     return i;
 }
 
@@ -637,7 +641,8 @@ std::vector<GiteaIssue> IssueDao::get_all() const
 {
     return with_stmt(db_,
         "SELECT id, number, title, body, state, labels_json, assignees_json, created_at_epoch, "
-        "updated_at_epoch, repository, html_url FROM issues ORDER BY updated_at_epoch DESC",
+        "updated_at_epoch, repository, html_url, milestone_id, milestone_title, milestone_due_on_epoch "
+        "FROM issues ORDER BY updated_at_epoch DESC",
         [](sqlite3_stmt* st) {
             std::vector<GiteaIssue> out;
             while (sqlite3_step(st) == SQLITE_ROW) out.push_back(row_to_issue(st));
@@ -650,7 +655,8 @@ std::optional<GiteaIssue> IssueDao::get_by_id(std::int64_t id) const
     sqlite3_stmt* st{};
     if (sqlite3_prepare_v2(db_.raw(),
             "SELECT id, number, title, body, state, labels_json, assignees_json, created_at_epoch, "
-            "updated_at_epoch, repository, html_url FROM issues WHERE id = ?",
+            "updated_at_epoch, repository, html_url, milestone_id, milestone_title, milestone_due_on_epoch "
+            "FROM issues WHERE id = ?",
             -1,
             &st,
             nullptr)
@@ -669,7 +675,8 @@ std::vector<GiteaIssue> IssueDao::get_by_state(std::string const& state) const
     sqlite3_stmt* st{};
     if (sqlite3_prepare_v2(db_.raw(),
             "SELECT id, number, title, body, state, labels_json, assignees_json, created_at_epoch, "
-            "updated_at_epoch, repository, html_url FROM issues WHERE state = ? ORDER BY "
+            "updated_at_epoch, repository, html_url, milestone_id, milestone_title, milestone_due_on_epoch "
+            "FROM issues WHERE state = ? ORDER BY "
             "updated_at_epoch DESC",
             -1,
             &st,
@@ -695,8 +702,8 @@ void IssueDao::upsert_all(std::vector<GiteaIssue> const& rows)
     sqlite3_stmt* st{};
     char const* sql =
         "INSERT OR REPLACE INTO issues (id, number, title, body, state, labels_json, "
-        "assignees_json, created_at_epoch, updated_at_epoch, repository, html_url) VALUES "
-        "(?,?,?,?,?,?,?,?,?,?,?)";
+        "assignees_json, created_at_epoch, updated_at_epoch, repository, html_url, milestone_id, "
+        "milestone_title, milestone_due_on_epoch) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     if (sqlite3_prepare_v2(db_.raw(), sql, -1, &st, nullptr) != SQLITE_OK) {
         throw std::runtime_error(sqlite3_errmsg(db_.raw()));
     }
@@ -717,6 +724,19 @@ void IssueDao::upsert_all(std::vector<GiteaIssue> const& rows)
             st, 10, row.repository.c_str(), static_cast<int>(row.repository.size()), SQLITE_TRANSIENT);
         sqlite3_bind_text(st, 11, row.html_url.c_str(), static_cast<int>(row.html_url.size()),
             SQLITE_TRANSIENT);
+        if (row.milestone_id)
+            sqlite3_bind_int64(st, 12, *row.milestone_id);
+        else
+            sqlite3_bind_null(st, 12);
+        if (row.milestone_title)
+            sqlite3_bind_text(st, 13, row.milestone_title->c_str(),
+                static_cast<int>(row.milestone_title->size()), SQLITE_TRANSIENT);
+        else
+            sqlite3_bind_null(st, 13);
+        if (row.milestone_due_on)
+            sqlite3_bind_int64(st, 14, *row.milestone_due_on);
+        else
+            sqlite3_bind_null(st, 14);
         if (sqlite3_step(st) != SQLITE_DONE) {
             sqlite3_finalize(st);
             throw std::runtime_error(sqlite3_errmsg(db_.raw()));

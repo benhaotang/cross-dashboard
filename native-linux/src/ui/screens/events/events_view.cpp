@@ -295,4 +295,22 @@ void EventsView::on_selection_changed()
     if (detail_body_) detail_body_->load_markdown(md);
 }
 
+bool EventsView::reveal_event(std::string const& uid)
+{
+    filter_ = TimeFilter::Week;
+    rb_week_.set_active(true);
+    refresh();
+
+    for (std::size_t index = 0; index < filtered_.size(); ++index) {
+        if (filtered_[index].uid != uid)
+            continue;
+        if (auto* row = list_.get_row_at_index(static_cast<int>(index))) {
+            list_.select_row(*row);
+            row->grab_focus();
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace cd

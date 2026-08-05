@@ -15,6 +15,7 @@
 namespace cd {
 
 class AppContainer;
+class SearchableFilterMenu;
 class SyncScheduler;
 
 /** Unified events, tasks, issues + estimated time from `#Nm` / `#Nh` tags. */
@@ -23,6 +24,10 @@ public:
     InboxView(AppContainer&, SyncScheduler&);
 
     void rebuild();
+
+    sigc::signal<void(std::string const&)> signal_event_requested;
+    sigc::signal<void(std::string const&)> signal_task_requested;
+    sigc::signal<void(std::int64_t)> signal_issue_requested;
 
 private:
     struct Row {
@@ -33,15 +38,22 @@ private:
     };
 
     void populate_rows(std::vector<Row>& out);
+    void on_filter_changed();
+    void on_row_activated(Gtk::ListBoxRow* row);
 
     AppContainer& app_;
     SyncScheduler& sync_;
     Gtk::Box toolbar_{Gtk::ORIENTATION_HORIZONTAL, 8};
     Gtk::Button refresh_btn_{};
+    SearchableFilterMenu* type_filter_{};
+    SearchableFilterMenu* date_filter_{};
+    Gtk::Button clear_filters_btn_{};
     Gtk::ScrolledWindow scroll_;
     Gtk::ListBox list_;
     Gtk::Label total_line_;
     std::vector<Row> rows_;
+    std::string type_filter_key_{"all"};
+    std::string date_filter_key_{"all"};
 };
 
 } // namespace cd

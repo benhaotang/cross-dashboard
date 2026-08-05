@@ -61,6 +61,12 @@ struct IssuesView: View {
         .onChange(of: viewModel.selectedIssueID) { _, id in
             appViewModel.selectedIssueID = id
         }
+        .onAppear {
+            viewModel.selectedIssueID = appViewModel.selectedIssueID
+        }
+        .onChange(of: appViewModel.selectedIssueID) { _, id in
+            viewModel.selectedIssueID = id
+        }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }
@@ -82,16 +88,41 @@ struct IssuesView: View {
             .accessibilityLabel("Create issue")
         }
         ToolbarItem {
-            Picker("State", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.filter = $0 }
-            )) {
-                ForEach(IssuesViewModel.Filter.allCases) { f in
-                    Text(f.rawValue).tag(f)
+            SearchableFilterMenu(
+                title: "Status",
+                options: IssuesViewModel.Filter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.filter.rawValue],
+                onChange: { keys in
+                    if let value = keys.first, let filter = IssuesViewModel.Filter(rawValue: value) {
+                        viewModel.filter = filter
+                    }
                 }
+            )
+        }
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Tags",
+                options: viewModel.allLabels.map { FilterMenuOption(id: $0, label: "#\($0)") },
+                selected: viewModel.selectedLabels,
+                allowsMultiple: true,
+                searchable: true,
+                onChange: { viewModel.selectedLabels = $0 }
+            )
+        }
+        if !viewModel.allMilestones.isEmpty {
+            ToolbarItem {
+                SearchableFilterMenu(
+                    title: "Milestone",
+                    options: viewModel.allMilestones,
+                    selected: viewModel.selectedMilestoneKey.map { [$0] } ?? [],
+                    searchable: true,
+                    defaultSelected: [],
+                    onChange: { viewModel.selectedMilestoneKey = $0.first }
+                )
             }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("Filter by state")
+        }
+        if viewModel.filter != .open || !viewModel.selectedLabels.isEmpty || viewModel.selectedMilestoneKey != nil {
+            ToolbarItem { ClearFiltersButton(action: viewModel.clearFilters) }
         }
         ToolbarItem {
             Button {
@@ -120,16 +151,22 @@ private struct IssueRow: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
 
-                HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
                     Text(issue.repository)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("#\(issue.number)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
                     if !issue.labels.isEmpty {
-                        ForEach(issue.labels.prefix(2), id: \.self) { label in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                ForEach(issue.labels, id: \.self) { label in
                             TagChip(tag: label)
+                                }
+                            }
                         }
                     }
                 }

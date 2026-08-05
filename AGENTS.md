@@ -421,6 +421,41 @@ Priority: `!` → low(9), `!!` → medium(5), `!!!` → high(1). Tags: `#word` �
 
 Property sheets: `ModalBottomSheet` on phone; inline detail pane (`NavigableListDetailPaneScaffold`) on tablet/Expanded.
 
+### Tags, Milestones, and List Filters
+
+- Task categories, Gitea labels, and Capture tags are rendered as reusable compact tag pills on list
+  cards, detail views, and Inbox cards. Android uses `TagFlow`, macOS uses `TagChip`, and Linux
+  uses `make_tag_flow`. Tag layouts consume available horizontal space before wrapping.
+- Tags have three visual kinds: planning-duration tags (`#30m`, `#2h`), magic planning tags
+  (configured Kanban tags plus fixed Covey tags: `do`, `delay`, `delegate`, `eliminate`), and
+  ordinary tags. Keep this classification consistent when adding another tag surface.
+- Task edit/detail flows support adding duration tags. Duration tags are also parsed by Inbox to
+  produce per-card estimates and the total estimated-time summary.
+- Issues persist their assigned milestone ID, title, and due date as part of `GiteaIssue`; milestone
+  identity is repository-scoped (`"owner/repo:id"`). Android Room is schema version 3 with
+  `MIGRATION_2_3`, Linux SQLite is schema version 2, and macOS adds optional SwiftData fields for a
+  lightweight migration. Milestones are issue metadata and filters, never standalone Inbox items.
+- Issues has independent Status, searchable multi-label, and (when detected) searchable Milestone
+  filters. Tasks has Status plus searchable multi-tag filters. Capture has Status plus searchable
+  multi-tag filters. Multiple selected tags use AND/intersection matching. A single X restores each
+  screen's defaults.
+- Android filter controls use `AdaptiveFilterBar`: medium/expanded widths show dropdowns, compact
+  widths show one modal filter sheet. macOS uses `SearchableFilterMenu` popovers; Linux uses the
+  reusable GTK `SearchableFilterMenu` popover. Filter buttons retain their category in the visible
+  label (`Status – Open`, `Type – All`, `Time range – Today`) and receive an accent treatment only
+  when their selection differs from the screen default. Android and macOS use native semantic icons;
+  Linux filters remain text-only because symbolic icon availability varies significantly by desktop
+  theme. Linux popovers use a 360px content width and a taller option viewport; do not shrink them
+  back to compact menu size.
+- Inbox and Views have independent Type and Date filters, so selections compose (for example,
+  `Tasks + This week`). The visible Date control is named **Time range** and its choices are All,
+  Today, Tomorrow, and This week. Inbox Events use
+  event start, Tasks use due date, and Issues use milestone due date; undated items are excluded only
+  while a date filter is active. Views supports Task and Issue types and uses the same Task/Issue date
+  rules.
+- Inbox cards navigate to the selected event, task, or issue on Android, macOS, and Linux. Preserve
+  stable entity identifiers when changing Inbox row models or navigation.
+
 Screen display name is **"Capture"**; internal `Destination` object remains `Destination.Memos` and macOS enum case remains `Screen.memos` (rawValue `"Capture"`). Do not create a new destination — reuse `Destination.Memos`.
 
 ---

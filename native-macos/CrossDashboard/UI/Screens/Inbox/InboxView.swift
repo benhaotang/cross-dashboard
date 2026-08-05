@@ -5,6 +5,7 @@ import CrossDashboardKit
 /// Mirrors InboxScreen on Android.
 struct InboxView: View {
 
+    @Environment(AppViewModel.self) private var appViewModel
     @State private var viewModel = InboxViewModel()
 
     var body: some View {
@@ -59,11 +60,22 @@ struct InboxView: View {
     private var itemList: some View {
         List {
             ForEach(viewModel.filteredItems) { item in
-                InboxItemRow(item: item)
+                InboxItemRow(item: item, onOpen: navigationAction(for: item))
                     .listRowSeparator(.visible)
             }
         }
         .listStyle(.inset)
+    }
+
+    private func navigationAction(for item: InboxItem) -> (() -> Void)? {
+        switch item {
+        case .event(let event, _):
+            return { appViewModel.openEvent(event.uid) }
+        case .task(let task, _):
+            return { appViewModel.openTask(task.uid) }
+        case .issue(let issue, _):
+            return { appViewModel.openIssue(issue.id) }
+        }
     }
 
     // ─── Toolbar ──────────────────────────────────────────────────────────────
@@ -71,16 +83,31 @@ struct InboxView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            Picker("Filter", selection: Binding(
-                get: { viewModel.filter },
-                set: { viewModel.filter = $0 }
-            )) {
-                ForEach(InboxViewModel.ItemType.allCases) { type in
-                    Text(type.rawValue).tag(type)
+            SearchableFilterMenu(
+                title: "Type",
+                options: InboxViewModel.ItemType.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.itemType.rawValue],
+                onChange: { selected in
+                    if let raw = selected.first, let value = InboxViewModel.ItemType(rawValue: raw) {
+                        viewModel.itemType = value
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("Filter inbox items")
+            )
+        }
+        ToolbarItem {
+            SearchableFilterMenu(
+                title: "Time range",
+                options: InboxViewModel.DateFilter.allCases.map { FilterMenuOption(id: $0.rawValue, label: $0.rawValue) },
+                selected: [viewModel.dateFilter.rawValue],
+                onChange: { selected in
+                    if let raw = selected.first, let value = InboxViewModel.DateFilter(rawValue: raw) {
+                        viewModel.dateFilter = value
+                    }
+                }
+            )
+        }
+        if viewModel.itemType != .all || viewModel.dateFilter != .all {
+            ToolbarItem { ClearFiltersButton(action: viewModel.clearFilters) }
         }
         ToolbarItem {
             Button {
@@ -97,8 +124,26 @@ struct InboxView: View {
 
 private struct InboxItemRow: View {
     let item: InboxItem
+    let onOpen: (() -> Void)?
 
     var body: some View {
+        Group {
+            if let onOpen {
+                Button(action: onOpen) {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                rowContent
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(itemTitle)
+        .accessibilityValue(itemSubtitle)
+        .accessibilityHint(accessibilityHint)
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             itemIcon
                 .frame(width: 28, height: 28)
@@ -125,10 +170,12 @@ private struct InboxItemRow: View {
             }
         }
         .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(itemTitle)
-        .accessibilityValue(itemSubtitle)
-        .accessibilityHint(estimatedLabel.map { "Estimated \($0)" } ?? "")
+        .contentShape(Rectangle())
+    }
+
+    private var accessibilityHint: String {
+        let estimate = estimatedLabel.map { " Estimated \($0)." } ?? ""
+        return onOpen == nil ? estimate.trimmingCharacters(in: .whitespaces) : "Open item.\(estimate)"
     }
 
     @ViewBuilder
@@ -143,9 +190,6 @@ private struct InboxItemRow: View {
         case .issue(let i, _):
             Image(systemName: i.state == "open" ? "exclamationmark.bubble" : "checkmark.bubble")
                 .foregroundStyle(i.state == "open" ? .orange : .purple)
-        case .milestone:
-            Image(systemName: "flag")
-                .foregroundStyle(.teal)
         }
     }
 
@@ -154,7 +198,6 @@ private struct InboxItemRow: View {
         case .event(let e, _):  return e.summary
         case .task(let t, _):   return t.summary
         case .issue(let i, _):  return i.title
-        case .milestone(let m): return m.title
         }
     }
 
@@ -171,11 +214,6 @@ private struct InboxItemRow: View {
             return t.calendarHref ?? ""
         case .issue(let i, _):
             return "\(i.repository) #\(i.number)"
-        case .milestone(let m):
-            if let due = m.dueOn {
-                return "Due \(due.formatted(date: .abbreviated, time: .omitted)) · \(m.openIssues) open"
-            }
-            return "\(m.openIssues) open issues"
         }
     }
 
@@ -193,8 +231,6 @@ private struct InboxItemRow: View {
             guard let m, m > 0 else { return nil }
             let h = m / 60; let rem = m % 60
             return h > 0 ? (rem == 0 ? "\(h)h" : "\(h)h\(rem)m") : "\(rem)m"
-        case .milestone:
-            return nil
         }
     }
 }

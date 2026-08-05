@@ -26,6 +26,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.crossdashboard.app.domain.model.MemosMemo
 import com.crossdashboard.app.domain.model.MemoState
+import com.crossdashboard.app.ui.component.TagFlow
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -78,7 +82,8 @@ fun MemosScreen(
                             }
                         },
                         onSetStateFilter = vm::setStateFilter,
-                        onSetTagFilter = vm::setTagFilter,
+                        onSetTagFilters = vm::setTagFilters,
+                        onClearFilters = vm::clearFilters,
                         onSync = vm::sync,
                         onArchive = vm::archiveMemo,
                         onRestore = vm::restoreMemo,
@@ -142,7 +147,8 @@ private fun MemosListPane(
     state: MemosUiState,
     onSelectMemo: (MemosMemo) -> Unit,
     onSetStateFilter: (MemoStateFilter) -> Unit,
-    onSetTagFilter: (String?) -> Unit,
+    onSetTagFilters: (Set<String>) -> Unit,
+    onClearFilters: () -> Unit,
     onSync: () -> Unit,
     onArchive: (String) -> Unit,
     onRestore: (String) -> Unit,
@@ -151,41 +157,32 @@ private fun MemosListPane(
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         // ── Filter bar ────────────────────────────────────────────────────────
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                FilterChip(
-                    selected = state.stateFilter == MemoStateFilter.NORMAL,
-                    onClick = { onSetStateFilter(MemoStateFilter.NORMAL) },
-                    label = { Text("Normal") },
-                )
-            }
-            item {
-                FilterChip(
-                    selected = state.stateFilter == MemoStateFilter.ARCHIVED,
-                    onClick = { onSetStateFilter(MemoStateFilter.ARCHIVED) },
-                    label = { Text("Archived") },
-                )
-            }
-            item {
-                FilterChip(
-                    selected = state.stateFilter == MemoStateFilter.ALL,
-                    onClick = { onSetStateFilter(MemoStateFilter.ALL) },
-                    label = { Text("All") },
-                )
-            }
-            // Tag filters
-            val tags = state.memos.flatMap { it.tags }.distinct()
-            items(tags) { tag ->
-                FilterChip(
-                    selected = state.selectedTag == tag,
-                    onClick = { onSetTagFilter(if (state.selectedTag == tag) null else tag) },
-                    label = { Text("#$tag") },
-                )
-            }
-        }
+        AdaptiveFilterBar(
+            filters = listOf(
+                AdaptiveFilterSpec(
+                    title = "Status",
+                    choices = listOf(
+                        FilterChoice(MemoStateFilter.NORMAL.name, "Active captures"),
+                        FilterChoice(MemoStateFilter.ARCHIVED.name, "Archived captures"),
+                        FilterChoice(MemoStateFilter.ALL.name, "All captures"),
+                    ),
+                    selectedKeys = setOf(state.stateFilter.name),
+                    onSelectionChange = { selected ->
+                        selected.firstOrNull()?.let { onSetStateFilter(MemoStateFilter.valueOf(it)) }
+                    },
+                ),
+                AdaptiveFilterSpec(
+                    title = "Tags",
+                    choices = state.availableTags.map { FilterChoice(it, "#$it") },
+                    selectedKeys = state.selectedTags,
+                    multiSelect = true,
+                    searchable = true,
+                    onSelectionChange = onSetTagFilters,
+                ),
+            ),
+            hasActiveFilters = state.stateFilter != MemoStateFilter.NORMAL || state.selectedTags.isNotEmpty(),
+            onClear = onClearFilters,
+        )
 
         if (state.isLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -278,14 +275,7 @@ private fun MemoListRow(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (memo.tags.isNotEmpty()) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(memo.tags) { tag ->
-                                    SuggestionChip(
-                                        onClick = {},
-                                        label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
-                                    )
-                                }
-                            }
+                            TagFlow(tags = memo.tags)
                         }
                         Text(
                             relativeTime(memo.displayTime),

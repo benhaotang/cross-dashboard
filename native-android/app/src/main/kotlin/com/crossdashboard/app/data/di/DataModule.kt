@@ -2,6 +2,8 @@ package com.crossdashboard.app.data.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.work.WorkManager
 import com.crossdashboard.app.data.db.*
 import com.crossdashboard.app.data.db.dao.*
@@ -19,10 +21,19 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DataModule {
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE issues ADD COLUMN milestoneId INTEGER")
+            db.execSQL("ALTER TABLE issues ADD COLUMN milestoneTitle TEXT")
+            db.execSQL("ALTER TABLE issues ADD COLUMN milestoneDueOnEpoch INTEGER")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "cross_dashboard.db")
+            .addMigrations(MIGRATION_2_3)
             .fallbackToDestructiveMigration(dropAllTables = false)
             .build()
 

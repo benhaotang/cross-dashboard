@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.issues
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -25,12 +26,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.GiteaIssue
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
+import com.crossdashboard.app.ui.component.TagFlow
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun IssuesScreen(
+    initialIssueId: Long? = null,
+    initialRepository: String? = null,
     viewModel: IssuesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -44,6 +51,24 @@ fun IssuesScreen(
         if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
             scope.launch {
                 navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, issue.id.toString())
+            }
+        }
+    }
+
+    var initialNavigationDone by remember(initialIssueId, initialRepository) { mutableStateOf(false) }
+    LaunchedEffect(initialIssueId, initialRepository, state.issues) {
+        if (!initialNavigationDone && initialIssueId != null && state.issues.isNotEmpty()) {
+            val target = state.issues.find {
+                it.id == initialIssueId &&
+                    (initialRepository == null || it.repository == initialRepository)
+            }
+            if (target != null) {
+                selectedIssue = target
+                viewModel.loadComments(target)
+                if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
+                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, target.id.toString())
+                }
+                initialNavigationDone = true
             }
         }
     }
@@ -86,27 +111,50 @@ fun IssuesScreen(
             listPane = {
                 AnimatedPane {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // ── State filter chips ────────────────────────────────
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            IssueStateFilter.entries.forEach { filter ->
-                                FilterChip(
-                                    selected = state.filter == filter,
-                                    onClick = { viewModel.setFilter(filter) },
-                                    label = {
-                                        Text(
-                                            text = filter.name.lowercase()
-                                                .replaceFirstChar { it.uppercase() },
-                                            style = MaterialTheme.typography.labelMedium,
-                                        )
+                        val issueFilters = buildList {
+                            add(
+                                AdaptiveFilterSpec(
+                                    title = "Status",
+                                    choices = IssueStateFilter.entries.map {
+                                        FilterChoice(it.name, it.name.lowercase().replaceFirstChar { char -> char.uppercase() })
                                     },
+                                    selectedKeys = setOf(state.filter.name),
+                                    onSelectionChange = { selected ->
+                                        selected.firstOrNull()?.let { viewModel.setFilter(IssueStateFilter.valueOf(it)) }
+                                    },
+                                )
+                            )
+                            add(
+                                AdaptiveFilterSpec(
+                                    title = "Tags",
+                                    choices = state.availableLabels.map { FilterChoice(it, "#$it") },
+                                    selectedKeys = state.selectedLabels,
+                                    multiSelect = true,
+                                    searchable = true,
+                                    onSelectionChange = viewModel::setLabelFilters,
+                                )
+                            )
+                            if (state.availableMilestones.isNotEmpty()) {
+                                add(
+                                    AdaptiveFilterSpec(
+                                        title = "Milestone",
+                                        choices = state.availableMilestones.map {
+                                            FilterChoice(it.key, "${it.title} · ${it.repository.substringAfterLast('/')}")
+                                        },
+                                    selectedKeys = state.selectedMilestoneKey?.let(::setOf) ?: emptySet(),
+                                    searchable = true,
+                                    defaultKeys = emptySet(),
+                                        onSelectionChange = { viewModel.setMilestoneFilter(it.firstOrNull()) },
+                                    )
                                 )
                             }
                         }
+                        AdaptiveFilterBar(
+                            filters = issueFilters,
+                            hasActiveFilters = state.filter != IssueStateFilter.OPEN ||
+                                state.selectedLabels.isNotEmpty() || state.selectedMilestoneKey != null,
+                            onClear = viewModel::clearFilters,
+                        )
 
                         if (state.issues.isEmpty()) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -124,6 +172,7 @@ fun IssuesScreen(
                                 items(state.issues, key = { it.id }) { issue ->
                                     IssueListRow(
                                         issue = issue,
+                                        magicTags = state.magicTags,
                                         isSelected = navigator.currentDestination?.contentKey == issue.id.toString(),
                                         onClick = { openIssue(issue) },
                                     )
@@ -145,9 +194,10 @@ fun IssuesScreen(
                             commentLoading = commentLoading,
                             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
                             commentAttachments = state.commentAttachments,
+                            magicTags = state.magicTags,
                             onDismiss = { scope.launch { navigator.navigateBack() } },
-                            onSave = { title, body ->
-                                viewModel.saveIssue(issue, title, body)
+                            onSave = { title, body, labels ->
+                                viewModel.saveIssue(issue, title, body, labels)
                                 scope.launch { navigator.navigateBack() }
                             },
                             onToggleState = {
@@ -185,9 +235,10 @@ fun IssuesScreen(
             commentLoading = commentLoading,
             issueAttachments = state.issueAttachments[issue.id] ?: emptyList(),
             commentAttachments = state.commentAttachments,
+            magicTags = state.magicTags,
             onDismiss = { selectedIssue = null },
-            onSave = { title, body ->
-                viewModel.saveIssue(issue, title, body)
+            onSave = { title, body, labels ->
+                viewModel.saveIssue(issue, title, body, labels)
                 selectedIssue = null
             },
             onToggleState = {
@@ -217,6 +268,7 @@ private val updFmt = DateTimeFormatter.ofPattern("d MMM").withZone(ZoneId.system
 @Composable
 private fun IssueListRow(
     issue: GiteaIssue,
+    magicTags: List<String>,
     isSelected: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -272,17 +324,11 @@ private fun IssueListRow(
                     )
                 }
                 if (issue.labels.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    TagFlow(
+                        tags = issue.labels,
+                        magicTags = magicTags,
                         modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        issue.labels.take(3).forEach { label ->
-                            SuggestionChip(
-                                onClick = {},
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }

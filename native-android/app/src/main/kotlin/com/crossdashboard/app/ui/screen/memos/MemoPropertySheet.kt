@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import com.crossdashboard.app.domain.model.*
 import com.crossdashboard.app.ui.component.MarkdownText
+import com.crossdashboard.app.ui.component.TagFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -96,11 +97,7 @@ fun MemoPropertySheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (memo.tags.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        memo.tags.forEach { tag ->
-                            SuggestionChip(onClick = {}, label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
+                    TagFlow(tags = memo.tags)
                 }
             }
         }

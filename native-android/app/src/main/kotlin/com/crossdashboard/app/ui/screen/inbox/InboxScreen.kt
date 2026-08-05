@@ -2,6 +2,7 @@ package com.crossdashboard.app.ui.screen.inbox
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -17,6 +18,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
+import com.crossdashboard.app.ui.component.TagFlow
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -60,7 +65,13 @@ fun InboxScreen(
                 .padding(padding),
         ) {
             // ── Filter chips ──────────────────────────────────────────────────
-            FilterRow(filter = state.filter, onFilterChange = vm::setFilter)
+            FilterRow(
+                typeFilter = state.typeFilter,
+                dateFilter = state.dateFilter,
+                onTypeChange = vm::setTypeFilter,
+                onDateChange = vm::setDateFilter,
+                onClear = vm::clearFilters,
+            )
 
             if (state.items.isEmpty()) {
                 Box(
@@ -83,10 +94,24 @@ fun InboxScreen(
             ) {
                 items(state.items, key = { itemKey(it) }) { item ->
                     when (item) {
-                        is InboxItem.Event -> EventInboxRow(item, zone)
-                        is InboxItem.Task -> TaskInboxRow(item, zone)
-                        is InboxItem.Issue -> IssueInboxRow(item)
-                        is InboxItem.Milestone -> MilestoneInboxRow(item, zone)
+                        is InboxItem.Event -> EventInboxRow(
+                            item = item,
+                            zone = zone,
+                            onClick = { onNavigate(Destination.EventDetail(item.event.uid)) },
+                        )
+                        is InboxItem.Task -> TaskInboxRow(
+                            item = item,
+                            zone = zone,
+                            magicTags = state.magicTags,
+                            onClick = { onNavigate(Destination.TaskDetail(item.task.uid)) },
+                        )
+                        is InboxItem.Issue -> IssueInboxRow(
+                            item = item,
+                            magicTags = state.magicTags,
+                            onClick = {
+                                onNavigate(Destination.IssueDetail(item.issue.id, item.issue.repository))
+                            },
+                        )
                     }
                     HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 }
@@ -127,32 +152,37 @@ fun InboxScreen(
 // ─── Filter chips ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun FilterRow(filter: InboxFilter, onFilterChange: (InboxFilter) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        InboxFilter.entries.forEach { f ->
-            val label = f.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-            FilterChip(
-                selected = filter == f,
-                onClick = { onFilterChange(f) },
-                label = { Text(label) },
-                modifier = Modifier.semantics {
-                    contentDescription = "Show $label items"
-                    stateDescription = if (filter == f) "selected" else "not selected"
-                },
-            )
-        }
-    }
+private fun FilterRow(
+    typeFilter: InboxTypeFilter,
+    dateFilter: InboxDateFilter,
+    onTypeChange: (InboxTypeFilter) -> Unit,
+    onDateChange: (InboxDateFilter) -> Unit,
+    onClear: () -> Unit,
+) {
+    AdaptiveFilterBar(
+        filters = listOf(
+            AdaptiveFilterSpec(
+                title = "Type",
+                choices = InboxTypeFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                selectedKeys = setOf(typeFilter.name),
+                onSelectionChange = { keys -> keys.firstOrNull()?.let { onTypeChange(InboxTypeFilter.valueOf(it)) } },
+            ),
+            AdaptiveFilterSpec(
+                title = "Time range",
+                choices = InboxDateFilter.entries.map { FilterChoice(it.name, it.displayName) },
+                selectedKeys = setOf(dateFilter.name),
+                onSelectionChange = { keys -> keys.firstOrNull()?.let { onDateChange(InboxDateFilter.valueOf(it)) } },
+            ),
+        ),
+        hasActiveFilters = typeFilter != InboxTypeFilter.ALL || dateFilter != InboxDateFilter.ALL,
+        onClear = onClear,
+    )
 }
 
 // ─── Item rows ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun EventInboxRow(item: InboxItem.Event, zone: ZoneId) {
+private fun EventInboxRow(item: InboxItem.Event, zone: ZoneId, onClick: () -> Unit) {
     val event = item.event
     val startZdt = event.start.atZone(zone)
     val endZdt = event.end.atZone(zone)
@@ -167,8 +197,12 @@ private fun EventInboxRow(item: InboxItem.Event, zone: ZoneId) {
     val locationStr = event.location?.let { ", at $it" } ?: ""
     val rowDesc = "Event: ${event.summary}, $dateStr$locationStr$timeStr"
 
-    ListItem(
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDesc },
+    ) {
+        ListItem(
         leadingContent = {
             Icon(
                 Icons.Outlined.CalendarMonth,
@@ -192,11 +226,17 @@ private fun EventInboxRow(item: InboxItem.Event, zone: ZoneId) {
                 )
             }
         },
-    )
+        )
+    }
 }
 
 @Composable
-private fun TaskInboxRow(item: InboxItem.Task, zone: ZoneId) {
+private fun TaskInboxRow(
+    item: InboxItem.Task,
+    zone: ZoneId,
+    magicTags: List<String>,
+    onClick: () -> Unit,
+) {
     val task = item.task
     val now = java.time.Instant.now()
     val isOverdue = task.due?.isBefore(now) == true && task.status != TaskStatus.COMPLETED
@@ -204,12 +244,16 @@ private fun TaskInboxRow(item: InboxItem.Task, zone: ZoneId) {
     val overdueStr = if (isOverdue) "overdue, " else ""
     val dueDesc = if (dueStr != null) ", due $dueStr" else ""
     val tagsDesc = if (task.categories.isNotEmpty())
-        ", tags: ${task.categories.take(3).joinToString { "#$it" }}" else ""
+        ", tags: ${task.categories.joinToString { "#${it.trimStart('#')}" }}" else ""
     val timeStr = item.estimatedMinutes?.let { ", ${InboxViewModel.formatMinutes(it)}" } ?: ""
     val rowDesc = "Task: $overdueStr${task.summary}$dueDesc$tagsDesc$timeStr"
 
-    ListItem(
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDesc },
+    ) {
+        ListItem(
         leadingContent = {
             Icon(
                 Icons.Outlined.CheckBoxOutlineBlank,
@@ -227,7 +271,7 @@ private fun TaskInboxRow(item: InboxItem.Task, zone: ZoneId) {
             )
         },
         supportingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (dueStr != null) {
                     Text(
                         if (isOverdue) "⚠ $dueStr" else dueStr,
@@ -236,12 +280,8 @@ private fun TaskInboxRow(item: InboxItem.Task, zone: ZoneId) {
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                task.categories.take(3).forEach { tag ->
-                    SuggestionChip(
-                        onClick = {},
-                        label = { Text("#$tag", style = MaterialTheme.typography.labelSmall) },
-                        modifier = Modifier.height(20.dp),
-                    )
+                if (task.categories.isNotEmpty()) {
+                    TagFlow(tags = task.categories, magicTags = magicTags)
                 }
             }
         },
@@ -254,19 +294,28 @@ private fun TaskInboxRow(item: InboxItem.Task, zone: ZoneId) {
                 )
             }
         },
-    )
+        )
+    }
 }
 
 @Composable
-private fun IssueInboxRow(item: InboxItem.Issue) {
+private fun IssueInboxRow(
+    item: InboxItem.Issue,
+    magicTags: List<String>,
+    onClick: () -> Unit,
+) {
     val issue = item.issue
     val labelsDesc = if (issue.labels.isNotEmpty())
-        ", labels: ${issue.labels.take(2).joinToString()}" else ""
+        ", labels: ${issue.labels.joinToString()}" else ""
     val timeStr = item.estimatedMinutes?.let { ", ${InboxViewModel.formatMinutes(it)}" } ?: ""
     val rowDesc = "Issue: ${issue.title}, ${issue.state}, ${issue.repository}$labelsDesc$timeStr"
 
-    ListItem(
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDesc },
+    ) {
+        ListItem(
         leadingContent = {
             Icon(
                 Icons.Outlined.BugReport,
@@ -276,18 +325,14 @@ private fun IssueInboxRow(item: InboxItem.Issue) {
         },
         headlineContent = { Text(issue.title, fontWeight = FontWeight.Medium) },
         supportingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     issue.repository,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                issue.labels.take(2).forEach { label ->
-                    SuggestionChip(
-                        onClick = {},
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                        modifier = Modifier.height(20.dp),
-                    )
+                if (issue.labels.isNotEmpty()) {
+                    TagFlow(tags = issue.labels, magicTags = magicTags)
                 }
             }
         },
@@ -300,34 +345,8 @@ private fun IssueInboxRow(item: InboxItem.Issue) {
                 )
             }
         },
-    )
-}
-
-@Composable
-private fun MilestoneInboxRow(item: InboxItem.Milestone, zone: ZoneId) {
-    val ms = item.milestone
-    val dueStr = ms.dueOn?.atZone(zone)?.format(DATE_FMT)
-    val dueDesc = if (dueStr != null) ", due $dueStr" else ""
-    val rowDesc = "Milestone: ${ms.title}, ${ms.openIssues} open, ${ms.closedIssues} closed$dueDesc"
-
-    ListItem(
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDesc },
-        leadingContent = {
-            Icon(
-                Icons.Outlined.Flag,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-            )
-        },
-        headlineContent = { Text(ms.title, fontWeight = FontWeight.Medium) },
-        supportingContent = {
-            Text(
-                "${ms.openIssues} open · ${ms.closedIssues} closed" +
-                    (if (dueStr != null) " · due $dueStr" else ""),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        },
-    )
+        )
+    }
 }
 
 // ─── Key helpers ──────────────────────────────────────────────────────────────
@@ -336,5 +355,4 @@ private fun itemKey(item: InboxItem): String = when (item) {
     is InboxItem.Event -> "event_${item.event.uid}"
     is InboxItem.Task -> "task_${item.task.uid}"
     is InboxItem.Issue -> "issue_${item.issue.id}"
-    is InboxItem.Milestone -> "milestone_${item.milestone.id}"
 }

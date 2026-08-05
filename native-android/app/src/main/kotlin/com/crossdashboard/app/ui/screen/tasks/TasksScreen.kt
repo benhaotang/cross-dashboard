@@ -40,8 +40,11 @@ import com.crossdashboard.app.domain.model.CalDavTask
 import com.crossdashboard.app.domain.model.TaskStatus
 import com.crossdashboard.app.ui.component.CalendarColorDot
 import com.crossdashboard.app.ui.component.CalendarColorResolver
+import com.crossdashboard.app.ui.component.AdaptiveFilterBar
+import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
+import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.component.PriorityChip
-import com.crossdashboard.app.ui.component.TagChip
+import com.crossdashboard.app.ui.component.TagFlow
 import com.crossdashboard.app.ui.navigation.Destination
 import kotlinx.coroutines.delay
 import java.time.ZoneId
@@ -96,9 +99,9 @@ fun TasksScreenContent(
 
     // Handle task-reminder notification tap: auto-open the detail pane for the target task
     var initialNavigationDone by remember(initialUid) { mutableStateOf(false) }
-    LaunchedEffect(initialUid, state.rootTasks) {
-        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.rootTasks.isNotEmpty()) {
-            val target = state.rootTasks.find { it.uid == initialUid }
+    LaunchedEffect(initialUid, state.tasks) {
+        if (!initialNavigationDone && !initialUid.isNullOrEmpty() && state.tasks.isNotEmpty()) {
+            val target = state.tasks.find { it.uid == initialUid }
             if (target != null) {
                 selectedTask = target
                 if (navigator.scaffoldValue[ListDetailPaneScaffoldRole.Detail] != PaneAdaptedValue.Hidden) {
@@ -136,8 +139,10 @@ fun TasksScreenContent(
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // ── Filter chips ────────────────────────────
                                 FilterRow(
-                                    selected = state.filter,
-                                    onSelect = viewModel::setFilter,
+                                    state = state,
+                                    onSelectStatus = viewModel::setFilter,
+                                    onSelectTags = viewModel::setTagFilters,
+                                    onClear = viewModel::clearFilters,
                                 )
 
                                 // ── Quick input bar ─────────────────────────
@@ -193,6 +198,7 @@ fun TasksScreenContent(
                                                 onSubtaskClick = { openTask(it) },
                                                 onSubtaskToggle = { viewModel.toggleComplete(it) },
                                                 onSubtaskExpand = { viewModel.toggleExpand(it.uid) },
+                                                magicTags = state.kanbanColumns,
                                                 isSelected = task.uid == selectedUid,
                                             )
                                         }
@@ -293,30 +299,35 @@ private fun TasksTopBar(onRefresh: () -> Unit, isLoading: Boolean = false) {
 
 @Composable
 private fun FilterRow(
-    selected: TaskFilter,
-    onSelect: (TaskFilter) -> Unit,
+    state: TasksUiState,
+    onSelectStatus: (TaskFilter) -> Unit,
+    onSelectTags: (Set<String>) -> Unit,
+    onClear: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        TaskFilter.entries.forEach { filter ->
-            val label = filter.name.lowercase().replaceFirstChar { it.uppercase() }
-            FilterChip(
-                selected = selected == filter,
-                onClick = { onSelect(filter) },
-                label = {
-                    Text(label, style = MaterialTheme.typography.labelMedium)
+    AdaptiveFilterBar(
+        filters = listOf(
+            AdaptiveFilterSpec(
+                title = "Status",
+                choices = TaskFilter.entries.map {
+                    FilterChoice(it.name, it.name.lowercase().replaceFirstChar { char -> char.uppercase() })
                 },
-                modifier = Modifier.semantics {
-                    contentDescription = "$label tasks filter"
-                    stateDescription = if (selected == filter) "selected" else "not selected"
+                selectedKeys = setOf(state.filter.name),
+                onSelectionChange = { selected ->
+                    selected.firstOrNull()?.let { onSelectStatus(TaskFilter.valueOf(it)) }
                 },
-            )
-        }
-    }
+            ),
+            AdaptiveFilterSpec(
+                title = "Tags",
+                choices = state.availableTags.map { FilterChoice(it, "#$it") },
+                selectedKeys = state.selectedTags,
+                multiSelect = true,
+                searchable = true,
+                onSelectionChange = onSelectTags,
+            ),
+        ),
+        hasActiveFilters = state.filter != TaskFilter.ACTIVE || state.selectedTags.isNotEmpty(),
+        onClear = onClear,
+    )
 }
 
 // ─── Quick input bar ──────────────────────────────────────────────────────────
@@ -356,24 +367,26 @@ private fun QuickInputBar(
 
         // Live parse preview chips
         if (parsedPreview != null && input.isNotBlank()) {
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (parsedPreview.priority > 0) {
-                    PriorityChip(priority = parsedPreview.priority)
+            Column(modifier = Modifier.padding(top = 4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (parsedPreview.priority > 0) {
+                        PriorityChip(priority = parsedPreview.priority)
+                    }
+                    parsedPreview.due?.let { due ->
+                        val fmt = DateTimeFormatter.ofPattern("d MMM HH:mm").withZone(ZoneId.systemDefault())
+                        SuggestionChip(
+                            onClick = {},
+                            label = {
+                                Text(fmt.format(due), style = MaterialTheme.typography.labelSmall)
+                            },
+                            modifier = Modifier.semantics { contentDescription = "Due: ${fmt.format(due)}" },
+                        )
+                    }
                 }
-                parsedPreview.categories.forEach { tag ->
-                    TagChip(label = "#$tag")
-                }
-                parsedPreview.due?.let { due ->
-                    val fmt = DateTimeFormatter.ofPattern("d MMM HH:mm").withZone(ZoneId.systemDefault())
-                    SuggestionChip(
-                        onClick = {},
-                        label = {
-                            Text(fmt.format(due), style = MaterialTheme.typography.labelSmall)
-                        },
-                        modifier = Modifier.semantics { contentDescription = "Due: ${fmt.format(due)}" },
+                if (parsedPreview.categories.isNotEmpty()) {
+                    TagFlow(
+                        tags = parsedPreview.categories,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
@@ -399,6 +412,7 @@ private fun TaskTreeNode(
     onSubtaskClick: (CalDavTask) -> Unit,
     onSubtaskToggle: (CalDavTask) -> Unit,
     onSubtaskExpand: (CalDavTask) -> Unit,
+    magicTags: List<String>,
     isSelected: Boolean = false,
 ) {
     val subtasks by subtasksFlow.collectAsStateWithLifecycle(emptyList())
@@ -414,6 +428,7 @@ private fun TaskTreeNode(
         onClick = onTaskClick,
         onToggleComplete = onToggleComplete,
         colorResolver = colorResolver,
+        magicTags = magicTags,
         isSelected = isSelected,
     )
 
@@ -430,6 +445,7 @@ private fun TaskTreeNode(
                     onClick = { onSubtaskClick(child) },
                     onToggleComplete = { onSubtaskToggle(child) },
                     colorResolver = colorResolver,
+                    magicTags = magicTags,
                 )
             }
         }
@@ -448,6 +464,7 @@ private fun TaskRow(
     onClick: () -> Unit,
     onToggleComplete: () -> Unit,
     colorResolver: CalendarColorResolver?,
+    magicTags: List<String>,
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
 ) {
@@ -468,10 +485,12 @@ private fun TaskRow(
         else -> ""
     }
     val dueDesc = task.due?.let { ", due ${dueFmt.format(it)}" } ?: ""
+    val tagsDesc = if (task.categories.isEmpty()) "" else
+        ", tags: ${task.categories.joinToString { "#${it.trimStart('#')}" }}"
     val subtaskDesc = if (hasChildren)
         ", $subtaskCount subtask${if (subtaskCount == 1) "" else "s"}, ${if (expanded) "expanded" else "collapsed"}"
     else ""
-    val rowDescription = "${task.summary}, $statusDesc$priorityDesc$dueDesc$subtaskDesc"
+    val rowDescription = "${task.summary}, $statusDesc$priorityDesc$dueDesc$tagsDesc$subtaskDesc"
 
     // Shared element: only the selected row participates in the card→detail transition.
     val sharedTransScope = LocalSharedTransitionScope.current
@@ -548,6 +567,13 @@ private fun TaskRow(
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+                if (task.categories.isNotEmpty()) {
+                    TagFlow(
+                        tags = task.categories,
+                        magicTags = magicTags,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
             }
 

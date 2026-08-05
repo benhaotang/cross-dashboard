@@ -87,16 +87,22 @@ class GiteaClient @Inject constructor(
 
     suspend fun fetchLabels(repo: String): List<GiteaLabel> = withContext(Dispatchers.IO) {
         val base = instanceUrl() ?: return@withContext emptyList()
-        val response = get("$base/api/v1/repos/$repo/labels") ?: return@withContext emptyList()
-        runCatching { json.decodeFromString<List<GiteaLabelDto>>(response) }
-            .getOrNull()?.map { GiteaLabel(it.id, it.name, it.color) }
-            ?: emptyList()
+        val labels = mutableListOf<GiteaLabel>()
+        for (page in 1..100) {
+            val response = get("$base/api/v1/repos/$repo/labels?page=$page&limit=50")
+                ?: break
+            val batch = runCatching { json.decodeFromString<List<GiteaLabelDto>>(response) }
+                .getOrNull() ?: break
+            if (batch.isEmpty()) break
+            labels += batch.map { GiteaLabel(it.id, it.name, it.color) }
+        }
+        labels
     }
 
     suspend fun createRepoLabel(repo: String, name: String, color: String = "0075ca"): GiteaLabel =
         withContext(Dispatchers.IO) {
             val base = instanceUrl() ?: throw IOException("No instance configured")
-            val payload = """{"name":"$name","color":"#$color"}"""
+            val payload = """{"name":${json.encodeToString(name)},"color":${json.encodeToString("#$color")}}"""
             val response = post("$base/api/v1/repos/$repo/labels", payload)
                 ?: throw IOException("Label creation failed")
             val dto = json.decodeFromString<GiteaLabelDto>(response)
@@ -107,7 +113,9 @@ class GiteaClient @Inject constructor(
         withContext(Dispatchers.IO) {
             val base = instanceUrl() ?: throw IOException("No instance configured")
             val payload = """{"labels":[${labelIds.joinToString(",")}]}"""
-            put("$base/api/v1/repos/$repo/issues/$number/labels", payload)
+            if (put("$base/api/v1/repos/$repo/issues/$number/labels", payload) == null) {
+                throw IOException("Label update failed")
+            }
         }
 
     suspend fun fetchIssueAttachments(repo: String, issueNumber: Int): List<GiteaAttachment> =
@@ -257,6 +265,7 @@ class GiteaClient @Inject constructor(
         val created_at: String,
         val updated_at: String,
         val html_url: String,
+        val milestone: GiteaMilestoneDto? = null,
     ) {
         fun toDomain(repo: String) = GiteaIssue(
             id = id,
@@ -270,8 +279,18 @@ class GiteaClient @Inject constructor(
             updatedAt = Instant.parse(updated_at),
             repository = repo,
             htmlUrl = html_url,
+            milestoneId = milestone?.id,
+            milestoneTitle = milestone?.title,
+            milestoneDueOn = milestone?.due_on?.let(Instant::parse),
         )
     }
+
+    @Serializable
+    private data class GiteaMilestoneDto(
+        val id: Long,
+        val title: String,
+        val due_on: String? = null,
+    )
 
     @Serializable
     private data class GiteaCommentDto(
