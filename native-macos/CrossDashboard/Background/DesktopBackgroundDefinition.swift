@@ -7,8 +7,13 @@ enum DesktopBackgroundImageFit: String, CaseIterable, Identifiable {
     var label: String { rawValue.capitalized }
 }
 
+enum DesktopBackgroundImageSlot: String {
+    case both, light, dark
+}
+
 struct DesktopBackgroundAppearance {
     var imageURL: URL?
+    var usesContainerAppearanceVariants: Bool = false
     var glassOpacity: CGFloat
     var imageFit: DesktopBackgroundImageFit
 }

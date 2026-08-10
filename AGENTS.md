@@ -221,6 +221,10 @@ picture, retain the solid light/dark fallback. Android and macOS renderer accent
 the current Android system/Material dynamic accent and macOS `controlAccentColor`, respectively,
 rather than a fixed project color.
 
+macOS has independent Both, Light, and Dark backdrop imports. Appearance-specific images override
+the Both slot. For a multi-image HEIC/HEIF imported into Both, ImageIO frame 0 is the light endpoint
+and the final frame is the dark endpoint; ordinary single-image files are reused for both variants.
+
 ### Data Layer
 - **Room is the source of truth.** UI observes `Flow<List<T>>` from DAOs and renders immediately from cache.
 - `SyncWorker` runs in the background (WorkManager) and does `clearAll() + upsert(freshData)` into Room.

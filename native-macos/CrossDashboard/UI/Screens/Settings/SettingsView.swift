@@ -287,17 +287,15 @@ private struct AppearanceSettingsTab: View {
 private struct DesktopBackgroundSettingsSection: View {
     @State private var manager = DesktopBackgroundManager.shared
     @State private var choosingPicture = false
+    @State private var pendingImageSlot: DesktopBackgroundImageSlot = .both
     @State private var pendingOpacity = 0.8
     var body: some View {
         Section("Desktop background") {
-            LabeledContent("Backdrop picture") {
-                HStack {
-                    Button(manager.imagePath == nil ? "Choose…" : "Replace…") { choosingPicture = true }
-                    if manager.imagePath != nil {
-                        Button("Remove", role: .destructive) { Task { await manager.removeBackdrop() } }
-                    }
-                }
-            }
+            backdropRow("Both appearances", slot: .both, selected: manager.imagePath != nil)
+            backdropRow("Light appearance", slot: .light, selected: manager.lightImagePath != nil)
+            backdropRow("Dark appearance", slot: .dark, selected: manager.darkImagePath != nil)
+            Text("Light and Dark selections override Both. A multi-image HEIC selected for Both uses its first frame in Light appearance and its last frame in Dark appearance.")
+                .font(.caption).foregroundStyle(.secondary)
             Picker("Picture fit", selection: Binding(
                 get: { manager.imageFit }, set: { manager.setImageFit($0) }
             )) {
@@ -333,9 +331,27 @@ private struct DesktopBackgroundSettingsSection: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .fileImporter(isPresented: $choosingPicture, allowedContentTypes: [.image]) { result in
-            if case .success(let url) = result { Task { await manager.importBackdrop(from: url) } }
+            if case .success(let url) = result {
+                let slot = pendingImageSlot
+                Task { await manager.importBackdrop(from: url, for: slot) }
+            }
         }
         .onAppear { pendingOpacity = manager.glassOpacity }
+    }
+
+    @ViewBuilder
+    private func backdropRow(_ label: String, slot: DesktopBackgroundImageSlot, selected: Bool) -> some View {
+        LabeledContent(label) {
+            HStack {
+                Text(manager.imageSummary(for: slot)).foregroundStyle(.secondary)
+                Button(selected ? "Replace…" : "Choose…") {
+                    pendingImageSlot = slot; choosingPicture = true
+                }
+                if selected {
+                    Button("Remove", role: .destructive) { Task { await manager.removeBackdrop(slot) } }
+                }
+            }
+        }
     }
 }
 

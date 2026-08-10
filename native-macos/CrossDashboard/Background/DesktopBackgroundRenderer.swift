@@ -1,5 +1,6 @@
 import AppKit
 import CoreImage
+import ImageIO
 
 @MainActor
 enum DesktopBackgroundRenderer {
@@ -18,21 +19,21 @@ enum DesktopBackgroundRenderer {
         let canvas = NSRect(x: 0, y: 0, width: width, height: height)
         (dark ? NSColor.black : NSColor.white).setFill()
         NSBezierPath(rect: canvas).fill()
-        let backdrop = appearance.imageURL.flatMap { NSImage(contentsOf: $0) }
+        let backdrop = loadBackdrop(appearance, dark: dark)
         if let backdrop { drawBackdrop(backdrop, in: canvas, fit: appearance.imageFit) }
         let blurredBackdrop = backdrop.flatMap { blurredImage($0) }
         let text = dark ? NSColor(hex: 0xEAF0F7) : NSColor(hex: 0x172235)
         let secondary = dark ? NSColor(hex: 0x9AABC2) : NSColor(hex: 0x52647A)
         let glassTint: NSColor = dark ? .black : .white
         let margin = min(width, height) * 0.065
-        drawGlass(in: NSRect(x: margin - 22, y: height - margin - 155,
-            width: width - margin * 2 + 44, height: 130), radius: 18,
+        drawGlass(in: NSRect(x: margin - 22, y: height - margin - 175,
+            width: width - margin * 2 + 44, height: 155), radius: 18,
             backdrop: blurredBackdrop, canvas: canvas, fit: appearance.imageFit,
             tint: glassTint, opacity: appearance.glassOpacity)
-        draw(content.title, at: NSPoint(x: margin, y: height - margin - 92), size: 72, color: text, bold: true, width: width - margin * 2)
-        draw(content.filters + (content.mode.map { "  ·  \($0)" } ?? "") + "  ·  \(content.rows.count) visible", at: NSPoint(x: margin, y: height - margin - 135), size: 24, color: secondary, width: width - margin * 2)
+        draw(content.title, at: NSPoint(x: margin, y: height - margin - 128), size: 64, color: text, bold: true, width: width - margin * 2)
+        draw(content.filters + (content.mode.map { "  ·  \($0)" } ?? "") + "  ·  \(content.rows.count) visible", at: NSPoint(x: margin, y: height - margin - 160), size: 22, color: secondary, width: width - margin * 2)
         let stamp = content.refreshedAt.formatted(date: .omitted, time: .shortened)
-        draw("UPDATED \(stamp)", at: NSPoint(x: width - margin - 300, y: height - margin - 82), size: 18, color: secondary, width: 300)
+        draw("UPDATED \(stamp)", at: NSPoint(x: width - margin - 300, y: height - margin - 116), size: 18, color: secondary, width: 300)
         if content.mode != nil && width >= height * 1.15 && width >= 1_400 {
             drawWideBoard(content, in: NSRect(x: margin, y: margin * 1.6,
                 width: width - margin * 2, height: height - margin * 2.6 - 190),
@@ -175,6 +176,23 @@ enum DesktopBackgroundRenderer {
         guard let output = filter.outputImage?.cropped(to: input.extent),
               let cgImage = CIContext().createCGImage(output, from: input.extent) else { return nil }
         return NSImage(cgImage: cgImage, size: image.size)
+    }
+
+    private static func loadBackdrop(_ appearance: DesktopBackgroundAppearance, dark: Bool) -> NSImage? {
+        guard let url = appearance.imageURL,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let count = CGImageSourceGetCount(source)
+        guard count > 0 else { return nil }
+        let index: Int
+        let extensionName = url.pathExtension.lowercased()
+        let pairedHEIC = extensionName == "heic" || extensionName == "heif"
+        if appearance.usesContainerAppearanceVariants && pairedHEIC && count > 1 {
+            index = dark ? count - 1 : 0
+        } else {
+            index = CGImageSourceGetPrimaryImageIndex(source)
+        }
+        guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
     }
 
     private static func drawFooter(_ content: DesktopBackgroundContent, visibleCount: Int,

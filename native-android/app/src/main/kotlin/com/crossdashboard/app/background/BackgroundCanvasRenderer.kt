@@ -7,8 +7,6 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import com.crossdashboard.app.ui.screen.inbox.InboxViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -32,8 +30,10 @@ object BackgroundCanvasRenderer {
         canvas.drawColor(ink)
         val w = canvas.width.toFloat()
         val h = canvas.height.toFloat()
-        val glassSource = backdrop?.let { composeBackdrop(it, canvas.width, canvas.height, appearance.imageFit, ink) }
-        glassSource?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+        val composedBackdrop = backdrop?.let { composeBackdrop(it, canvas.width, canvas.height, appearance.imageFit, ink) }
+        composedBackdrop?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+        val glassSource = composedBackdrop?.let(::downsampleForGlass)
+        composedBackdrop?.recycle()
         val glassTint = if (dark) Color.BLACK else Color.WHITE
         val landscape = w > h
         val margin = (minOf(w, h) * .065f).coerceAtLeast(32f)
@@ -172,15 +172,18 @@ object BackgroundCanvasRenderer {
         if (source != null) {
             canvas.save()
             canvas.clipPath(Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) })
-            canvas.drawBitmap(source, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                renderEffect = RenderEffect.createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
-            })
+            canvas.drawBitmap(source, null, android.graphics.Rect(0, 0, canvas.width, canvas.height),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
             canvas.restore()
         }
         canvas.drawRoundRect(rect, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb((opacity.coerceIn(.5f, 1f) * 255).toInt(), Color.red(tint), Color.green(tint), Color.blue(tint))
         })
     }
+
+    private fun downsampleForGlass(source: Bitmap): Bitmap = Bitmap.createScaledBitmap(
+        source, maxOf(64, source.width / 24), maxOf(64, source.height / 24), true
+    )
 
     private fun composeBackdrop(source: Bitmap, width: Int, height: Int, fit: WallpaperImageFit, fallback: Int): Bitmap {
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

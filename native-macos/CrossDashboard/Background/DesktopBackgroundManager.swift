@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import OSLog
 import CrossDashboardKit
+import ImageIO
 
 @Observable
 @MainActor
@@ -10,16 +11,22 @@ final class DesktopBackgroundManager {
     private static let logger = Logger(subsystem: "com.crossdashboard.app", category: "DesktopBackground")
     private let key = "desktop_background_definition"
     private let imageKey = "desktop_background_image_path"
+    private let lightImageKey = "desktop_background_light_image_path"
+    private let darkImageKey = "desktop_background_dark_image_path"
     private let opacityKey = "desktop_background_glass_opacity"
     private let fitKey = "desktop_background_image_fit"
     var definition: DesktopBackgroundDefinition?
     var lastMessage = "No background snapshot"
     var imagePath: String?
+    var lightImagePath: String?
+    var darkImagePath: String?
     var glassOpacity: Double
     var imageFit: DesktopBackgroundImageFit
 
     private init() {
         imagePath = UserDefaults.standard.string(forKey: imageKey)
+        lightImagePath = UserDefaults.standard.string(forKey: lightImageKey)
+        darkImagePath = UserDefaults.standard.string(forKey: darkImageKey)
         let storedOpacity = UserDefaults.standard.object(forKey: opacityKey) as? Double
         glassOpacity = min(1, max(0.5, storedOpacity ?? 0.8))
         imageFit = DesktopBackgroundImageFit(rawValue: UserDefaults.standard.string(forKey: fitKey) ?? "") ?? .fill
@@ -28,30 +35,39 @@ final class DesktopBackgroundManager {
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.applyCurrentAppearance() } }
     }
 
-    func importBackdrop(from source: URL) async {
+    func importBackdrop(from source: URL, for slot: DesktopBackgroundImageSlot) async {
         let accessed = source.startAccessingSecurityScopedResource()
         defer { if accessed { source.stopAccessingSecurityScopedResource() } }
         do {
             let directory = try backgroundDirectory()
-            let destination = directory.appendingPathComponent("source-image")
+            let stem = switch slot { case .both: "source-image"; case .light: "source-image-light"; case .dark: "source-image-dark" }
+            let destination = directory.appendingPathComponent(stem)
                 .appendingPathExtension(source.pathExtension.isEmpty ? "image" : source.pathExtension)
-            let temporary = directory.appendingPathComponent("source-image.import")
+            let temporary = directory.appendingPathComponent("\(stem).import")
             try? FileManager.default.removeItem(at: temporary)
             try FileManager.default.copyItem(at: source, to: temporary)
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: temporary, to: destination)
-            if let old = imagePath, old != destination.path { try? FileManager.default.removeItem(atPath: old) }
-            imagePath = destination.path
+            let old = path(for: slot)
+            if let old, old != destination.path { try? FileManager.default.removeItem(atPath: old) }
+            setPath(destination.path, for: slot)
+            if slot == .both {
+                removeStoredImage(for: .light)
+                removeStoredImage(for: .dark)
+            }
             persistAppearance()
+            let variants = imageCount(at: destination)
+            lastMessage = slot == .both && isHEIC(destination) && variants > 1
+                ? "Imported HEIC with \(variants) appearance frames"
+                : "Backdrop picture imported"
             await refreshIfEnabled(reason: "Backdrop picture changed", force: true)
         } catch {
             lastMessage = "Background image error: \(error.localizedDescription)"
         }
     }
 
-    func removeBackdrop() async {
-        if let imagePath { try? FileManager.default.removeItem(atPath: imagePath) }
-        self.imagePath = nil
+    func removeBackdrop(_ slot: DesktopBackgroundImageSlot) async {
+        removeStoredImage(for: slot)
         persistAppearance()
         await refreshIfEnabled(reason: "Backdrop picture removed", force: true)
     }
@@ -101,14 +117,17 @@ final class DesktopBackgroundManager {
         let content = build(definition)
         do {
             let directory = try backgroundDirectory()
-            let appearance = DesktopBackgroundAppearance(
-                imageURL: imagePath.map { URL(fileURLWithPath: $0) },
-                glassOpacity: CGFloat(glassOpacity), imageFit: imageFit)
             let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .controlAccentColor
             for screen in NSScreen.screens {
                 let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
                 let pixels = CGSize(width: screen.frame.width * screen.backingScaleFactor, height: screen.frame.height * screen.backingScaleFactor)
                 for dark in [false, true] {
+                    let specificPath = dark ? darkImagePath : lightImagePath
+                    let selectedPath = specificPath ?? imagePath
+                    let appearance = DesktopBackgroundAppearance(
+                        imageURL: selectedPath.map { URL(fileURLWithPath: $0) },
+                        usesContainerAppearanceVariants: specificPath == nil && imagePath != nil,
+                        glassOpacity: CGFloat(glassOpacity), imageFit: imageFit)
                     guard let data = DesktopBackgroundRenderer.render(content, pixels: pixels, dark: dark,
                         appearance: appearance, accent: accent) else {
                         throw DesktopBackgroundError.renderFailed(id, pixels)
@@ -225,8 +244,41 @@ final class DesktopBackgroundManager {
     private func persistAppearance() {
         if let imagePath { UserDefaults.standard.set(imagePath, forKey: imageKey) }
         else { UserDefaults.standard.removeObject(forKey: imageKey) }
+        if let lightImagePath { UserDefaults.standard.set(lightImagePath, forKey: lightImageKey) }
+        else { UserDefaults.standard.removeObject(forKey: lightImageKey) }
+        if let darkImagePath { UserDefaults.standard.set(darkImagePath, forKey: darkImageKey) }
+        else { UserDefaults.standard.removeObject(forKey: darkImageKey) }
         UserDefaults.standard.set(glassOpacity, forKey: opacityKey)
         UserDefaults.standard.set(imageFit.rawValue, forKey: fitKey)
+    }
+
+    func imageSummary(for slot: DesktopBackgroundImageSlot) -> String {
+        guard let path = path(for: slot) else { return "Not selected" }
+        let count = imageCount(at: URL(fileURLWithPath: path))
+        return slot == .both && isHEIC(URL(fileURLWithPath: path)) && count > 1
+            ? "HEIC · \(count) appearance frames" : "Selected"
+    }
+
+    private func path(for slot: DesktopBackgroundImageSlot) -> String? {
+        switch slot { case .both: imagePath; case .light: lightImagePath; case .dark: darkImagePath }
+    }
+
+    private func setPath(_ value: String?, for slot: DesktopBackgroundImageSlot) {
+        switch slot { case .both: imagePath = value; case .light: lightImagePath = value; case .dark: darkImagePath = value }
+    }
+
+    private func removeStoredImage(for slot: DesktopBackgroundImageSlot) {
+        if let value = path(for: slot) { try? FileManager.default.removeItem(atPath: value) }
+        setPath(nil, for: slot)
+    }
+
+    private func imageCount(at url: URL) -> Int {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return 0 }
+        return CGImageSourceGetCount(source)
+    }
+
+    private func isHEIC(_ url: URL) -> Bool {
+        ["heic", "heif"].contains(url.pathExtension.lowercased())
     }
 
     private func backgroundDirectory() throws -> URL {

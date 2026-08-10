@@ -61,7 +61,7 @@ class DashboardWallpaperService : WallpaperService() {
                     runCatching {
                         android.graphics.ImageDecoder.decodeBitmap(
                             android.graphics.ImageDecoder.createSource(java.io.File(path))
-                        ) { decoder, _, _ -> decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE }
+                        ) { decoder, _, _ -> decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE) }
                     }.getOrNull()
                 }
                 val content = template?.takeIf { it.enabled }?.let { builder.build(it) }

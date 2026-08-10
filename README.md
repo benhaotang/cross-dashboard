@@ -116,6 +116,9 @@ Background Settings can add a personal picture beneath the snapshot. Scale, Fill
 placement modes are available, and the content is drawn on light- or dark-tinted blurred glass
 whose opacity defaults to 80% and can be adjusted from 50–100%. Removing the picture restores the solid light/dark background.
 Android and macOS planning accents follow the current system accent color.
+On macOS, a backdrop can be supplied for both appearances or separately for Light and Dark.
+Multi-image HEIC/HEIF files selected for both use their first and last frames as the light and dark
+endpoints, respectively.
 
 Linux accepts any direct command template containing `%f`, which is replaced by the rendered file
 path. Presets are provided for `xwallpaper --zoom %f` and `swaybg -o "*" -i %f -m fill`. Commands
