@@ -11,6 +11,6 @@ public enum AppTimeZone {
     public static func applyOverride(_ identifier: String?) {
         let normalized = identifier?.trimmingCharacters(in: .whitespacesAndNewlines)
         let selected = normalized.flatMap { $0.isEmpty ? nil : TimeZone(identifier: $0) }
-        NSTimeZone.default = (selected ?? system) as NSTimeZone
+        NSTimeZone.default = selected ?? system
     }
 }

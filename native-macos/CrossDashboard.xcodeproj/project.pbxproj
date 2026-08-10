@@ -38,6 +38,7 @@
 		5B2CFE5D85A8C49C5236C238 /* NextcloudLoginFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */; };
 		61E48A4E77C4BB702942F927 /* MemoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5877BCA60E880220B7CC2EBF /* MemoRepository.swift */; };
 		6DAF738052CD6D8DB479867D /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD9483C874CB530DF9A120A /* KeychainStore.swift */; };
+		B7F04E2C91A84D06A7311001 /* AppTimeZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F04E2C91A84D06A7311011 /* AppTimeZone.swift */; };
 		750FF831C1C4F601579209A3 /* StatsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D859CFD78F2E84BF16E90D /* StatsRepository.swift */; };
 		75518D6C95F5F914DD3AA55B /* CommentOnIssueSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 549DE8981E5BE4F792A9E0F7 /* CommentOnIssueSheet.swift */; };
 		76507D9CDEA780837A312414 /* QuickInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4609EBB710853F6A19CB30E /* QuickInputBar.swift */; };
@@ -180,6 +181,7 @@
 		7073EC024D219CC1F8EB2F24 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		715AA46225159588276265C9 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
 		7641D65CA8AFF372C2B8DDED /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		B7F04E2C91A84D06A7311011 /* AppTimeZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTimeZone.swift; sourceTree = "<group>"; };
 		767D7E1190C88C65D6C69418 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7B6427F1E2158C381D0806D1 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		7D89FD0DB39DE2676008E5EA /* NoteDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDetailView.swift; sourceTree = "<group>"; };
@@ -336,6 +338,7 @@
 			isa = PBXGroup;
 			children = (
 				7641D65CA8AFF372C2B8DDED /* AppPreferences.swift */,
+				B7F04E2C91A84D06A7311011 /* AppTimeZone.swift */,
 				0CD9483C874CB530DF9A120A /* KeychainStore.swift */,
 			);
 			path = Prefs;
@@ -695,6 +698,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C64722C1FF2A96827065E610 /* AppPreferences.swift in Sources */,
+				B7F04E2C91A84D06A7311001 /* AppTimeZone.swift in Sources */,
 				6DAF738052CD6D8DB479867D /* KeychainStore.swift in Sources */,
 				1E540EFF344808791430730D /* Models.swift in Sources */,
 				A4FC232AA76A8E04B4257064 /* PersistenceController.swift in Sources */,

@@ -53,7 +53,8 @@ class DashboardWallpaperService : WallpaperService() {
             if (!surfaceReady || (!visible && !isPreview)) return
             scope.coroutineContext.cancelChildren()
             scope.launch {
-                val (template, orientation) = WallpaperProfileResolver.resolve(getDisplayContext(), prefs)
+                val displayContext = getDisplayContext() ?: this@DashboardWallpaperService
+                val (template, orientation) = WallpaperProfileResolver.resolve(displayContext, prefs)
                 val content = template?.takeIf { it.enabled }?.let { builder.build(it) }
                     ?: BackgroundContent("CROSS-DASHBOARD", "Capture Inbox or Views to begin", rows = emptyList())
                 withContext(Dispatchers.Main.immediate) {
@@ -61,7 +62,7 @@ class DashboardWallpaperService : WallpaperService() {
                     var canvas: android.graphics.Canvas? = null
                     try {
                         canvas = surfaceHolder.lockCanvas()
-                        val dark = getDisplayContext().resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                        val dark = displayContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
                         canvas?.let { BackgroundCanvasRenderer.draw(it, content, orientation, dark) }
                     } finally {
                         canvas?.let { surfaceHolder.unlockCanvasAndPost(it) }
