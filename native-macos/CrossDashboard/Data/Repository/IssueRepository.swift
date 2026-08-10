@@ -65,7 +65,7 @@ final class IssueRepository {
         let updated = try await client.updateIssue(repo: repo, number: number, title: title, body: body, state: state)
         upsertInDB(updated)
         if state == "closed" {
-            await statsRepo.incrementIssuesClosed()
+            statsRepo.incrementIssuesClosed()
         }
         return updated
     }

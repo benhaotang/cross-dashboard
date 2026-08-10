@@ -116,7 +116,7 @@ final class PomodoroViewModel {
         if state.phase == .work {
             // Log completed session
             Task {
-                await container.statsRepository.incrementPomodoro()
+                container.statsRepository.incrementPomodoro()
                 if let task = currentTask {
                     logSessionToTask(task)
                 }

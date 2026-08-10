@@ -284,7 +284,6 @@ enum ICalParser {
     private static func unfold(_ icalText: String) -> [String] {
         var result: [String] = []
         var current = ""
-        let newline  = CharacterSet.newlines
         for line in icalText.components(separatedBy: .newlines) {
             if line.hasPrefix(" ") || line.hasPrefix("\t") {
                 current += line.dropFirst()

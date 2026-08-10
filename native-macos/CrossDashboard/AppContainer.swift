@@ -12,7 +12,7 @@ final class AppContainer {
 
     // ─── Shared instance ──────────────────────────────────────────────────────
 
-    nonisolated(unsafe) static let shared: AppContainer = MainActor.assumeIsolated { AppContainer() }
+    nonisolated static let shared: AppContainer = MainActor.assumeIsolated { AppContainer() }
 
     // ─── Data layer ───────────────────────────────────────────────────────────
 
