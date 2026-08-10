@@ -108,6 +108,10 @@ private:
     Gtk::Entry background_command_;
     Gtk::FileChooserButton background_image_{"Choose backdrop picture", Gtk::FILE_CHOOSER_ACTION_OPEN};
     Gtk::Button background_image_clear_{"Remove picture"};
+    Gtk::FileChooserButton background_light_image_{"Choose light backdrop", Gtk::FILE_CHOOSER_ACTION_OPEN};
+    Gtk::Button background_light_image_clear_{"Remove picture"};
+    Gtk::FileChooserButton background_dark_image_{"Choose dark backdrop", Gtk::FILE_CHOOSER_ACTION_OPEN};
+    Gtk::Button background_dark_image_clear_{"Remove picture"};
     Gtk::ComboBoxText background_image_fit_;
     Gtk::Scale background_opacity_{Gtk::ORIENTATION_HORIZONTAL};
     Gtk::Label background_status_;

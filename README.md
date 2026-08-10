@@ -119,6 +119,9 @@ Android and macOS planning accents follow the current system accent color.
 On macOS, a backdrop can be supplied for both appearances or separately for Light and Dark.
 Multi-image HEIC/HEIF files selected for both use their first and last frames as the light and dark
 endpoints, respectively.
+Android and Linux provide the same Both, Light, and Dark override slots. Android switches during a
+live-wallpaper configuration redraw; Linux reads the XDG desktop color-scheme portal before each
+render and refreshes when that setting changes.
 
 Linux accepts any direct command template containing `%f`, which is replaced by the rendered file
 path. Presets are provided for `xwallpaper --zoom %f` and `swaybg -o "*" -i %f -m fill`. Commands

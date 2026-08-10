@@ -225,6 +225,8 @@ class AppPreferences @Inject constructor(
         .catchIo()
         .map { p -> WallpaperAppearance(
             imagePath = p[Keys.WALLPAPER_IMAGE_PATH],
+            lightImagePath = p[Keys.WALLPAPER_LIGHT_IMAGE_PATH],
+            darkImagePath = p[Keys.WALLPAPER_DARK_IMAGE_PATH],
             glassOpacity = (p[Keys.WALLPAPER_GLASS_OPACITY] ?: 0.8f).coerceIn(0.5f, 1f),
             imageFit = runCatching { WallpaperImageFit.valueOf(p[Keys.WALLPAPER_IMAGE_FIT] ?: WallpaperImageFit.FILL.name) }
                 .getOrDefault(WallpaperImageFit.FILL),
@@ -234,6 +236,10 @@ class AppPreferences @Inject constructor(
         ds.edit { p ->
             if (value.imagePath == null) p.remove(Keys.WALLPAPER_IMAGE_PATH)
             else p[Keys.WALLPAPER_IMAGE_PATH] = value.imagePath
+            if (value.lightImagePath == null) p.remove(Keys.WALLPAPER_LIGHT_IMAGE_PATH)
+            else p[Keys.WALLPAPER_LIGHT_IMAGE_PATH] = value.lightImagePath
+            if (value.darkImagePath == null) p.remove(Keys.WALLPAPER_DARK_IMAGE_PATH)
+            else p[Keys.WALLPAPER_DARK_IMAGE_PATH] = value.darkImagePath
             p[Keys.WALLPAPER_GLASS_OPACITY] = value.glassOpacity.coerceIn(0.5f, 1f)
             p[Keys.WALLPAPER_IMAGE_FIT] = value.imageFit.name
         }
@@ -273,6 +279,8 @@ class AppPreferences @Inject constructor(
         val BACKGROUND_INNER = stringPreferencesKey("background_inner")
         val WALLPAPER_ORIENTATION = stringPreferencesKey("wallpaper_orientation")
         val WALLPAPER_IMAGE_PATH = stringPreferencesKey("wallpaper_image_path")
+        val WALLPAPER_LIGHT_IMAGE_PATH = stringPreferencesKey("wallpaper_light_image_path")
+        val WALLPAPER_DARK_IMAGE_PATH = stringPreferencesKey("wallpaper_dark_image_path")
         val WALLPAPER_GLASS_OPACITY = floatPreferencesKey("wallpaper_glass_opacity")
         val WALLPAPER_IMAGE_FIT = stringPreferencesKey("wallpaper_image_fit")
     }

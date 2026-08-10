@@ -79,6 +79,7 @@ struct ServiceState {
     GMainLoop* loop{g_main_loop_new(nullptr, FALSE)};
     GDBusConnection* connection{};
     guint registration_id{};
+    guint portal_settings_subscription_id{};
     guint periodic_id{};
     guint alarm_refresh_id{};
     guint pomodoro_tick_id{};
@@ -106,6 +107,8 @@ struct ServiceState {
         if (worker.joinable()) worker.join();
         if (connection && registration_id != 0)
             g_dbus_connection_unregister_object(connection, registration_id);
+        if (connection && portal_settings_subscription_id != 0)
+            g_dbus_connection_signal_unsubscribe(connection, portal_settings_subscription_id);
         if (connection) g_object_unref(connection);
         if (loop) g_main_loop_unref(loop);
     }
@@ -290,6 +293,21 @@ void refresh_background(ServiceState& state)
         std::fprintf(stderr,"cross-dashboard-service: %s\n",message.c_str());
 }
 
+gboolean refresh_background_idle(gpointer user_data)
+{
+    refresh_background(*static_cast<ServiceState*>(user_data));return G_SOURCE_REMOVE;
+}
+
+void portal_setting_changed(GDBusConnection*, char const*, char const*, char const*, char const*,
+    GVariant* parameters, gpointer user_data)
+{
+    char const* setting_namespace{}; char const* key{}; GVariant* value{};
+    g_variant_get(parameters,"(&s&s@v)",&setting_namespace,&key,&value);
+    if(value)g_variant_unref(value);
+    if(std::string{setting_namespace}=="org.freedesktop.appearance"&&std::string{key}=="color-scheme")
+        g_idle_add(&refresh_background_idle,user_data);
+}
+
 gboolean finish_sync(gpointer user_data)
 {
     std::unique_ptr<SyncCompletion> completion(static_cast<SyncCompletion*>(user_data));
@@ -449,6 +467,10 @@ void bus_acquired(GDBusConnection* connection, char const*, gpointer user_data)
 {
     auto& state = *static_cast<ServiceState*>(user_data);
     state.connection = G_DBUS_CONNECTION(g_object_ref(connection));
+    state.portal_settings_subscription_id=g_dbus_connection_signal_subscribe(connection,
+        "org.freedesktop.portal.Desktop","org.freedesktop.portal.Settings","SettingChanged",
+        "/org/freedesktop/portal/desktop",nullptr,G_DBUS_SIGNAL_FLAGS_NONE,
+        &portal_setting_changed,&state,nullptr);
     GError* error = nullptr;
     GDBusNodeInfo* info = g_dbus_node_info_new_for_xml(kIntrospectionXml, &error);
     if (!info) {

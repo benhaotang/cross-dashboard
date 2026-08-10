@@ -172,8 +172,9 @@ fun SettingsScreen(
 @Composable
 private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
     val context = LocalContext.current
+    var pictureSlot by remember { mutableStateOf(WallpaperImageSlot.BOTH) }
     val picturePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) vm.setWallpaperImage(uri)
+        if (uri != null) vm.setWallpaperImage(uri, pictureSlot)
     }
     var fitExpanded by remember { mutableStateOf(false) }
     var glassOpacity by remember(state.wallpaperAppearance.glassOpacity) {
@@ -190,22 +191,30 @@ private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
             style = MaterialTheme.typography.bodySmall,
             color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text("Backdrop picture", style = MaterialTheme.typography.labelMedium)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { picturePicker.launch("image/*") }) {
-                Icon(Icons.Outlined.Image, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (state.wallpaperAppearance.imagePath == null) "Choose picture" else "Replace picture")
-            }
-            if (state.wallpaperAppearance.imagePath != null) {
-                IconButton(onClick = { vm.setWallpaperImage(null) }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Remove backdrop picture")
+        Text("Backdrop pictures", style = MaterialTheme.typography.labelMedium)
+        WallpaperImageSlot.entries.forEach { slot ->
+            val path = state.wallpaperAppearance.imagePath(slot)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(slot.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+                    Text(if (path == null) "Not selected" else "Selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { pictureSlot = slot; picturePicker.launch("image/*") }) {
+                    Icon(Icons.Outlined.Image, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (path == null) "Choose" else "Replace")
+                }
+                if (path != null) {
+                    IconButton(onClick = { vm.setWallpaperImage(null, slot) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove ${slot.name.lowercase()} backdrop picture")
+                    }
                 }
             }
         }
         Text(
-            if (state.wallpaperAppearance.imagePath == null) "No picture selected; light and dark use their solid defaults."
-            else "The picture is copied into private app storage for reliable wallpaper refreshes.",
+            "Light and Dark override Both. Pictures are copied into private app storage for reliable wallpaper refreshes.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

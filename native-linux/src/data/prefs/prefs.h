@@ -52,6 +52,8 @@ public:
     [[nodiscard]] std::optional<std::string> background_command() const;
     [[nodiscard]] std::optional<std::string> background_template_json() const;
     [[nodiscard]] std::optional<std::string> background_image_path() const;
+    [[nodiscard]] std::optional<std::string> background_light_image_path() const;
+    [[nodiscard]] std::optional<std::string> background_dark_image_path() const;
     [[nodiscard]] std::optional<std::string> background_image_fit() const;
     [[nodiscard]] std::optional<std::string> background_glass_opacity() const;
 
@@ -67,6 +69,8 @@ public:
     [[nodiscard]] bool set_background_command(std::string const&);
     [[nodiscard]] bool set_background_template_json(std::string const&);
     [[nodiscard]] bool set_background_image_path(std::string const&);
+    [[nodiscard]] bool set_background_light_image_path(std::string const&);
+    [[nodiscard]] bool set_background_dark_image_path(std::string const&);
     [[nodiscard]] bool set_background_image_fit(std::string const&);
     [[nodiscard]] bool set_background_glass_opacity(std::string const&);
 

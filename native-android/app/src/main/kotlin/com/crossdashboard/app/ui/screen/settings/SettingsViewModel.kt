@@ -249,12 +249,18 @@ class SettingsViewModel @Inject constructor(
         _state.update { it.copy(infoMessage = "Background snapshot cleared") }
     }
 
-    fun setWallpaperImage(uri: android.net.Uri?) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        val old = _state.value.wallpaperAppearance.imagePath
+    fun setWallpaperImage(uri: android.net.Uri?, slot: WallpaperImageSlot) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        val appearance = _state.value.wallpaperAppearance
+        val old = appearance.imagePath(slot)
         val path = if (uri == null) null else runCatching {
             val directory = java.io.File(context.filesDir, "background").apply { mkdirs() }
-            val target = java.io.File(directory, "source_image")
-            val temporary = java.io.File(directory, "source_image.import")
+            val stem = when (slot) {
+                WallpaperImageSlot.BOTH -> "source_image"
+                WallpaperImageSlot.LIGHT -> "source_image_light"
+                WallpaperImageSlot.DARK -> "source_image_dark"
+            }
+            val target = java.io.File(directory, stem)
+            val temporary = java.io.File(directory, "$stem.import")
             context.contentResolver.openInputStream(uri)?.use { input ->
                 temporary.outputStream().use { output -> input.copyTo(output) }
             } ?: error("Could not read selected picture")
@@ -267,7 +273,18 @@ class SettingsViewModel @Inject constructor(
             return@launch
         }
         if (uri == null && old != null) runCatching { java.io.File(old).delete() }
-        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(imagePath = path))
+        val updated = when (slot) {
+            WallpaperImageSlot.BOTH -> {
+                if (uri != null) {
+                    appearance.lightImagePath?.let { runCatching { java.io.File(it).delete() } }
+                    appearance.darkImagePath?.let { runCatching { java.io.File(it).delete() } }
+                    appearance.copy(imagePath = path, lightImagePath = null, darkImagePath = null)
+                } else appearance.copy(imagePath = null)
+            }
+            WallpaperImageSlot.LIGHT -> appearance.copy(lightImagePath = path)
+            WallpaperImageSlot.DARK -> appearance.copy(darkImagePath = path)
+        }
+        prefs.setWallpaperAppearance(updated)
     }
 
     fun setWallpaperGlassOpacity(value: Float) = viewModelScope.launch {

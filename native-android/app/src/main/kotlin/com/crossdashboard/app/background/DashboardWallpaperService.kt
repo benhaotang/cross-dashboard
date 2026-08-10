@@ -57,7 +57,9 @@ class DashboardWallpaperService : WallpaperService() {
                 val displayContext = getDisplayContext() ?: this@DashboardWallpaperService
                 val (template, orientation) = WallpaperProfileResolver.resolve(displayContext, prefs)
                 val appearance = prefs.wallpaperAppearanceFlow.first()
-                val backdrop = appearance.imagePath?.let { path ->
+                val dark = displayContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                val backdropPath = appearance.imagePath(dark)
+                val backdrop = backdropPath?.let { path ->
                     runCatching {
                         android.graphics.ImageDecoder.decodeBitmap(
                             android.graphics.ImageDecoder.createSource(java.io.File(path))
@@ -71,7 +73,6 @@ class DashboardWallpaperService : WallpaperService() {
                     var canvas: android.graphics.Canvas? = null
                     try {
                         canvas = surfaceHolder.lockCanvas()
-                        val dark = displayContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
                         val accent = displayContext.getColor(
                             if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_600
                         )

@@ -225,6 +225,12 @@ macOS has independent Both, Light, and Dark backdrop imports. Appearance-specifi
 the Both slot. For a multi-image HEIC/HEIF imported into Both, ImageIO frame 0 is the light endpoint
 and the final frame is the dark endpoint; ordinary single-image files are reused for both variants.
 
+Android and Linux also have Both, Light, and Dark backdrop slots, with appearance-specific slots
+overriding Both. Android resolves the slot from the current `UI_MODE_NIGHT` configuration whenever
+the live wallpaper redraws. The Linux systemd service reads the standardized XDG Settings portal
+`org.freedesktop.appearance/color-scheme` immediately before rendering when the app theme is Auto,
+and subscribes to its `SettingChanged` signal so theme switches refresh the background promptly.
+
 ### Data Layer
 - **Room is the source of truth.** UI observes `Flow<List<T>>` from DAOs and renders immediately from cache.
 - `SyncWorker` runs in the background (WorkManager) and does `clearAll() + upsert(freshData)` into Room.

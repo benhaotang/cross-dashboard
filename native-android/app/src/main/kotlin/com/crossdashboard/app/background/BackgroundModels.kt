@@ -12,12 +12,22 @@ enum class WallpaperProfile { STANDARD, FOLD_COVER, FOLD_INNER }
 enum class PreferredWallpaperOrientation { PORTRAIT, LANDSCAPE }
 
 enum class WallpaperImageFit { SCALE, FILL, STRETCH }
+enum class WallpaperImageSlot { BOTH, LIGHT, DARK }
 
 data class WallpaperAppearance(
     val imagePath: String? = null,
+    val lightImagePath: String? = null,
+    val darkImagePath: String? = null,
     val glassOpacity: Float = 0.8f,
     val imageFit: WallpaperImageFit = WallpaperImageFit.FILL,
-)
+) {
+    fun imagePath(dark: Boolean): String? = if (dark) darkImagePath ?: imagePath else lightImagePath ?: imagePath
+    fun imagePath(slot: WallpaperImageSlot): String? = when (slot) {
+        WallpaperImageSlot.BOTH -> imagePath
+        WallpaperImageSlot.LIGHT -> lightImagePath
+        WallpaperImageSlot.DARK -> darkImagePath
+    }
+}
 
 @Serializable
 data class BackgroundTemplate(
