@@ -108,12 +108,12 @@ final class MemosViewModel {
     }
 
     func archiveMemo(_ name: String) async {
-        await memoRepo.archiveMemo(name)
+        _ = await memoRepo.archiveMemo(name)
         snackbarMessage = "Memo archived"
     }
 
     func restoreMemo(_ name: String) async {
-        await memoRepo.restoreMemo(name)
+        _ = await memoRepo.restoreMemo(name)
         snackbarMessage = "Memo restored"
     }
 

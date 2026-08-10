@@ -279,13 +279,9 @@ final class SettingsViewModel {
         caldavConnectionResult = nil
         Task {
             defer { caldavIsTestingConnection = false }
-            do {
-                let cals = try await container.calDavClient.fetchCalendars()
-                availableCalendars = cals
-                caldavConnectionResult = "Connected — \(cals.count) calendar(s) found."
-            } catch {
-                caldavConnectionResult = "Error: \(error.localizedDescription)"
-            }
+            let cals = await container.calDavClient.fetchCalendars()
+            availableCalendars = cals
+            caldavConnectionResult = "Connected — \(cals.count) calendar(s) found."
         }
     }
 
@@ -306,7 +302,7 @@ final class SettingsViewModel {
                 return
             case .success(let flowInit):
                 if let url = URL(string: flowInit.loginUrl) {
-                    await MainActor.run { NSWorkspace.shared.open(url) }
+                    _ = await MainActor.run { NSWorkspace.shared.open(url) }
                 }
                 caldavLoginFlowStatus = "Waiting for browser approval…"
 

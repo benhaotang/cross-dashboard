@@ -51,7 +51,7 @@ final class ViewsViewModel {
     /// All open (non-completed, non-cancelled) tasks — mirrors Android's filter.
     var allTasks: [CalDavTask] {
         guard itemType != .issues else { return [] }
-        container.taskRepository.allTasks.filter {
+        return container.taskRepository.allTasks.filter {
             $0.status != .completed && $0.status != .cancelled && matchesDate($0.due)
         }
     }

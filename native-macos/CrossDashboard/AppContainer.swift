@@ -12,7 +12,7 @@ final class AppContainer {
 
     // ─── Shared instance ──────────────────────────────────────────────────────
 
-    nonisolated(unsafe) static let shared: AppContainer = MainActor.assumeIsolated { AppContainer() }
+    nonisolated static let shared: AppContainer = MainActor.assumeIsolated { AppContainer() }
 
     // ─── Data layer ───────────────────────────────────────────────────────────
 
@@ -71,6 +71,7 @@ final class AppContainer {
         preferences.lastSyncDate = Date()
         writeWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
+        await DesktopBackgroundManager.shared.refreshIfEnabled()
     }
 
     private func writeWidgetSnapshot() {

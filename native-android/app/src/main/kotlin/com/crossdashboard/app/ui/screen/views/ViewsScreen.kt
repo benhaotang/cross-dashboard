@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.ui.component.AdaptiveFilterBar
 import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
 import com.crossdashboard.app.ui.component.FilterChoice
+import com.crossdashboard.app.ui.component.BackgroundSnapshotAction
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -49,6 +50,7 @@ fun ViewsScreen(
             TopAppBar(
                 title = { Text("Views") },
                 actions = {
+                    BackgroundSnapshotAction(vm::snapshotBackground)
                     if (state.viewMode == ViewMode.KANBAN) {
                         IconButton(
                             onClick = vm::openColumnConfig,

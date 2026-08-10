@@ -101,7 +101,7 @@ final class TaskRepository {
         }
         try await update(updated)
         if !wasCompleted {
-            await statsRepo.incrementTasksCompleted()
+            statsRepo.incrementTasksCompleted()
         }
         return updated
     }

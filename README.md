@@ -105,4 +105,29 @@ systemctl --user status crossdashboard.service
 journalctl --user -u crossdashboard.service
 ```
 
+### Filtered backgrounds
+
+Inbox and Views include a camera button that snapshots the current filters and layout as the
+background template. Android exposes it as a light/dark live wallpaper, macOS maintains matching
+light/dark desktop images per connected display, and native Linux renders
+`$XDG_CACHE_HOME/crossdashboard/background.png` from the systemd user service.
+
+Background Settings can add a personal picture beneath the snapshot. Scale, Fill, and Stretch
+placement modes are available, and the content is drawn on light- or dark-tinted blurred glass
+whose opacity defaults to 80% and can be adjusted from 50–100%. Removing the picture restores the solid light/dark background.
+Android and macOS planning accents follow the current system accent color.
+On macOS, a backdrop can be supplied for both appearances or separately for Light and Dark.
+Multi-image HEIC/HEIF files selected for both use their first and last frames as the light and dark
+endpoints, respectively.
+Android and Linux provide the same Both, Light, and Dark override slots. Android switches during a
+live-wallpaper configuration redraw; Linux reads the XDG desktop color-scheme portal before each
+render and refreshes when that setting changes.
+
+Linux accepts any direct command template containing `%f`, which is replaced by the rendered file
+path. Presets are provided for `xwallpaper --zoom %f` and `swaybg -o "*" -i %f -m fill`. Commands
+are parsed as arguments and are never run through a shell, so pipes, redirects, and shell expansion
+are intentionally unsupported. Automatic Linux backgrounds are unavailable in the Flatpak build.
+Backgrounds can expose item titles behind desktop icons or on an Android lock screen; choose the
+captured filters with the same care as other lock-screen content.
+
 Shared under the MIT license. (If AI code is licensable:))

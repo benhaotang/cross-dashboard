@@ -323,7 +323,6 @@ final class CalDavClient: Sendable {
             pattern: "<[^:]*:?response\\b[^>]*>(.*?)</[^:]*:?response>",
             options: [.dotMatchesLineSeparators]
         )
-        let nsXml = xml as NSString
         let blocks = responsePattern.matches(in: xml, range: NSRange(xml.startIndex..., in: xml))
         for block in blocks {
             guard let range = Range(block.range(at: 1), in: xml) else { continue }

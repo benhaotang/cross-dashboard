@@ -22,6 +22,7 @@ import com.crossdashboard.app.ui.component.AdaptiveFilterBar
 import com.crossdashboard.app.ui.component.AdaptiveFilterSpec
 import com.crossdashboard.app.ui.component.FilterChoice
 import com.crossdashboard.app.ui.component.TagFlow
+import com.crossdashboard.app.ui.component.BackgroundSnapshotAction
 import com.crossdashboard.app.ui.navigation.Destination
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -45,6 +46,7 @@ fun InboxScreen(
             TopAppBar(
                 title = { Text("Inbox") },
                 actions = {
+                    BackgroundSnapshotAction(vm::snapshotBackground)
                     totalFormatted?.let { total ->
                         Text(
                             text = total,

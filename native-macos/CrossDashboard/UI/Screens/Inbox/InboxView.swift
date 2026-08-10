@@ -82,6 +82,12 @@ struct InboxView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem {
+            Button { Task { await DesktopBackgroundManager.shared.captureInbox(viewModel) } } label: {
+                Label("Snapshot current view as background", systemImage: "camera.viewfinder")
+            }
+            .help("Snapshot current view as background")
+        }
         ToolbarItem(placement: .primaryAction) {
             SearchableFilterMenu(
                 title: "Type",

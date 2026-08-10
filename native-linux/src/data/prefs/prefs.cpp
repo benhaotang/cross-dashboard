@@ -260,6 +260,23 @@ std::optional<std::string> AppPreferences::kanban_column_tags_csv() const
     return out;
 }
 
+static std::optional<std::string> read_pref_string(std::string const& path, char const* key)
+{
+    KeyFileGuard kf(g_key_file_new());
+    if (!load_ini(kf.get(), path)) return std::nullopt;
+    GError* err{}; gchar* value = g_key_file_get_string(kf.get(), kIniGroup, key, &err);
+    if (!value) { if (err) g_error_free(err); return std::nullopt; }
+    std::string result{value}; g_free(value); return result;
+}
+
+std::optional<std::string> AppPreferences::background_command() const { return read_pref_string(ini_path_, "background_command"); }
+std::optional<std::string> AppPreferences::background_template_json() const { return read_pref_string(ini_path_, "background_template"); }
+std::optional<std::string> AppPreferences::background_image_path() const { return read_pref_string(ini_path_, "background_image_path"); }
+std::optional<std::string> AppPreferences::background_light_image_path() const { return read_pref_string(ini_path_, "background_light_image_path"); }
+std::optional<std::string> AppPreferences::background_dark_image_path() const { return read_pref_string(ini_path_, "background_dark_image_path"); }
+std::optional<std::string> AppPreferences::background_image_fit() const { return read_pref_string(ini_path_, "background_image_fit"); }
+std::optional<std::string> AppPreferences::background_glass_opacity() const { return read_pref_string(ini_path_, "background_glass_opacity"); }
+
 bool AppPreferences::set_theme(std::string const& v)
 {
     KeyFileGuard kf(g_key_file_new());
@@ -336,6 +353,20 @@ bool AppPreferences::set_kanban_column_tags_csv(std::string const& v)
     g_key_file_set_string(kf.get(), kIniGroup, "kanban_column_tags", v.c_str());
     return save_ini(kf.get(), ini_path_);
 }
+
+static bool write_pref_string(std::string const& path, char const* key, std::string const& value)
+{
+    KeyFileGuard kf(g_key_file_new()); (void)load_ini(kf.get(), path);
+    g_key_file_set_string(kf.get(), kIniGroup, key, value.c_str()); return save_ini(kf.get(), path);
+}
+
+bool AppPreferences::set_background_command(std::string const& v) { return write_pref_string(ini_path_, "background_command", v); }
+bool AppPreferences::set_background_template_json(std::string const& v) { return write_pref_string(ini_path_, "background_template", v); }
+bool AppPreferences::set_background_image_path(std::string const& v) { return write_pref_string(ini_path_, "background_image_path", v); }
+bool AppPreferences::set_background_light_image_path(std::string const& v) { return write_pref_string(ini_path_, "background_light_image_path", v); }
+bool AppPreferences::set_background_dark_image_path(std::string const& v) { return write_pref_string(ini_path_, "background_dark_image_path", v); }
+bool AppPreferences::set_background_image_fit(std::string const& v) { return write_pref_string(ini_path_, "background_image_fit", v); }
+bool AppPreferences::set_background_glass_opacity(std::string const& v) { return write_pref_string(ini_path_, "background_glass_opacity", v); }
 
 namespace {
 struct OriginalTimezone {

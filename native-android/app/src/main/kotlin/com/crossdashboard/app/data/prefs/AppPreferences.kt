@@ -5,11 +5,18 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.background.BackgroundTemplate
+import com.crossdashboard.app.background.PreferredWallpaperOrientation
+import com.crossdashboard.app.background.WallpaperProfile
+import com.crossdashboard.app.background.WallpaperAppearance
+import com.crossdashboard.app.background.WallpaperImageFit
+import com.crossdashboard.app.background.WallpaperUpdateNotifier
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import javax.inject.Inject
@@ -189,6 +196,62 @@ class AppPreferences @Inject constructor(
         ds.edit { it[Keys.LAST_SYNC_EPOCH] = epochMillis }
     }
 
+    // ─── Background snapshots ────────────────────────────────────────────
+
+    fun backgroundTemplateFlow(profile: WallpaperProfile): Flow<BackgroundTemplate?> = ds.data
+        .catchIo()
+        .map { p -> p[backgroundKey(profile)]?.let { raw -> runCatching { Json.decodeFromString<BackgroundTemplate>(raw) }.getOrNull() } }
+
+    suspend fun setBackgroundTemplate(profile: WallpaperProfile, template: BackgroundTemplate?) {
+        ds.edit { p ->
+            val key = backgroundKey(profile)
+            if (template == null) p.remove(key) else p[key] = Json.encodeToString(template)
+        }
+        WallpaperUpdateNotifier.notify(context)
+    }
+
+    val preferredWallpaperOrientationFlow: Flow<PreferredWallpaperOrientation> = ds.data
+        .catchIo()
+        .map { p -> runCatching {
+            PreferredWallpaperOrientation.valueOf(p[Keys.WALLPAPER_ORIENTATION] ?: PreferredWallpaperOrientation.PORTRAIT.name)
+        }.getOrDefault(PreferredWallpaperOrientation.PORTRAIT) }
+
+    suspend fun setPreferredWallpaperOrientation(value: PreferredWallpaperOrientation) {
+        ds.edit { it[Keys.WALLPAPER_ORIENTATION] = value.name }
+        WallpaperUpdateNotifier.notify(context)
+    }
+
+    val wallpaperAppearanceFlow: Flow<WallpaperAppearance> = ds.data
+        .catchIo()
+        .map { p -> WallpaperAppearance(
+            imagePath = p[Keys.WALLPAPER_IMAGE_PATH],
+            lightImagePath = p[Keys.WALLPAPER_LIGHT_IMAGE_PATH],
+            darkImagePath = p[Keys.WALLPAPER_DARK_IMAGE_PATH],
+            glassOpacity = (p[Keys.WALLPAPER_GLASS_OPACITY] ?: 0.8f).coerceIn(0.5f, 1f),
+            imageFit = runCatching { WallpaperImageFit.valueOf(p[Keys.WALLPAPER_IMAGE_FIT] ?: WallpaperImageFit.FILL.name) }
+                .getOrDefault(WallpaperImageFit.FILL),
+        ) }
+
+    suspend fun setWallpaperAppearance(value: WallpaperAppearance) {
+        ds.edit { p ->
+            if (value.imagePath == null) p.remove(Keys.WALLPAPER_IMAGE_PATH)
+            else p[Keys.WALLPAPER_IMAGE_PATH] = value.imagePath
+            if (value.lightImagePath == null) p.remove(Keys.WALLPAPER_LIGHT_IMAGE_PATH)
+            else p[Keys.WALLPAPER_LIGHT_IMAGE_PATH] = value.lightImagePath
+            if (value.darkImagePath == null) p.remove(Keys.WALLPAPER_DARK_IMAGE_PATH)
+            else p[Keys.WALLPAPER_DARK_IMAGE_PATH] = value.darkImagePath
+            p[Keys.WALLPAPER_GLASS_OPACITY] = value.glassOpacity.coerceIn(0.5f, 1f)
+            p[Keys.WALLPAPER_IMAGE_FIT] = value.imageFit.name
+        }
+        WallpaperUpdateNotifier.notify(context)
+    }
+
+    private fun backgroundKey(profile: WallpaperProfile): Preferences.Key<String> = when (profile) {
+        WallpaperProfile.STANDARD -> Keys.BACKGROUND_STANDARD
+        WallpaperProfile.FOLD_COVER -> Keys.BACKGROUND_COVER
+        WallpaperProfile.FOLD_INNER -> Keys.BACKGROUND_INNER
+    }
+
     // ─── Keys ─────────────────────────────────────────────────────────────────
 
     private object Keys {
@@ -211,6 +274,15 @@ class AppPreferences @Inject constructor(
         val BIOMETRIC_PIN_HASH = stringPreferencesKey("biometric_pin_hash")
         val SYSTEM_CREDENTIAL = booleanPreferencesKey("system_credential")
         val LAST_SYNC_EPOCH = longPreferencesKey("last_sync_epoch")
+        val BACKGROUND_STANDARD = stringPreferencesKey("background_standard")
+        val BACKGROUND_COVER = stringPreferencesKey("background_cover")
+        val BACKGROUND_INNER = stringPreferencesKey("background_inner")
+        val WALLPAPER_ORIENTATION = stringPreferencesKey("wallpaper_orientation")
+        val WALLPAPER_IMAGE_PATH = stringPreferencesKey("wallpaper_image_path")
+        val WALLPAPER_LIGHT_IMAGE_PATH = stringPreferencesKey("wallpaper_light_image_path")
+        val WALLPAPER_DARK_IMAGE_PATH = stringPreferencesKey("wallpaper_dark_image_path")
+        val WALLPAPER_GLASS_OPACITY = floatPreferencesKey("wallpaper_glass_opacity")
+        val WALLPAPER_IMAGE_FIT = stringPreferencesKey("wallpaper_image_fit")
     }
 }
 

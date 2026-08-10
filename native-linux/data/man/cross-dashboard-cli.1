@@ -102,3 +102,11 @@ Inspect logs with:
 .EX
 journalctl --user -u crossdashboard.service
 .EE
+.SH BACKGROUND SNAPSHOTS
+Inbox and Views can snapshot their current filters as a desktop background. The systemd user
+service renders the PNG and invokes the command template configured in Settings. The template must
+contain
+.B %f
+for the generated path. It is executed directly without a shell; pipelines, redirections,
+substitutions, and daemonizing commands are unsupported. This integration is not available in the
+Flatpak build.

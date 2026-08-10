@@ -193,6 +193,44 @@ Three-column `NavigationSplitView`: sidebar (screen list) → content (list view
 
 ## Key Architecture Decisions
 
+### Filtered Background Snapshots
+
+Inbox and Views expose a camera/capture action that persists the current filters (and Views mode)
+as a background template. Data is re-filtered from the local source of truth after each existing
+background sync; later UI filter changes do not mutate the saved template.
+
+- Android registers `DashboardWallpaperService`; it redraws light/dark palettes for system
+  appearance and stores separate standard, fold-cover, and fold-inner templates.
+- macOS renders light/dark PNG pairs per `NSScreen` and applies the current appearance with
+  `NSWorkspace`. Generated files live in `~/Pictures/Cross-Dashboard/Backgrounds` under the
+  Pictures read/write sandbox entitlement so the desktop service can read them. Only the currently
+  addressable Space per screen can be updated.
+- Native Linux renders `$XDG_CACHE_HOME/crossdashboard/background.png` in the systemd user service
+  and invokes a direct argv command containing `%f`. xwallpaper and swaybg are presets, not special
+  integrations. Flatpak does not support automatic host wallpaper commands.
+
+Backgrounds render titles, dates, types, tags, and counts only. Never add descriptions, issue
+bodies, credentials, or attachment data to a background render model. User-facing documentation
+must warn that visible titles can appear behind desktop icons or on the Android lock screen.
+
+Background Settings may select one app-owned backdrop picture shared by all snapshot profiles.
+Render the picture using the selected Scale (contain), Fill (cover), or Stretch mode, then place
+content on subtly blurred matte-glass panels. Glass opacity defaults to 80% and is adjustable from
+50–100%; light output uses white-tinted glass and dark output uses black-tinted glass. With no
+picture, retain the solid light/dark fallback. Android and macOS renderer accents must come from
+the current Android system/Material dynamic accent and macOS `controlAccentColor`, respectively,
+rather than a fixed project color.
+
+macOS has independent Both, Light, and Dark backdrop imports. Appearance-specific images override
+the Both slot. For a multi-image HEIC/HEIF imported into Both, ImageIO frame 0 is the light endpoint
+and the final frame is the dark endpoint; ordinary single-image files are reused for both variants.
+
+Android and Linux also have Both, Light, and Dark backdrop slots, with appearance-specific slots
+overriding Both. Android resolves the slot from the current `UI_MODE_NIGHT` configuration whenever
+the live wallpaper redraws. The Linux systemd service reads the standardized XDG Settings portal
+`org.freedesktop.appearance/color-scheme` immediately before rendering when the app theme is Auto,
+and subscribes to its `SettingChanged` signal so theme switches refresh the background promptly.
+
 ### Data Layer
 - **Room is the source of truth.** UI observes `Flow<List<T>>` from DAOs and renders immediately from cache.
 - `SyncWorker` runs in the background (WorkManager) and does `clearAll() + upsert(freshData)` into Room.

@@ -84,6 +84,17 @@
                 android:value="Pomodoro productivity timer with live notification" />
         </service>
 
+        <service
+            android:name=".background.DashboardWallpaperService"
+            android:exported="true"
+            android:label="@string/dashboard_wallpaper_name"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/dashboard_wallpaper" />
+        </service>
+
         <!-- Event alarm receiver -->
         <receiver
             android:name=".alarm.EventAlarmReceiver"

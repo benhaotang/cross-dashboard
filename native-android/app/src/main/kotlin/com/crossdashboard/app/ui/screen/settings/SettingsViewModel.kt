@@ -16,6 +16,7 @@ import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.domain.model.*
 import com.crossdashboard.app.ui.component.CalendarColorResolver
 import com.crossdashboard.app.worker.SyncWorker
+import com.crossdashboard.app.background.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -67,6 +68,11 @@ data class SettingsUiState(
 
     // ── Appearance ────────────────────────────────────────────────────────────
     val theme: ThemePreference = ThemePreference.SYSTEM,
+    val backgroundStandard: BackgroundTemplate? = null,
+    val backgroundCover: BackgroundTemplate? = null,
+    val backgroundInner: BackgroundTemplate? = null,
+    val wallpaperOrientation: PreferredWallpaperOrientation = PreferredWallpaperOrientation.PORTRAIT,
+    val wallpaperAppearance: WallpaperAppearance = WallpaperAppearance(),
     val timeZoneOverride: String? = null,
     val systemTimeZone: String = AppTimeZone.systemZoneId.id,
 
@@ -227,6 +233,66 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             prefs.systemCredentialFlow.collect { b -> _state.update { it.copy(systemCredentialEnabled = b) } }
         }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.STANDARD).collect { v -> _state.update { it.copy(backgroundStandard = v) } } }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_COVER).collect { v -> _state.update { it.copy(backgroundCover = v) } } }
+        viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_INNER).collect { v -> _state.update { it.copy(backgroundInner = v) } } }
+        viewModelScope.launch { prefs.preferredWallpaperOrientationFlow.collect { v -> _state.update { it.copy(wallpaperOrientation = v) } } }
+        viewModelScope.launch { prefs.wallpaperAppearanceFlow.collect { v -> _state.update { it.copy(wallpaperAppearance = v) } } }
+    }
+
+    fun setWallpaperOrientation(value: PreferredWallpaperOrientation) = viewModelScope.launch {
+        prefs.setPreferredWallpaperOrientation(value)
+    }
+
+    fun clearBackground(profile: WallpaperProfile) = viewModelScope.launch {
+        prefs.setBackgroundTemplate(profile, null)
+        _state.update { it.copy(infoMessage = "Background snapshot cleared") }
+    }
+
+    fun setWallpaperImage(uri: android.net.Uri?, slot: WallpaperImageSlot) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        val appearance = _state.value.wallpaperAppearance
+        val old = appearance.imagePath(slot)
+        val path = if (uri == null) null else runCatching {
+            val directory = java.io.File(context.filesDir, "background").apply { mkdirs() }
+            val stem = when (slot) {
+                WallpaperImageSlot.BOTH -> "source_image"
+                WallpaperImageSlot.LIGHT -> "source_image_light"
+                WallpaperImageSlot.DARK -> "source_image_dark"
+            }
+            val target = java.io.File(directory, stem)
+            val temporary = java.io.File(directory, "$stem.import")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            } ?: error("Could not read selected picture")
+            java.nio.file.Files.move(temporary.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            target.absolutePath
+        }.getOrElse {
+            _state.update { state -> state.copy(errorMessage = "Could not save selected picture") }
+            return@launch
+        }
+        if (uri == null && old != null) runCatching { java.io.File(old).delete() }
+        val updated = when (slot) {
+            WallpaperImageSlot.BOTH -> {
+                if (uri != null) {
+                    appearance.lightImagePath?.let { runCatching { java.io.File(it).delete() } }
+                    appearance.darkImagePath?.let { runCatching { java.io.File(it).delete() } }
+                    appearance.copy(imagePath = path, lightImagePath = null, darkImagePath = null)
+                } else appearance.copy(imagePath = null)
+            }
+            WallpaperImageSlot.LIGHT -> appearance.copy(lightImagePath = path)
+            WallpaperImageSlot.DARK -> appearance.copy(darkImagePath = path)
+        }
+        prefs.setWallpaperAppearance(updated)
+    }
+
+    fun setWallpaperGlassOpacity(value: Float) = viewModelScope.launch {
+        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(glassOpacity = value))
+    }
+
+    fun setWallpaperImageFit(value: WallpaperImageFit) = viewModelScope.launch {
+        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(imageFit = value))
     }
 
     // ─── CalDAV section ───────────────────────────────────────────────────────

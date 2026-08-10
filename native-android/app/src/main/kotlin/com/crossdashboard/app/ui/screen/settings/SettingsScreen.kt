@@ -1,5 +1,7 @@
 package com.crossdashboard.app.ui.screen.settings
 
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crossdashboard.app.BuildConfig
 import com.crossdashboard.app.domain.model.*
+import com.crossdashboard.app.background.*
 import com.nextcloud.android.sso.AccountImporter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,6 +131,9 @@ fun SettingsScreen(
             item { SectionHeader("Appearance") }
             item { AppearanceSection(state = state, vm = vm) }
 
+            item { SectionHeader("Background") }
+            item { BackgroundSection(state = state, vm = vm) }
+
             // ── Navigation ───────────────────────────────────────────────────
             item { SectionHeader("Navigation") }
             item { NavigationSection(state = state, vm = vm) }
@@ -158,6 +164,130 @@ fun SettingsScreen(
             // ── About ────────────────────────────────────────────────────────
             item { SectionHeader("About") }
             item { AboutSection() }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
+    val context = LocalContext.current
+    var pictureSlot by remember { mutableStateOf(WallpaperImageSlot.BOTH) }
+    val picturePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) vm.setWallpaperImage(uri, pictureSlot)
+    }
+    var fitExpanded by remember { mutableStateOf(false) }
+    var glassOpacity by remember(state.wallpaperAppearance.glassOpacity) {
+        mutableFloatStateOf(state.wallpaperAppearance.glassOpacity)
+    }
+    val wallpaperInfo = WallpaperManager.getInstance(context).wallpaperInfo
+    val isActive = wallpaperInfo?.component == ComponentName(context, DashboardWallpaperService::class.java)
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            if (isActive) "Cross-Dashboard live wallpaper is active" else "Cross-Dashboard live wallpaper is not active",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Backdrop pictures", style = MaterialTheme.typography.labelMedium)
+        WallpaperImageSlot.entries.forEach { slot ->
+            val path = state.wallpaperAppearance.imagePath(slot)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(slot.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+                    Text(if (path == null) "Not selected" else "Selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { pictureSlot = slot; picturePicker.launch("image/*") }) {
+                    Icon(Icons.Outlined.Image, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (path == null) "Choose" else "Replace")
+                }
+                if (path != null) {
+                    IconButton(onClick = { vm.setWallpaperImage(null, slot) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove ${slot.name.lowercase()} backdrop picture")
+                    }
+                }
+            }
+        }
+        Text(
+            "Light and Dark override Both. Pictures are copied into private app storage for reliable wallpaper refreshes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box {
+            OutlinedButton(onClick = { fitExpanded = true }) {
+                Text("Picture fit · ${state.wallpaperAppearance.imageFit.name.lowercase().replaceFirstChar { it.uppercase() }}")
+                Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = fitExpanded, onDismissRequest = { fitExpanded = false }) {
+                WallpaperImageFit.entries.forEach { fit ->
+                    DropdownMenuItem(
+                        text = { Text(fit.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        onClick = { vm.setWallpaperImageFit(fit); fitExpanded = false },
+                        leadingIcon = if (fit == state.wallpaperAppearance.imageFit) {
+                            { Icon(Icons.Outlined.Check, contentDescription = null) }
+                        } else null,
+                    )
+                }
+            }
+        }
+        Text("Glass opacity · ${(glassOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+        Slider(
+            value = glassOpacity,
+            onValueChange = { glassOpacity = it },
+            onValueChangeFinished = { vm.setWallpaperGlassOpacity(glassOpacity) },
+            valueRange = 0.5f..1f,
+            steps = 9,
+        )
+        Text("Preferred tablet orientation", style = MaterialTheme.typography.labelMedium)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            PreferredWallpaperOrientation.entries.forEachIndexed { index, value ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index, PreferredWallpaperOrientation.entries.size),
+                    selected = state.wallpaperOrientation == value,
+                    onClick = { vm.setWallpaperOrientation(value) },
+                    label = { Text(value.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                )
+            }
+        }
+        listOf(
+            Triple("Standard", WallpaperProfile.STANDARD, state.backgroundStandard),
+            Triple("Cover", WallpaperProfile.FOLD_COVER, state.backgroundCover),
+            Triple("Opened", WallpaperProfile.FOLD_INNER, state.backgroundInner),
+        ).forEach { (label, profile, template) ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = template?.let {
+                            if (it.source == BackgroundSource.INBOX) {
+                                "Inbox · ${it.inboxTypeFilter.lowercase()} · ${it.inboxDateFilter.lowercase()}"
+                            } else {
+                                "Views · ${it.viewsMode.lowercase()} · ${it.viewsTypeFilter.lowercase()} · ${it.viewsDateFilter.lowercase()}"
+                            }
+                        } ?: "Not configured",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (template != null) IconButton(onClick = { vm.clearBackground(profile) }) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Clear $label background snapshot")
+                }
+            }
+        }
+        Button(onClick = {
+            context.startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                    ComponentName(context, DashboardWallpaperService::class.java))
+            })
+        }) {
+            Icon(Icons.Outlined.Wallpaper, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Open wallpaper preview")
         }
     }
 }

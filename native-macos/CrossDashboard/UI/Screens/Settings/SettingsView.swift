@@ -1,5 +1,6 @@
 import SwiftUI
 import CrossDashboardKit
+import UniformTypeIdentifiers
 
 /// Full settings window with tabbed sections.
 /// Mirrors SettingsScreen on Android. Opens via Cmd+, (macOS Settings scene).
@@ -189,6 +190,8 @@ private struct AppearanceSettingsTab: View {
                 .pickerStyle(.segmented)
             }
 
+            DesktopBackgroundSettingsSection()
+
             Section("Date & time") {
                 TextField("Timezone override", text: $viewModel.timeZoneOverride,
                           prompt: Text("Automatic (\(viewModel.systemTimeZone))"))
@@ -278,6 +281,77 @@ private struct AppearanceSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+}
+
+private struct DesktopBackgroundSettingsSection: View {
+    @State private var manager = DesktopBackgroundManager.shared
+    @State private var choosingPicture = false
+    @State private var pendingImageSlot: DesktopBackgroundImageSlot = .both
+    @State private var pendingOpacity = 0.8
+    var body: some View {
+        Section("Desktop background") {
+            backdropRow("Both appearances", slot: .both, selected: manager.imagePath != nil)
+            backdropRow("Light appearance", slot: .light, selected: manager.lightImagePath != nil)
+            backdropRow("Dark appearance", slot: .dark, selected: manager.darkImagePath != nil)
+            Text("Light and Dark selections override Both. A multi-image HEIC selected for Both uses its first frame in Light appearance and its last frame in Dark appearance.")
+                .font(.caption).foregroundStyle(.secondary)
+            Picker("Picture fit", selection: Binding(
+                get: { manager.imageFit }, set: { manager.setImageFit($0) }
+            )) {
+                ForEach(DesktopBackgroundImageFit.allCases) { fit in Text(fit.label).tag(fit) }
+            }
+            LabeledContent("Glass opacity") {
+                HStack {
+                    Slider(value: Binding(
+                        get: { pendingOpacity }, set: { pendingOpacity = $0 }
+                    ), in: 0.5...1, step: 0.05, onEditingChanged: { editing in
+                        if !editing { manager.setGlassOpacity(pendingOpacity) }
+                    })
+                    Text("\(Int(pendingOpacity * 100))%").monospacedDigit().frame(width: 42)
+                }.frame(width: 260)
+            }
+            if let definition = manager.definition {
+                LabeledContent("Snapshot", value: definition.summary)
+                LabeledContent("Status", value: manager.lastMessage)
+                Toggle("Update automatically", isOn: Binding(
+                    get: { definition.enabled },
+                    set: { $0 ? manager.enable() : manager.disable() }
+                ))
+                Button("Update now") {
+                    Task { await manager.refreshIfEnabled(reason: "Manual Settings update", force: true) }
+                }
+            } else {
+                Text("Use the camera button in Inbox or Views to create a background snapshot.")
+                    .foregroundStyle(.secondary)
+            }
+            Text("Light and dark variants follow the current system appearance. macOS updates the current desktop on each connected display; other Spaces may retain their existing wallpaper.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Generated images are stored in Pictures/Cross-Dashboard/Backgrounds so the macOS desktop service can read them.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .fileImporter(isPresented: $choosingPicture, allowedContentTypes: [.image]) { result in
+            if case .success(let url) = result {
+                let slot = pendingImageSlot
+                Task { await manager.importBackdrop(from: url, for: slot) }
+            }
+        }
+        .onAppear { pendingOpacity = manager.glassOpacity }
+    }
+
+    @ViewBuilder
+    private func backdropRow(_ label: String, slot: DesktopBackgroundImageSlot, selected: Bool) -> some View {
+        LabeledContent(label) {
+            HStack {
+                Text(manager.imageSummary(for: slot)).foregroundStyle(.secondary)
+                Button(selected ? "Replace…" : "Choose…") {
+                    pendingImageSlot = slot; choosingPicture = true
+                }
+                if selected {
+                    Button("Remove", role: .destructive) { Task { await manager.removeBackdrop(slot) } }
+                }
+            }
+        }
     }
 }
 

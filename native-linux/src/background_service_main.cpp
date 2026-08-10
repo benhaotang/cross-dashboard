@@ -3,6 +3,7 @@
 #include "background/pomodoro_session.h"
 #include "background/service_dbus.h"
 #include "background/sync_runner.h"
+#include "background/background_manager.h"
 #include "data/db/task_dao.h"
 #include "data/prefs/prefs.h"
 
@@ -36,6 +37,8 @@ constexpr char kIntrospectionXml[] = R"XML(
       <arg type='b' name='success'/>
       <arg type='as' name='errors'/>
     </signal>
+    <method name='RefreshBackground'><arg type='b' name='accepted' direction='out'/></method>
+    <signal name='BackgroundUpdated'><arg type='b' name='success'/><arg type='s' name='message'/></signal>
     <method name='StartPomodoro'>
       <arg type='s' name='kind' direction='in'/><arg type='s' name='id' direction='in'/>
       <arg type='s' name='title' direction='in'/><arg type='s' name='phase' direction='in'/>
@@ -71,10 +74,12 @@ struct SyncCompletion {
 
 struct ServiceState {
     cd::AppContainer app;
+    cd::BackgroundManager backgrounds{app};
     cd::NotificationScheduler notifications{app};
     GMainLoop* loop{g_main_loop_new(nullptr, FALSE)};
     GDBusConnection* connection{};
     guint registration_id{};
+    guint portal_settings_subscription_id{};
     guint periodic_id{};
     guint alarm_refresh_id{};
     guint pomodoro_tick_id{};
@@ -102,6 +107,8 @@ struct ServiceState {
         if (worker.joinable()) worker.join();
         if (connection && registration_id != 0)
             g_dbus_connection_unregister_object(connection, registration_id);
+        if (connection && portal_settings_subscription_id != 0)
+            g_dbus_connection_signal_unsubscribe(connection, portal_settings_subscription_id);
         if (connection) g_object_unref(connection);
         if (loop) g_main_loop_unref(loop);
     }
@@ -277,12 +284,37 @@ void emit_sync_completed(ServiceState& state, std::vector<std::string> const& er
     }
 }
 
+void refresh_background(ServiceState& state)
+{
+    std::string message; bool const success=state.backgrounds.refresh(message);
+    if(state.connection) g_dbus_connection_emit_signal(state.connection,nullptr,cd::service_dbus::kObjectPath,
+        cd::service_dbus::kInterface,cd::service_dbus::kBackgroundUpdatedSignal,g_variant_new("(bs)",success,message.c_str()),nullptr);
+    if(!success && message!="Background updates are disabled" && message!="No enabled background snapshot")
+        std::fprintf(stderr,"cross-dashboard-service: %s\n",message.c_str());
+}
+
+gboolean refresh_background_idle(gpointer user_data)
+{
+    refresh_background(*static_cast<ServiceState*>(user_data));return G_SOURCE_REMOVE;
+}
+
+void portal_setting_changed(GDBusConnection*, char const*, char const*, char const*, char const*,
+    GVariant* parameters, gpointer user_data)
+{
+    char const* setting_namespace{}; char const* key{}; GVariant* value{};
+    g_variant_get(parameters,"(&s&s@v)",&setting_namespace,&key,&value);
+    if(value)g_variant_unref(value);
+    if(std::string{setting_namespace}=="org.freedesktop.appearance"&&std::string{key}=="color-scheme")
+        g_idle_add(&refresh_background_idle,user_data);
+}
+
 gboolean finish_sync(gpointer user_data)
 {
     std::unique_ptr<SyncCompletion> completion(static_cast<SyncCompletion*>(user_data));
     ServiceState& state = *completion->state;
     if (state.worker.joinable()) state.worker.join();
     state.notifications.reschedule_all();
+    refresh_background(state);
     schedule_periodic(state);
     for (auto const& error : completion->errors)
         std::fprintf(stderr, "cross-dashboard-service: %s\n", error.c_str());
@@ -341,6 +373,15 @@ void handle_method_call(GDBusConnection*, char const*, char const*, char const*,
     if (std::string{method} == cd::service_dbus::kSyncMethod) {
         bool const accepted = request_sync(state);
         g_dbus_method_invocation_return_value(invocation, g_variant_new("(b)", accepted));
+        return;
+    }
+    if (std::string{method} == cd::service_dbus::kRefreshBackgroundMethod) {
+        std::string message; bool const success=state.backgrounds.refresh(message);
+        if (state.connection) g_dbus_connection_emit_signal(state.connection, nullptr,
+            cd::service_dbus::kObjectPath, cd::service_dbus::kInterface,
+            cd::service_dbus::kBackgroundUpdatedSignal,
+            g_variant_new("(bs)", success, message.c_str()), nullptr);
+        g_dbus_method_invocation_return_value(invocation,g_variant_new("(b)",TRUE));
         return;
     }
     if (std::string{method} == cd::service_dbus::kGetPomodoroStateMethod) {
@@ -426,6 +467,10 @@ void bus_acquired(GDBusConnection* connection, char const*, gpointer user_data)
 {
     auto& state = *static_cast<ServiceState*>(user_data);
     state.connection = G_DBUS_CONNECTION(g_object_ref(connection));
+    state.portal_settings_subscription_id=g_dbus_connection_signal_subscribe(connection,
+        "org.freedesktop.portal.Desktop","org.freedesktop.portal.Settings","SettingChanged",
+        "/org/freedesktop/portal/desktop",nullptr,G_DBUS_SIGNAL_FLAGS_NONE,
+        &portal_setting_changed,&state,nullptr);
     GError* error = nullptr;
     GDBusNodeInfo* info = g_dbus_node_info_new_for_xml(kIntrospectionXml, &error);
     if (!info) {
@@ -464,6 +509,7 @@ int main()
         ServiceState state;
         (void)notify_init("cross-dashboard");
         state.notifications.reschedule_all();
+        refresh_background(state);
         state.alarm_refresh_id = g_timeout_add_seconds(60, &refresh_alarms, &state);
 
         schedule_periodic(state);
