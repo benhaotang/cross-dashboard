@@ -26,14 +26,15 @@ enum DesktopBackgroundRenderer {
         let secondary = dark ? NSColor(hex: 0x9AABC2) : NSColor(hex: 0x52647A)
         let glassTint: NSColor = dark ? .black : .white
         let margin = min(width, height) * 0.065
-        drawGlass(in: NSRect(x: margin - 22, y: height - margin - 175,
-            width: width - margin * 2 + 44, height: 155), radius: 18,
+        drawGlass(in: NSRect(x: margin, y: height - margin - 175,
+            width: width - margin * 2, height: 155), radius: 18,
             backdrop: blurredBackdrop, canvas: canvas, fit: appearance.imageFit,
             tint: glassTint, opacity: appearance.glassOpacity)
-        draw(content.title, at: NSPoint(x: margin, y: height - margin - 128), size: 64, color: text, bold: true, width: width - margin * 2)
-        draw(content.filters + (content.mode.map { "  ·  \($0)" } ?? "") + "  ·  \(content.rows.count) visible", at: NSPoint(x: margin, y: height - margin - 160), size: 22, color: secondary, width: width - margin * 2)
+        let headerInset: CGFloat = 22
+        draw(content.title, at: NSPoint(x: margin + headerInset, y: height - margin - 128), size: 64, color: text, bold: true, width: width - margin * 2 - headerInset * 2)
+        draw(content.filters + (content.mode.map { "  ·  \($0)" } ?? "") + "  ·  \(content.rows.count) visible", at: NSPoint(x: margin + headerInset, y: height - margin - 160), size: 22, color: secondary, width: width - margin * 2 - headerInset * 2)
         let stamp = content.refreshedAt.formatted(date: .omitted, time: .shortened)
-        draw("UPDATED \(stamp)", at: NSPoint(x: width - margin - 300, y: height - margin - 116), size: 18, color: secondary, width: 300)
+        draw("UPDATED \(stamp)", at: NSPoint(x: width - margin - headerInset - 300, y: height - margin - 116), size: 18, color: secondary, width: 300)
         if content.mode != nil && width >= height * 1.15 && width >= 1_400 {
             drawWideBoard(content, in: NSRect(x: margin, y: margin * 1.6,
                 width: width - margin * 2, height: height - margin * 2.6 - 190),

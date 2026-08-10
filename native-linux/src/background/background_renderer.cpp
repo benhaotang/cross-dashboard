@@ -107,11 +107,11 @@ bool render_background_png(BackgroundContent const& v, BackgroundAppearance cons
     unsigned background = appearance.dark ? 0x000000 : 0xFFFFFF; color(c, background); cairo_paint(c);
     rc.blur = load_backdrop(c, appearance, background, error);
     if (!appearance.image_path.empty() && !rc.blur) { cairo_destroy(c); cairo_surface_destroy(surface); return false; }
-    glass(c, rc, 205, 135, 3430, 245, 30);
+    glass(c, rc, 230, 135, 3380, 245, 30);
     auto now = std::time(nullptr); char stamp[16]{}; std::strftime(stamp, sizeof(stamp), "%H:%M", std::localtime(&now));
-    text(c, "Sans Bold", 112, rc.text, 230, 170, v.title, 2600);
-    text(c, "Sans", 38, rc.secondary, 235, 310, v.filters + (v.title == "VIEWS" ? " · " + v.mode : "") + " · " + std::to_string(v.rows.size()) + " visible", 2800);
-    text(c, "Sans", 30, rc.secondary, 3200, 185, std::string("UPDATED ") + stamp, 430);
+    text(c, "Sans Bold", 112, rc.text, 255, 170, v.title, 2550);
+    text(c, "Sans", 38, rc.secondary, 255, 310, v.filters + (v.title == "VIEWS" ? " · " + v.mode : "") + " · " + std::to_string(v.rows.size()) + " visible", 2750);
+    text(c, "Sans", 30, rc.secondary, 3155, 185, std::string("UPDATED ") + stamp, 430);
     if (v.title == "VIEWS" && !v.groups.empty()) {
         if (v.mode == "covey") { double gap = 24, cell_w = (3380 - gap) / 2, cell_h = (1570 - gap) / 2; for (std::size_t i = 0; i < std::min<std::size_t>(4, v.groups.size()); ++i) board_panel(c, rc, v, v.groups[i], 230 + (i % 2) * (cell_w + gap), 430 + (i / 2) * (cell_h + gap), cell_w, cell_h); }
         else { std::size_t count = std::min<std::size_t>(7, v.groups.size()); double gap = 18, col_w = (3380 - gap * (count - 1)) / count; for (std::size_t i = 0; i < count; ++i) board_panel(c, rc, v, v.groups[i], 230 + i * (col_w + gap), 430, col_w, 1570); }

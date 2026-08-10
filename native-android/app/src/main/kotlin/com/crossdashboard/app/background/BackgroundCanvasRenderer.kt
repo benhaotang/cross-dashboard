@@ -44,12 +44,13 @@ object BackgroundCanvasRenderer {
         }
         val meta = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = secondary; textSize = title.textSize * .34f }
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = text; textSize = title.textSize * .36f }
-        drawGlass(canvas, RectF(margin - 20f, margin - 14f, w - margin + 20f, margin + title.textSize * 1.85f),
+        drawGlass(canvas, RectF(margin, margin - 14f, w - margin, margin + title.textSize * 1.85f),
             18f, glassSource, glassTint, appearance.glassOpacity)
-        canvas.drawText(content.title, margin, margin + title.textSize, title)
-        canvas.drawText(content.filterLabel + (content.mode?.let { "  ·  $it" } ?: "") + "  ·  ${content.rows.size} visible", margin, margin + title.textSize * 1.55f, meta)
+        val headerInset = 20f
+        canvas.drawText(content.title, margin + headerInset, margin + title.textSize, title)
+        canvas.drawText(content.filterLabel + (content.mode?.let { "  ·  $it" } ?: "") + "  ·  ${content.rows.size} visible", margin + headerInset, margin + title.textSize * 1.55f, meta)
         val stamp = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(content.refreshedAt))
-        canvas.drawText("UPDATED $stamp", w - margin - meta.measureText("UPDATED $stamp"), margin + meta.textSize, meta)
+        canvas.drawText("UPDATED $stamp", w - margin - headerInset - meta.measureText("UPDATED $stamp"), margin + meta.textSize, meta)
         var y = margin + title.textSize * 2.15f
         if (content.rows.isEmpty()) {
             canvas.drawText("Nothing matches this snapshot", margin, y + body.textSize * 2f, body)
