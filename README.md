@@ -20,16 +20,16 @@ This is an experimental client for self-hosting services like CalDAV, [Gitea](ht
 - Pomodoro timer
 - Widgets on macOS and Android
 - Markdown (Block LaTeX) rendering
+- Dynamic Background
+- Cli on Linux
 
 ## Platform Strategy
 
-| Platform | Status | Directory | Stack |
-|---|---|---|---|
-| **Android** | ✅ Complete | `native-android/` | Kotlin + Jetpack Compose |
-| **macOS** | ✅ Complete | `native-macos/` | Swift 6.2 + SwiftUI |
-| **Linux** | ✅ Complete | `native-linux/` | GTK3 + libhandy-1 |
-
-There is no React Native, Expo, or Electron shell in this repo; only the native trees above are maintained.
+| Platform |  Directory | Stack |
+|---|---|---|
+| **Android** |  `native-android/` | Kotlin + Jetpack Compose |
+| **macOS** |  `native-macos/` | Swift 6.2 + SwiftUI |
+| **Linux** |  `native-linux/` | GTK3 + libhandy-1 |
 
 ## URL Scheme
 
@@ -45,9 +45,6 @@ name: Capture
 icon: square o
 url: crossdashboard://capture?text={popclip text}
 ```
-
-> [!NOTE]
-> This is mainly a personal project for myself, therefore, only Android 16+ and Mac OS 15+ are supported, with no plan to support older versions.
 
 ## Linux CLI and background service
 
@@ -104,5 +101,8 @@ systemctl --user enable --now crossdashboard.service
 systemctl --user status crossdashboard.service
 journalctl --user -u crossdashboard.service
 ```
+
+> [!NOTE]
+> This is mainly a personal project for myself, therefore, only Android 16+ and Mac OS 15+ are supported, with no plan to support older versions.
 
 Shared under the MIT license. (If AI code is licensable:))
