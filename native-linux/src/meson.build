@@ -6,6 +6,8 @@ soup_dep = dependency('libsoup-3.0', required: true)
 json_dep = dependency('nlohmann_json')
 cairo_dep = dependency('cairo')
 pangocairo_dep = dependency('pangocairo')
+gdk_pixbuf_dep = dependency('gdk-pixbuf-2.0')
+gdk_dep = dependency('gdk-3.0')
 notify_dep = dependency('libnotify')
 appindicator_dep = dependency('appindicator3-0.1', required: false)
 appindicator_is_ayatana = false
@@ -94,6 +96,8 @@ core_deps = [
   json_dep,
   cairo_dep,
   pangocairo_dep,
+  gdk_pixbuf_dep,
+  gdk_dep,
 ]
 
 gui_deps = core_deps + [
@@ -206,6 +210,15 @@ background_command_test_exe = executable(
   install: false,
 )
 test('background_command', background_command_test_exe)
+
+background_renderer_test_exe = executable(
+  'background_renderer_test',
+  files('../tests/background_renderer_test.cpp', 'background/background_renderer.cpp'),
+  include_directories: src_inc,
+  dependencies: [cairo_dep, pangocairo_dep, gdk_pixbuf_dep, gdk_dep],
+  install: false,
+)
+test('background_renderer', background_renderer_test_exe)
 
 dbus_run_session = find_program('dbus-run-session')
 service_pomodoro_test = find_program('../tests/service_pomodoro_test.sh')

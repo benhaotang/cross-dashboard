@@ -112,6 +112,11 @@ background template. Android exposes it as a light/dark live wallpaper, macOS ma
 light/dark desktop images per connected display, and native Linux renders
 `$XDG_CACHE_HOME/crossdashboard/background.png` from the systemd user service.
 
+Background Settings can add a personal picture beneath the snapshot. Scale, Fill, and Stretch
+placement modes are available, and the content is drawn on light- or dark-tinted blurred glass
+whose opacity defaults to 80% and can be adjusted from 50–100%. Removing the picture restores the solid light/dark background.
+Android and macOS planning accents follow the current system accent color.
+
 Linux accepts any direct command template containing `%f`, which is replaced by the rendered file
 path. Presets are provided for `xwallpaper --zoom %f` and `swaybg -o "*" -i %f -m fill`. Commands
 are parsed as arguments and are never run through a shell, so pipes, redirects, and shell expansion

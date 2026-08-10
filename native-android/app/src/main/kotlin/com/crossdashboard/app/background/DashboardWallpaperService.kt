@@ -10,6 +10,7 @@ import android.view.SurfaceHolder
 import com.crossdashboard.app.data.prefs.AppPreferences
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -55,6 +56,14 @@ class DashboardWallpaperService : WallpaperService() {
             scope.launch {
                 val displayContext = getDisplayContext() ?: this@DashboardWallpaperService
                 val (template, orientation) = WallpaperProfileResolver.resolve(displayContext, prefs)
+                val appearance = prefs.wallpaperAppearanceFlow.first()
+                val backdrop = appearance.imagePath?.let { path ->
+                    runCatching {
+                        android.graphics.ImageDecoder.decodeBitmap(
+                            android.graphics.ImageDecoder.createSource(java.io.File(path))
+                        ) { decoder, _, _ -> decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE }
+                    }.getOrNull()
+                }
                 val content = template?.takeIf { it.enabled }?.let { builder.build(it) }
                     ?: BackgroundContent("CROSS-DASHBOARD", "Capture Inbox or Views to begin", rows = emptyList())
                 withContext(Dispatchers.Main.immediate) {
@@ -63,8 +72,12 @@ class DashboardWallpaperService : WallpaperService() {
                     try {
                         canvas = surfaceHolder.lockCanvas()
                         val dark = displayContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-                        canvas?.let { BackgroundCanvasRenderer.draw(it, content, orientation, dark) }
+                        val accent = displayContext.getColor(
+                            if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_600
+                        )
+                        canvas?.let { BackgroundCanvasRenderer.draw(it, content, orientation, dark, appearance, backdrop, accent) }
                     } finally {
+                        backdrop?.recycle()
                         canvas?.let { surfaceHolder.unlockCanvasAndPost(it) }
                     }
                 }

@@ -11,6 +11,14 @@ enum class WallpaperProfile { STANDARD, FOLD_COVER, FOLD_INNER }
 @Serializable
 enum class PreferredWallpaperOrientation { PORTRAIT, LANDSCAPE }
 
+enum class WallpaperImageFit { SCALE, FILL, STRETCH }
+
+data class WallpaperAppearance(
+    val imagePath: String? = null,
+    val glassOpacity: Float = 0.8f,
+    val imageFit: WallpaperImageFit = WallpaperImageFit.FILL,
+)
+
 @Serializable
 data class BackgroundTemplate(
     val enabled: Boolean = true,

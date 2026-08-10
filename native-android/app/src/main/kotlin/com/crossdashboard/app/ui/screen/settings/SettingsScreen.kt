@@ -172,6 +172,13 @@ fun SettingsScreen(
 @Composable
 private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
     val context = LocalContext.current
+    val picturePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) vm.setWallpaperImage(uri)
+    }
+    var fitExpanded by remember { mutableStateOf(false) }
+    var glassOpacity by remember(state.wallpaperAppearance.glassOpacity) {
+        mutableFloatStateOf(state.wallpaperAppearance.glassOpacity)
+    }
     val wallpaperInfo = WallpaperManager.getInstance(context).wallpaperInfo
     val isActive = wallpaperInfo?.component == ComponentName(context, DashboardWallpaperService::class.java)
     Column(
@@ -182,6 +189,50 @@ private fun BackgroundSection(state: SettingsUiState, vm: SettingsViewModel) {
             if (isActive) "Cross-Dashboard live wallpaper is active" else "Cross-Dashboard live wallpaper is not active",
             style = MaterialTheme.typography.bodySmall,
             color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Backdrop picture", style = MaterialTheme.typography.labelMedium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { picturePicker.launch("image/*") }) {
+                Icon(Icons.Outlined.Image, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (state.wallpaperAppearance.imagePath == null) "Choose picture" else "Replace picture")
+            }
+            if (state.wallpaperAppearance.imagePath != null) {
+                IconButton(onClick = { vm.setWallpaperImage(null) }) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Remove backdrop picture")
+                }
+            }
+        }
+        Text(
+            if (state.wallpaperAppearance.imagePath == null) "No picture selected; light and dark use their solid defaults."
+            else "The picture is copied into private app storage for reliable wallpaper refreshes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box {
+            OutlinedButton(onClick = { fitExpanded = true }) {
+                Text("Picture fit · ${state.wallpaperAppearance.imageFit.name.lowercase().replaceFirstChar { it.uppercase() }}")
+                Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = fitExpanded, onDismissRequest = { fitExpanded = false }) {
+                WallpaperImageFit.entries.forEach { fit ->
+                    DropdownMenuItem(
+                        text = { Text(fit.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        onClick = { vm.setWallpaperImageFit(fit); fitExpanded = false },
+                        leadingIcon = if (fit == state.wallpaperAppearance.imageFit) {
+                            { Icon(Icons.Outlined.Check, contentDescription = null) }
+                        } else null,
+                    )
+                }
+            }
+        }
+        Text("Glass opacity · ${(glassOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+        Slider(
+            value = glassOpacity,
+            onValueChange = { glassOpacity = it },
+            onValueChangeFinished = { vm.setWallpaperGlassOpacity(glassOpacity) },
+            valueRange = 0.5f..1f,
+            steps = 9,
         )
         Text("Preferred tablet orientation", style = MaterialTheme.typography.labelMedium)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

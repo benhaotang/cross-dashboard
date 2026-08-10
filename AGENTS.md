@@ -213,6 +213,14 @@ Backgrounds render titles, dates, types, tags, and counts only. Never add descri
 bodies, credentials, or attachment data to a background render model. User-facing documentation
 must warn that visible titles can appear behind desktop icons or on the Android lock screen.
 
+Background Settings may select one app-owned backdrop picture shared by all snapshot profiles.
+Render the picture using the selected Scale (contain), Fill (cover), or Stretch mode, then place
+content on subtly blurred matte-glass panels. Glass opacity defaults to 80% and is adjustable from
+50–100%; light output uses white-tinted glass and dark output uses black-tinted glass. With no
+picture, retain the solid light/dark fallback. Android and macOS renderer accents must come from
+the current Android system/Material dynamic accent and macOS `controlAccentColor`, respectively,
+rather than a fixed project color.
+
 ### Data Layer
 - **Room is the source of truth.** UI observes `Flow<List<T>>` from DAOs and renders immediately from cache.
 - `SyncWorker` runs in the background (WorkManager) and does `clearAll() + upsert(freshData)` into Room.

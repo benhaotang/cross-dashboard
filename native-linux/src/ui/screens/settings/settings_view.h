@@ -8,11 +8,13 @@
 #include <gtkmm/checkbutton.h>
 #include <gtkmm/comboboxtext.h>
 #include <gtkmm/entry.h>
+#include <gtkmm/filechooserbutton.h>
 #include <gtkmm/grid.h>
 #include <gtkmm/label.h>
 #include <gtkmm/notebook.h>
 #include <gtkmm/radiobutton.h>
 #include <gtkmm/scrolledwindow.h>
+#include <gtkmm/scale.h>
 #include <gtkmm/spinbutton.h>
 
 #include <string>
@@ -104,6 +106,10 @@ private:
     Gtk::Button save_kanban_btn_{"Save Kanban column tags"};
     Gtk::ComboBoxText background_provider_;
     Gtk::Entry background_command_;
+    Gtk::FileChooserButton background_image_{"Choose backdrop picture", Gtk::FILE_CHOOSER_ACTION_OPEN};
+    Gtk::Button background_image_clear_{"Remove picture"};
+    Gtk::ComboBoxText background_image_fit_;
+    Gtk::Scale background_opacity_{Gtk::ORIENTATION_HORIZONTAL};
     Gtk::Label background_status_;
 
     Gtk::Box top_bar_{Gtk::ORIENTATION_HORIZONTAL, 8};

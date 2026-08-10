@@ -22,6 +22,7 @@
 
 #include <gtkmm/button.h>
 #include <gtkmm/grid.h>
+#include <gtkmm/filefilter.h>
 #include <gtkmm/label.h>
 #include <gtkmm/messagedialog.h>
 #include <gtkmm/separator.h>
@@ -300,11 +301,17 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     background_provider_.set_active_id(existing_command.empty()?"disabled":existing_command=="xwallpaper --zoom %f"?"xwallpaper":existing_command=="swaybg -o \"*\" -i %f -m fill"?"swaybg":"custom");
     background_provider_.signal_changed().connect([this]{auto id=background_provider_.get_active_id();if(id=="disabled")background_command_.set_text("");else if(id=="xwallpaper")background_command_.set_text("xwallpaper --zoom %f");else if(id=="swaybg")background_command_.set_text("swaybg -o \"*\" -i %f -m fill");});
     appear_page->pack_start(background_provider_,false,false);background_command_.set_placeholder_text("wallpaper-tool --set %f");background_command_.set_hexpand(true);appear_page->pack_start(background_command_,false,false);
+    auto image_filter=Gtk::FileFilter::create(); image_filter->set_name("Pictures"); image_filter->add_pixbuf_formats(); background_image_.add_filter(image_filter);
+    if(auto path=app_.prefs().background_image_path();path&&!path->empty())background_image_.set_filename(*path);
+    auto* image_row=Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL,8));image_row->pack_start(background_image_,true,true);image_row->pack_start(background_image_clear_,false,false);appear_page->pack_start(*image_row,false,false);
+    background_image_clear_.signal_clicked().connect([this]{background_image_.unselect_all();});
+    background_image_fit_.append("scale","Scale");background_image_fit_.append("fill","Fill");background_image_fit_.append("stretch","Stretch");background_image_fit_.set_active_id(app_.prefs().background_image_fit().value_or("fill"));appear_page->pack_start(background_image_fit_,false,false);
+    background_opacity_.set_range(50,100);background_opacity_.set_increments(5,10);background_opacity_.set_digits(0);background_opacity_.set_value(std::stod(app_.prefs().background_glass_opacity().value_or("0.8"))*100);background_opacity_.set_value_pos(Gtk::POS_RIGHT);appear_page->pack_start(*Gtk::manage(new Gtk::Label("Glass opacity")),false,false);appear_page->pack_start(background_opacity_,false,false);
     if(auto raw=app_.prefs().background_template_json()){BackgroundTemplate definition;if(parse_background_template(*raw,definition))background_status_.set_text("Snapshot: "+background_template_summary(definition));}
     else background_status_.set_text("No Inbox or Views snapshot yet");
     background_status_.set_halign(Gtk::ALIGN_START);appear_page->pack_start(background_status_,false,false);
     auto* background_help=Gtk::manage(new Gtk::Label("%f is replaced with the rendered PNG path. Commands are launched directly; shell pipes and redirects are not supported."));background_help->set_line_wrap(true);background_help->set_halign(Gtk::ALIGN_START);appear_page->pack_start(*background_help,false,false);
-    auto* save_background=Gtk::manage(new Gtk::Button("Save and update background"));save_background->signal_clicked().connect([this]{std::string command=background_command_.get_text();if(!command.empty()){std::vector<std::string> args;std::string error;if(!expand_background_command(command,"/tmp/background test.png",args,error)){background_status_.set_text(error);return;}}(void)app_.prefs().set_background_command(command);sync_.refresh_background();background_status_.set_text(command.empty()?"Automatic background updates disabled":"Background update requested");});appear_page->pack_start(*save_background,false,false);
+    auto* save_background=Gtk::manage(new Gtk::Button("Save and update background"));save_background->signal_clicked().connect([this]{std::string command=background_command_.get_text();if(!command.empty()){std::vector<std::string> args;std::string error;if(!expand_background_command(command,"/tmp/background test.png",args,error)){background_status_.set_text(error);return;}}(void)app_.prefs().set_background_command(command);(void)app_.prefs().set_background_image_path(background_image_.get_filename());(void)app_.prefs().set_background_image_fit(background_image_fit_.get_active_id());(void)app_.prefs().set_background_glass_opacity(std::to_string(background_opacity_.get_value()/100.0));sync_.refresh_background();background_status_.set_text(command.empty()?"Automatic background updates disabled":"Background update requested");});appear_page->pack_start(*save_background,false,false);
     if(g_getenv("FLATPAK_ID")){background_provider_.set_sensitive(false);background_command_.set_sensitive(false);save_background->set_sensitive(false);background_status_.set_text("Automatic backgrounds require the native systemd service and are unavailable in Flatpak.");}
 
     // General (About + sync — macOS splits notifications; we keep sync + notifications here)

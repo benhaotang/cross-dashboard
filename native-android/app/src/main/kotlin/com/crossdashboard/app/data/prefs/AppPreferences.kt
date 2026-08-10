@@ -8,6 +8,8 @@ import com.crossdashboard.app.domain.model.*
 import com.crossdashboard.app.background.BackgroundTemplate
 import com.crossdashboard.app.background.PreferredWallpaperOrientation
 import com.crossdashboard.app.background.WallpaperProfile
+import com.crossdashboard.app.background.WallpaperAppearance
+import com.crossdashboard.app.background.WallpaperImageFit
 import com.crossdashboard.app.background.WallpaperUpdateNotifier
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -219,6 +221,25 @@ class AppPreferences @Inject constructor(
         WallpaperUpdateNotifier.notify(context)
     }
 
+    val wallpaperAppearanceFlow: Flow<WallpaperAppearance> = ds.data
+        .catchIo()
+        .map { p -> WallpaperAppearance(
+            imagePath = p[Keys.WALLPAPER_IMAGE_PATH],
+            glassOpacity = (p[Keys.WALLPAPER_GLASS_OPACITY] ?: 0.8f).coerceIn(0.5f, 1f),
+            imageFit = runCatching { WallpaperImageFit.valueOf(p[Keys.WALLPAPER_IMAGE_FIT] ?: WallpaperImageFit.FILL.name) }
+                .getOrDefault(WallpaperImageFit.FILL),
+        ) }
+
+    suspend fun setWallpaperAppearance(value: WallpaperAppearance) {
+        ds.edit { p ->
+            if (value.imagePath == null) p.remove(Keys.WALLPAPER_IMAGE_PATH)
+            else p[Keys.WALLPAPER_IMAGE_PATH] = value.imagePath
+            p[Keys.WALLPAPER_GLASS_OPACITY] = value.glassOpacity.coerceIn(0.5f, 1f)
+            p[Keys.WALLPAPER_IMAGE_FIT] = value.imageFit.name
+        }
+        WallpaperUpdateNotifier.notify(context)
+    }
+
     private fun backgroundKey(profile: WallpaperProfile): Preferences.Key<String> = when (profile) {
         WallpaperProfile.STANDARD -> Keys.BACKGROUND_STANDARD
         WallpaperProfile.FOLD_COVER -> Keys.BACKGROUND_COVER
@@ -251,6 +272,9 @@ class AppPreferences @Inject constructor(
         val BACKGROUND_COVER = stringPreferencesKey("background_cover")
         val BACKGROUND_INNER = stringPreferencesKey("background_inner")
         val WALLPAPER_ORIENTATION = stringPreferencesKey("wallpaper_orientation")
+        val WALLPAPER_IMAGE_PATH = stringPreferencesKey("wallpaper_image_path")
+        val WALLPAPER_GLASS_OPACITY = floatPreferencesKey("wallpaper_glass_opacity")
+        val WALLPAPER_IMAGE_FIT = stringPreferencesKey("wallpaper_image_fit")
     }
 }
 

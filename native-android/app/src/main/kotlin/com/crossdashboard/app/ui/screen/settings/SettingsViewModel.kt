@@ -72,6 +72,7 @@ data class SettingsUiState(
     val backgroundCover: BackgroundTemplate? = null,
     val backgroundInner: BackgroundTemplate? = null,
     val wallpaperOrientation: PreferredWallpaperOrientation = PreferredWallpaperOrientation.PORTRAIT,
+    val wallpaperAppearance: WallpaperAppearance = WallpaperAppearance(),
     val timeZoneOverride: String? = null,
     val systemTimeZone: String = AppTimeZone.systemZoneId.id,
 
@@ -236,6 +237,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_COVER).collect { v -> _state.update { it.copy(backgroundCover = v) } } }
         viewModelScope.launch { prefs.backgroundTemplateFlow(WallpaperProfile.FOLD_INNER).collect { v -> _state.update { it.copy(backgroundInner = v) } } }
         viewModelScope.launch { prefs.preferredWallpaperOrientationFlow.collect { v -> _state.update { it.copy(wallpaperOrientation = v) } } }
+        viewModelScope.launch { prefs.wallpaperAppearanceFlow.collect { v -> _state.update { it.copy(wallpaperAppearance = v) } } }
     }
 
     fun setWallpaperOrientation(value: PreferredWallpaperOrientation) = viewModelScope.launch {
@@ -245,6 +247,35 @@ class SettingsViewModel @Inject constructor(
     fun clearBackground(profile: WallpaperProfile) = viewModelScope.launch {
         prefs.setBackgroundTemplate(profile, null)
         _state.update { it.copy(infoMessage = "Background snapshot cleared") }
+    }
+
+    fun setWallpaperImage(uri: android.net.Uri?) = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        val old = _state.value.wallpaperAppearance.imagePath
+        val path = if (uri == null) null else runCatching {
+            val directory = java.io.File(context.filesDir, "background").apply { mkdirs() }
+            val target = java.io.File(directory, "source_image")
+            val temporary = java.io.File(directory, "source_image.import")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            } ?: error("Could not read selected picture")
+            java.nio.file.Files.move(temporary.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+            target.absolutePath
+        }.getOrElse {
+            _state.update { state -> state.copy(errorMessage = "Could not save selected picture") }
+            return@launch
+        }
+        if (uri == null && old != null) runCatching { java.io.File(old).delete() }
+        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(imagePath = path))
+    }
+
+    fun setWallpaperGlassOpacity(value: Float) = viewModelScope.launch {
+        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(glassOpacity = value))
+    }
+
+    fun setWallpaperImageFit(value: WallpaperImageFit) = viewModelScope.launch {
+        prefs.setWallpaperAppearance(_state.value.wallpaperAppearance.copy(imageFit = value))
     }
 
     // ─── CalDAV section ───────────────────────────────────────────────────────

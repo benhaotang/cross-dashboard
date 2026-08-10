@@ -9,13 +9,61 @@ final class DesktopBackgroundManager {
     static let shared = DesktopBackgroundManager()
     private static let logger = Logger(subsystem: "com.crossdashboard.app", category: "DesktopBackground")
     private let key = "desktop_background_definition"
+    private let imageKey = "desktop_background_image_path"
+    private let opacityKey = "desktop_background_glass_opacity"
+    private let fitKey = "desktop_background_image_fit"
     var definition: DesktopBackgroundDefinition?
     var lastMessage = "No background snapshot"
+    var imagePath: String?
+    var glassOpacity: Double
+    var imageFit: DesktopBackgroundImageFit
 
     private init() {
+        imagePath = UserDefaults.standard.string(forKey: imageKey)
+        let storedOpacity = UserDefaults.standard.object(forKey: opacityKey) as? Double
+        glassOpacity = min(1, max(0.5, storedOpacity ?? 0.8))
+        imageFit = DesktopBackgroundImageFit(rawValue: UserDefaults.standard.string(forKey: fitKey) ?? "") ?? .fill
         if let data = UserDefaults.standard.data(forKey: key) { definition = try? JSONDecoder().decode(DesktopBackgroundDefinition.self, from: data) }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.refreshIfEnabled() } }
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.applyCurrentAppearance() } }
+    }
+
+    func importBackdrop(from source: URL) async {
+        let accessed = source.startAccessingSecurityScopedResource()
+        defer { if accessed { source.stopAccessingSecurityScopedResource() } }
+        do {
+            let directory = try backgroundDirectory()
+            let destination = directory.appendingPathComponent("source-image")
+                .appendingPathExtension(source.pathExtension.isEmpty ? "image" : source.pathExtension)
+            let temporary = directory.appendingPathComponent("source-image.import")
+            try? FileManager.default.removeItem(at: temporary)
+            try FileManager.default.copyItem(at: source, to: temporary)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: temporary, to: destination)
+            if let old = imagePath, old != destination.path { try? FileManager.default.removeItem(atPath: old) }
+            imagePath = destination.path
+            persistAppearance()
+            await refreshIfEnabled(reason: "Backdrop picture changed", force: true)
+        } catch {
+            lastMessage = "Background image error: \(error.localizedDescription)"
+        }
+    }
+
+    func removeBackdrop() async {
+        if let imagePath { try? FileManager.default.removeItem(atPath: imagePath) }
+        self.imagePath = nil
+        persistAppearance()
+        await refreshIfEnabled(reason: "Backdrop picture removed", force: true)
+    }
+
+    func setGlassOpacity(_ value: Double) {
+        glassOpacity = min(1, max(0.5, value)); persistAppearance()
+        Task { await refreshIfEnabled(reason: "Glass opacity changed", force: true) }
+    }
+
+    func setImageFit(_ value: DesktopBackgroundImageFit) {
+        imageFit = value; persistAppearance()
+        Task { await refreshIfEnabled(reason: "Backdrop fit changed", force: true) }
     }
 
     func captureInbox(_ vm: InboxViewModel) async {
@@ -52,17 +100,18 @@ final class DesktopBackgroundManager {
         Self.logger.info("Starting background refresh: \(reason, privacy: .public)")
         let content = build(definition)
         do {
-            let directory = try FileManager.default.url(for: .picturesDirectory,
-                in: .userDomainMask, appropriateFor: nil, create: true)
-                .appendingPathComponent("Cross-Dashboard", isDirectory: true)
-                .appendingPathComponent("Backgrounds", isDirectory: true)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let directory = try backgroundDirectory()
+            let appearance = DesktopBackgroundAppearance(
+                imageURL: imagePath.map { URL(fileURLWithPath: $0) },
+                glassOpacity: CGFloat(glassOpacity), imageFit: imageFit)
+            let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? .controlAccentColor
             for screen in NSScreen.screens {
                 let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
                 let pixels = CGSize(width: screen.frame.width * screen.backingScaleFactor, height: screen.frame.height * screen.backingScaleFactor)
                 for dark in [false, true] {
-                    guard let data = DesktopBackgroundRenderer.render(content, pixels: pixels, dark: dark) else {
-                        throw DesktopBackgroundError.renderFailed(id)
+                    guard let data = DesktopBackgroundRenderer.render(content, pixels: pixels, dark: dark,
+                        appearance: appearance, accent: accent) else {
+                        throw DesktopBackgroundError.renderFailed(id, pixels)
                     }
                     let url = directory.appendingPathComponent("\(id)_\(dark ? "dark" : "light").png")
                     try data.write(to: url, options: .atomic)
@@ -171,16 +220,34 @@ final class DesktopBackgroundManager {
             UserDefaults.standard.set(data, forKey: key)
         }
     }
+
+
+    private func persistAppearance() {
+        if let imagePath { UserDefaults.standard.set(imagePath, forKey: imageKey) }
+        else { UserDefaults.standard.removeObject(forKey: imageKey) }
+        UserDefaults.standard.set(glassOpacity, forKey: opacityKey)
+        UserDefaults.standard.set(imageFit.rawValue, forKey: fitKey)
+    }
+
+    private func backgroundDirectory() throws -> URL {
+        let directory = try FileManager.default.url(for: .picturesDirectory,
+            in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("Cross-Dashboard", isDirectory: true)
+            .appendingPathComponent("Backgrounds", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 }
 
 private enum DesktopBackgroundError: LocalizedError {
-    case renderFailed(String)
+    case renderFailed(String, CGSize)
     case missingRenderedFile(URL)
     case notApplied(expected: URL, actual: URL?)
 
     var errorDescription: String? {
         switch self {
-        case .renderFailed(let display): return "Could not render display \(display)."
+        case .renderFailed(let display, let pixels):
+            return "Could not render display \(display) at \(Int(pixels.width))×\(Int(pixels.height)) pixels."
         case .missingRenderedFile(let url): return "Rendered image is missing at \(url.path)."
         case .notApplied(let expected, let actual):
             return "macOS did not select \(expected.lastPathComponent); current image is \(actual?.lastPathComponent ?? "unknown")."

@@ -1,26 +1,40 @@
 package com.crossdashboard.app.background
 
 import android.graphics.Canvas
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import com.crossdashboard.app.ui.screen.inbox.InboxViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 object BackgroundCanvasRenderer {
-    private const val EVENT = 0xFF65C7D0.toInt()
-    private const val TASK = 0xFFF2B35D.toInt()
     private const val OVERDUE = 0xFFF27C7C.toInt()
 
-    fun draw(canvas: Canvas, content: BackgroundContent, preferred: PreferredWallpaperOrientation, dark: Boolean) {
-        val ink = if (dark) 0xFF0B1220.toInt() else 0xFFF2F6FA.toInt()
-        val panel = if (dark) 0xFF18243A.toInt() else 0xFFFFFFFF.toInt()
+    fun draw(
+        canvas: Canvas,
+        content: BackgroundContent,
+        preferred: PreferredWallpaperOrientation,
+        dark: Boolean,
+        appearance: WallpaperAppearance = WallpaperAppearance(),
+        backdrop: Bitmap? = null,
+        systemAccent: Int = 0xFF65C7D0.toInt(),
+    ) {
+        val ink = if (dark) Color.BLACK else Color.WHITE
         val text = if (dark) 0xFFEAF0F7.toInt() else 0xFF172235.toInt()
         val secondary = if (dark) 0xFF9AABC2.toInt() else 0xFF52647A.toInt()
         canvas.drawColor(ink)
         val w = canvas.width.toFloat()
         val h = canvas.height.toFloat()
+        val glassSource = backdrop?.let { composeBackdrop(it, canvas.width, canvas.height, appearance.imageFit, ink) }
+        glassSource?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+        val glassTint = if (dark) Color.BLACK else Color.WHITE
         val landscape = w > h
         val margin = (minOf(w, h) * .065f).coerceAtLeast(32f)
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -30,6 +44,8 @@ object BackgroundCanvasRenderer {
         }
         val meta = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = secondary; textSize = title.textSize * .34f }
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = text; textSize = title.textSize * .36f }
+        drawGlass(canvas, RectF(margin - 20f, margin - 14f, w - margin + 20f, margin + title.textSize * 1.85f),
+            18f, glassSource, glassTint, appearance.glassOpacity)
         canvas.drawText(content.title, margin, margin + title.textSize, title)
         canvas.drawText(content.filterLabel + (content.mode?.let { "  ·  $it" } ?: "") + "  ·  ${content.rows.size} visible", margin, margin + title.textSize * 1.55f, meta)
         val stamp = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(content.refreshedAt))
@@ -37,11 +53,13 @@ object BackgroundCanvasRenderer {
         var y = margin + title.textSize * 2.15f
         if (content.rows.isEmpty()) {
             canvas.drawText("Nothing matches this snapshot", margin, y + body.textSize * 2f, body)
+            glassSource?.recycle()
             return
         }
         if (content.mode != null && w >= h * 1.15f && w >= 1200f) {
             drawWideBoard(canvas, content, RectF(margin, y, w - margin, h - margin * 1.5f),
-                panel, text, secondary, body, meta)
+                text, secondary, body, meta, glassSource, glassTint, appearance.glassOpacity, systemAccent)
+            glassSource?.recycle()
             return
         }
         val preferredMatches = (preferred == PreferredWallpaperOrientation.LANDSCAPE) == landscape
@@ -49,13 +67,14 @@ object BackgroundCanvasRenderer {
         val visible = content.rows.take(limit)
         val rowH = ((h - y - margin) / (visible.size + 1)).coerceIn(body.textSize * 2.0f, body.textSize * 3.2f)
         visible.forEach { row ->
-            canvas.drawRoundRect(RectF(margin, y, w - margin, y + rowH * .82f), rowH * .14f, rowH * .14f, Paint().apply { color = panel })
-            val accent = when { row.overdue -> OVERDUE; row.kind == BackgroundRow.Kind.EVENT -> EVENT; else -> TASK }
+            val rowRect = RectF(margin, y, w - margin, y + rowH * .82f)
+            drawGlass(canvas, rowRect, rowH * .14f, glassSource, glassTint, appearance.glassOpacity)
+            val accent = if (row.overdue) OVERDUE else systemAccent
             canvas.drawRoundRect(RectF(margin, y, margin + 7f, y + rowH * .82f), 4f, 4f, Paint().apply { color = accent })
             val tagWidth = if (row.group == null) 0f else minOf(190f, w * .22f)
             val maxWidth = w - margin * 2 - 34f - tagWidth
             canvas.drawText(ellipsize(row.title, body, maxWidth), margin + 24f, y + rowH * .38f, body)
-            row.group?.let { drawMagicTag(canvas, it, w - margin - tagWidth, y + rowH * .18f, tagWidth - 12f, meta) }
+            row.group?.let { drawMagicTag(canvas, it, w - margin - tagWidth, y + rowH * .18f, tagWidth - 12f, meta, systemAccent) }
             canvas.drawText(ellipsize(row.subtitle, meta, maxWidth), margin + 24f, y + rowH * .66f, meta)
             y += rowH
         }
@@ -67,17 +86,21 @@ object BackgroundCanvasRenderer {
             }
         }
         if (footer.isNotEmpty()) canvas.drawText(footer, margin, h - margin, meta)
+        glassSource?.recycle()
     }
 
     private fun drawWideBoard(
         canvas: Canvas,
         content: BackgroundContent,
         bounds: RectF,
-        panelColor: Int,
         textColor: Int,
         secondaryColor: Int,
         body: Paint,
         meta: Paint,
+        glassSource: Bitmap?,
+        glassTint: Int,
+        glassOpacity: Float,
+        accent: Int,
     ) {
         val groups = content.groups.ifEmpty { content.rows.mapNotNull { it.group }.distinct() }
         if (groups.isEmpty()) return
@@ -99,7 +122,7 @@ object BackgroundCanvasRenderer {
                     bounds.left + index * (columnW + gap) + columnW, bounds.bottom)
             }
             drawBoardPanel(canvas, group, content.rows.filter { it.group?.equals(group, ignoreCase = true) == true },
-                rect, panelColor, textColor, secondaryColor, body, meta)
+                rect, textColor, secondaryColor, body, meta, glassSource, glassTint, glassOpacity, accent)
         }
     }
 
@@ -108,14 +131,17 @@ object BackgroundCanvasRenderer {
         group: String,
         rows: List<BackgroundRow>,
         rect: RectF,
-        panelColor: Int,
         textColor: Int,
         secondaryColor: Int,
         body: Paint,
         meta: Paint,
+        glassSource: Bitmap?,
+        glassTint: Int,
+        glassOpacity: Float,
+        accent: Int,
     ) {
-        canvas.drawRoundRect(rect, 18f, 18f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = panelColor })
-        drawMagicTag(canvas, group, rect.left + 16f, rect.top + 18f, rect.width() - 70f, meta)
+        drawGlass(canvas, rect, 18f, glassSource, glassTint, glassOpacity)
+        drawMagicTag(canvas, group, rect.left + 16f, rect.top + 18f, rect.width() - 70f, meta, accent)
         canvas.drawText(rows.size.toString(), rect.right - 42f, rect.top + 39f,
             Paint(meta).apply { color = secondaryColor })
         val available = maxOf(1, ((rect.height() - 88f) / 68f).toInt())
@@ -135,11 +161,41 @@ object BackgroundCanvasRenderer {
             rect.bottom - 14f, Paint(meta).apply { color = secondaryColor })
     }
 
-    private fun drawMagicTag(canvas: Canvas, value: String, x: Float, y: Float, width: Float, textPaint: Paint) {
-        val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33F2B35D }
+    private fun drawMagicTag(canvas: Canvas, value: String, x: Float, y: Float, width: Float, textPaint: Paint, accent: Int) {
+        val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(52, Color.red(accent), Color.green(accent), Color.blue(accent)) }
         canvas.drawRoundRect(RectF(x, y, x + width, y + 32f), 16f, 16f, tagPaint)
-        val labelPaint = Paint(textPaint).apply { color = TASK; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        val labelPaint = Paint(textPaint).apply { color = accent; typeface = android.graphics.Typeface.DEFAULT_BOLD }
         canvas.drawText(ellipsize("#${value.uppercase()}", labelPaint, width - 18f), x + 9f, y + 22f, labelPaint)
+    }
+
+    private fun drawGlass(canvas: Canvas, rect: RectF, radius: Float, source: Bitmap?, tint: Int, opacity: Float) {
+        if (source != null) {
+            canvas.save()
+            canvas.clipPath(Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) })
+            canvas.drawBitmap(source, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                renderEffect = RenderEffect.createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
+            })
+            canvas.restore()
+        }
+        canvas.drawRoundRect(rect, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb((opacity.coerceIn(.5f, 1f) * 255).toInt(), Color.red(tint), Color.green(tint), Color.blue(tint))
+        })
+    }
+
+    private fun composeBackdrop(source: Bitmap, width: Int, height: Int, fit: WallpaperImageFit, fallback: Int): Bitmap {
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val target = Canvas(output).apply { drawColor(fallback) }
+        if (fit == WallpaperImageFit.STRETCH) {
+            target.drawBitmap(source, null, android.graphics.Rect(0, 0, width, height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+            return output
+        }
+        val sx = width.toFloat() / source.width
+        val sy = height.toFloat() / source.height
+        val scale = if (fit == WallpaperImageFit.FILL) maxOf(sx, sy) else minOf(sx, sy)
+        val dx = (width - source.width * scale) / 2f
+        val dy = (height - source.height * scale) / 2f
+        target.drawBitmap(source, Matrix().apply { postScale(scale, scale); postTranslate(dx, dy) }, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        return output
     }
 
     private fun ellipsize(value: String, paint: Paint, maxWidth: Float): String {

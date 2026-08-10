@@ -1,5 +1,6 @@
 import SwiftUI
 import CrossDashboardKit
+import UniformTypeIdentifiers
 
 /// Full settings window with tabbed sections.
 /// Mirrors SettingsScreen on Android. Opens via Cmd+, (macOS Settings scene).
@@ -285,8 +286,33 @@ private struct AppearanceSettingsTab: View {
 
 private struct DesktopBackgroundSettingsSection: View {
     @State private var manager = DesktopBackgroundManager.shared
+    @State private var choosingPicture = false
+    @State private var pendingOpacity = 0.8
     var body: some View {
         Section("Desktop background") {
+            LabeledContent("Backdrop picture") {
+                HStack {
+                    Button(manager.imagePath == nil ? "Choose…" : "Replace…") { choosingPicture = true }
+                    if manager.imagePath != nil {
+                        Button("Remove", role: .destructive) { Task { await manager.removeBackdrop() } }
+                    }
+                }
+            }
+            Picker("Picture fit", selection: Binding(
+                get: { manager.imageFit }, set: { manager.setImageFit($0) }
+            )) {
+                ForEach(DesktopBackgroundImageFit.allCases) { fit in Text(fit.label).tag(fit) }
+            }
+            LabeledContent("Glass opacity") {
+                HStack {
+                    Slider(value: Binding(
+                        get: { pendingOpacity }, set: { pendingOpacity = $0 }
+                    ), in: 0.5...1, step: 0.05, onEditingChanged: { editing in
+                        if !editing { manager.setGlassOpacity(pendingOpacity) }
+                    })
+                    Text("\(Int(pendingOpacity * 100))%").monospacedDigit().frame(width: 42)
+                }.frame(width: 260)
+            }
             if let definition = manager.definition {
                 LabeledContent("Snapshot", value: definition.summary)
                 LabeledContent("Status", value: manager.lastMessage)
@@ -306,6 +332,10 @@ private struct DesktopBackgroundSettingsSection: View {
             Text("Generated images are stored in Pictures/Cross-Dashboard/Backgrounds so the macOS desktop service can read them.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+        .fileImporter(isPresented: $choosingPicture, allowedContentTypes: [.image]) { result in
+            if case .success(let url) = result { Task { await manager.importBackdrop(from: url) } }
+        }
+        .onAppear { pendingOpacity = manager.glassOpacity }
     }
 }
 

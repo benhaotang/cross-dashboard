@@ -1,6 +1,17 @@
 import Foundation
 
 enum DesktopBackgroundSource: String, Codable { case inbox, views }
+enum DesktopBackgroundImageFit: String, CaseIterable, Identifiable {
+    case scale, fill, stretch
+    var id: Self { self }
+    var label: String { rawValue.capitalized }
+}
+
+struct DesktopBackgroundAppearance {
+    var imageURL: URL?
+    var glassOpacity: CGFloat
+    var imageFit: DesktopBackgroundImageFit
+}
 
 struct DesktopBackgroundDefinition: Codable, Equatable {
     var enabled = true
