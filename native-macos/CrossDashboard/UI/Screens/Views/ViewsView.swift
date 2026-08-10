@@ -20,7 +20,7 @@ struct ViewsView: View {
         .navigationTitle("Views")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button { DesktopBackgroundManager.shared.captureViews(viewModel) } label: {
+                Button { Task { await DesktopBackgroundManager.shared.captureViews(viewModel) } } label: {
                     Label("Snapshot current view as background", systemImage: "camera.viewfinder")
                 }
                 .help("Snapshot current view as background")

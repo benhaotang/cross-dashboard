@@ -48,6 +48,8 @@ BackgroundContent build_background_content(AppContainer& app, BackgroundTemplate
         std::stable_sort(out.rows.begin(),out.rows.end(),[](auto const& a,auto const& b){return a.title<b.title;});
     } else {
         auto settings=merged_app_preferences(app.prefs()); auto const& groups=settings.kanban_columns;
+        out.groups=t.views_mode=="covey"?std::vector<std::string>{"Do First","Schedule","Delegate","Eliminate"}:std::vector<std::string>{"Untagged"};
+        if(t.views_mode!="covey")out.groups.insert(out.groups.end(),groups.begin(),groups.end());
         if(t.views_type!="issues") for(auto const& v:TaskDao(app.db()).get_all()) if(v.status!=TaskStatus::Completed&&v.status!=TaskStatus::Cancelled&&date_matches(v.due,t.views_date)){
             std::string group;
             if(t.views_mode=="covey") { if(has_tag(v.categories,"do"))group="Do First";else if(has_tag(v.categories,"delay"))group="Schedule";else if(has_tag(v.categories,"delegate"))group="Delegate";else if(has_tag(v.categories,"eliminate"))group="Eliminate";else group="Untagged"; }

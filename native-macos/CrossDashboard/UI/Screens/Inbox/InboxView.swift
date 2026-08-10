@@ -83,7 +83,7 @@ struct InboxView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem {
-            Button { DesktopBackgroundManager.shared.captureInbox(viewModel) } label: {
+            Button { Task { await DesktopBackgroundManager.shared.captureInbox(viewModel) } } label: {
                 Label("Snapshot current view as background", systemImage: "camera.viewfinder")
             }
             .help("Snapshot current view as background")

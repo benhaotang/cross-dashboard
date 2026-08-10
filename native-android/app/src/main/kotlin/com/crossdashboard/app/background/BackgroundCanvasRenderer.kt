@@ -39,6 +39,11 @@ object BackgroundCanvasRenderer {
             canvas.drawText("Nothing matches this snapshot", margin, y + body.textSize * 2f, body)
             return
         }
+        if (content.mode != null && w >= h * 1.15f && w >= 1200f) {
+            drawWideBoard(canvas, content, RectF(margin, y, w - margin, h - margin * 1.5f),
+                panel, text, secondary, body, meta)
+            return
+        }
         val preferredMatches = (preferred == PreferredWallpaperOrientation.LANDSCAPE) == landscape
         val limit = when { minOf(w, h) < 700 -> 5; preferredMatches -> 12; else -> 8 }
         val visible = content.rows.take(limit)
@@ -47,10 +52,11 @@ object BackgroundCanvasRenderer {
             canvas.drawRoundRect(RectF(margin, y, w - margin, y + rowH * .82f), rowH * .14f, rowH * .14f, Paint().apply { color = panel })
             val accent = when { row.overdue -> OVERDUE; row.kind == BackgroundRow.Kind.EVENT -> EVENT; else -> TASK }
             canvas.drawRoundRect(RectF(margin, y, margin + 7f, y + rowH * .82f), 4f, 4f, Paint().apply { color = accent })
-            val maxWidth = w - margin * 2 - 34f
+            val tagWidth = if (row.group == null) 0f else minOf(190f, w * .22f)
+            val maxWidth = w - margin * 2 - 34f - tagWidth
             canvas.drawText(ellipsize(row.title, body, maxWidth), margin + 24f, y + rowH * .38f, body)
-            val sub = listOfNotNull(row.group, row.subtitle).joinToString("  ·  ")
-            canvas.drawText(ellipsize(sub, meta, maxWidth), margin + 24f, y + rowH * .66f, meta)
+            row.group?.let { drawMagicTag(canvas, it, w - margin - tagWidth, y + rowH * .18f, tagWidth - 12f, meta) }
+            canvas.drawText(ellipsize(row.subtitle, meta, maxWidth), margin + 24f, y + rowH * .66f, meta)
             y += rowH
         }
         val footer = buildString {
@@ -61,6 +67,79 @@ object BackgroundCanvasRenderer {
             }
         }
         if (footer.isNotEmpty()) canvas.drawText(footer, margin, h - margin, meta)
+    }
+
+    private fun drawWideBoard(
+        canvas: Canvas,
+        content: BackgroundContent,
+        bounds: RectF,
+        panelColor: Int,
+        textColor: Int,
+        secondaryColor: Int,
+        body: Paint,
+        meta: Paint,
+    ) {
+        val groups = content.groups.ifEmpty { content.rows.mapNotNull { it.group }.distinct() }
+        if (groups.isEmpty()) return
+        val covey = content.mode?.equals("Covey", ignoreCase = true) == true
+        val visibleGroups = if (covey) groups.take(4) else groups.take(7)
+        val gap = 18f
+        visibleGroups.forEachIndexed { index, group ->
+            val rect = if (covey) {
+                val cellW = (bounds.width() - gap) / 2f
+                val cellH = (bounds.height() - gap) / 2f
+                val column = index % 2
+                val row = index / 2
+                RectF(bounds.left + column * (cellW + gap), bounds.top + row * (cellH + gap),
+                    bounds.left + column * (cellW + gap) + cellW,
+                    bounds.top + row * (cellH + gap) + cellH)
+            } else {
+                val columnW = (bounds.width() - gap * (visibleGroups.size - 1)) / visibleGroups.size
+                RectF(bounds.left + index * (columnW + gap), bounds.top,
+                    bounds.left + index * (columnW + gap) + columnW, bounds.bottom)
+            }
+            drawBoardPanel(canvas, group, content.rows.filter { it.group?.equals(group, ignoreCase = true) == true },
+                rect, panelColor, textColor, secondaryColor, body, meta)
+        }
+    }
+
+    private fun drawBoardPanel(
+        canvas: Canvas,
+        group: String,
+        rows: List<BackgroundRow>,
+        rect: RectF,
+        panelColor: Int,
+        textColor: Int,
+        secondaryColor: Int,
+        body: Paint,
+        meta: Paint,
+    ) {
+        canvas.drawRoundRect(rect, 18f, 18f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = panelColor })
+        drawMagicTag(canvas, group, rect.left + 16f, rect.top + 18f, rect.width() - 70f, meta)
+        canvas.drawText(rows.size.toString(), rect.right - 42f, rect.top + 39f,
+            Paint(meta).apply { color = secondaryColor })
+        val available = maxOf(1, ((rect.height() - 88f) / 68f).toInt())
+        var y = rect.top + 65f
+        rows.take(available).forEach { row ->
+            val rowRect = RectF(rect.left + 12f, y, rect.right - 12f, y + 56f)
+            canvas.drawRoundRect(rowRect, 10f, 10f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (row.overdue) OVERDUE else 0x332C4163
+            })
+            val rowBody = Paint(body).apply { color = textColor; textSize *= .72f }
+            val rowMeta = Paint(meta).apply { color = secondaryColor; textSize *= .78f }
+            canvas.drawText(ellipsize(row.title, rowBody, rowRect.width() - 20f), rowRect.left + 10f, y + 24f, rowBody)
+            canvas.drawText(ellipsize(row.subtitle, rowMeta, rowRect.width() - 20f), rowRect.left + 10f, y + 46f, rowMeta)
+            y += 66f
+        }
+        if (rows.size > available) canvas.drawText("+${rows.size - available} more", rect.left + 16f,
+            rect.bottom - 14f, Paint(meta).apply { color = secondaryColor })
+    }
+
+    private fun drawMagicTag(canvas: Canvas, value: String, x: Float, y: Float, width: Float, textPaint: Paint) {
+        val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33F2B35D }
+        canvas.drawRoundRect(RectF(x, y, x + width, y + 32f), 16f, 16f, tagPaint)
+        val labelPaint = Paint(textPaint).apply { color = TASK; typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        canvas.drawText(ellipsize("#${value.uppercase()}", labelPaint, width - 18f), x + 9f, y + 22f, labelPaint)
     }
 
     private fun ellipsize(value: String, paint: Paint, maxWidth: Float): String {

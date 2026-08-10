@@ -34,14 +34,16 @@ struct DesktopBackgroundContent {
     let title: String
     let filters: String
     let mode: String?
+    let groups: [String]
     let rows: [DesktopBackgroundRow]
     let totalMinutes: Int
     let refreshedAt: Date
 
-    init(title: String, filters: String, mode: String?, rows: [DesktopBackgroundRow], totalMinutes: Int = 0) {
+    init(title: String, filters: String, mode: String?, groups: [String] = [], rows: [DesktopBackgroundRow], totalMinutes: Int = 0) {
         self.title = title
         self.filters = filters
         self.mode = mode
+        self.groups = groups
         self.rows = rows
         self.totalMinutes = totalMinutes
         self.refreshedAt = Date()

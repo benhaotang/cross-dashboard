@@ -1,11 +1,13 @@
 import AppKit
 import Observation
+import OSLog
 import CrossDashboardKit
 
 @Observable
 @MainActor
 final class DesktopBackgroundManager {
     static let shared = DesktopBackgroundManager()
+    private static let logger = Logger(subsystem: "com.crossdashboard.app", category: "DesktopBackground")
     private let key = "desktop_background_definition"
     var definition: DesktopBackgroundDefinition?
     var lastMessage = "No background snapshot"
@@ -16,26 +18,41 @@ final class DesktopBackgroundManager {
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.applyCurrentAppearance() } }
     }
 
-    func captureInbox(_ vm: InboxViewModel) {
+    func captureInbox(_ vm: InboxViewModel) async {
         definition = DesktopBackgroundDefinition(source: .inbox, inboxType: vm.itemType.rawValue,
             inboxDate: vm.dateFilter.rawValue, searchQuery: vm.searchText.isEmpty ? nil : vm.searchText)
-        persist(); Task { await refreshIfEnabled() }
+        persist()
+        await refreshIfEnabled(reason: "Inbox capture")
     }
 
-    func captureViews(_ vm: ViewsViewModel) {
+    func captureViews(_ vm: ViewsViewModel) async {
         definition = DesktopBackgroundDefinition(source: .views, viewsType: vm.itemType.rawValue,
             viewsDate: vm.dateFilter.rawValue, viewsMode: vm.mode.rawValue)
-        persist(); Task { await refreshIfEnabled() }
+        persist()
+        await refreshIfEnabled(reason: "Views capture")
     }
 
     func disable() { definition?.enabled = false; persist(); lastMessage = "Automatic updates disabled" }
-    func enable() { definition?.enabled = true; persist(); Task { await refreshIfEnabled() } }
+    func enable() {
+        definition?.enabled = true
+        persist()
+        Task { await refreshIfEnabled(reason: "Enabled in Settings") }
+    }
 
-    func refreshIfEnabled() async {
-        guard let definition, definition.enabled else { return }
+    func refreshIfEnabled(reason: String = "Automatic refresh", force: Bool = false) async {
+        guard let definition else {
+            lastMessage = "Create a snapshot from Inbox or Views first."
+            return
+        }
+        guard definition.enabled || force else {
+            lastMessage = "Automatic updates are disabled."
+            return
+        }
+        lastMessage = "Rendering background…"
+        Self.logger.info("Starting background refresh: \(reason, privacy: .public)")
         let content = build(definition)
         do {
-            let directory = try FileManager.default.url(for: .applicationSupportDirectory,
+            let directory = try FileManager.default.url(for: .picturesDirectory,
                 in: .userDomainMask, appropriateFor: nil, create: true)
                 .appendingPathComponent("Cross-Dashboard", isDirectory: true)
                 .appendingPathComponent("Backgrounds", isDirectory: true)
@@ -44,12 +61,21 @@ final class DesktopBackgroundManager {
                 let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
                 let pixels = CGSize(width: screen.frame.width * screen.backingScaleFactor, height: screen.frame.height * screen.backingScaleFactor)
                 for dark in [false, true] {
-                    guard let data = DesktopBackgroundRenderer.render(content, pixels: pixels, dark: dark) else { continue }
-                    try data.write(to: directory.appendingPathComponent("\(id)_\(dark ? "dark" : "light").png"), options: .atomic)
+                    guard let data = DesktopBackgroundRenderer.render(content, pixels: pixels, dark: dark) else {
+                        throw DesktopBackgroundError.renderFailed(id)
+                    }
+                    let url = directory.appendingPathComponent("\(id)_\(dark ? "dark" : "light").png")
+                    try data.write(to: url, options: .atomic)
+                    Self.logger.debug("Rendered \(url.path, privacy: .public)")
                 }
             }
-            try apply(directory: directory); lastMessage = "Updated \(Date().formatted(date: .omitted, time: .shortened))"
-        } catch { lastMessage = error.localizedDescription }
+            try apply(directory: directory)
+            lastMessage = "Updated \(Date().formatted(date: .omitted, time: .shortened))"
+            Self.logger.info("Desktop background refresh completed")
+        } catch {
+            lastMessage = "Background error: \(error.localizedDescription)"
+            Self.logger.error("Background refresh failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func applyCurrentAppearance() async { await refreshIfEnabled() }
@@ -58,9 +84,17 @@ final class DesktopBackgroundManager {
         for screen in NSScreen.screens {
             let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
             let url = directory.appendingPathComponent("\(id)_\(dark ? "dark" : "light").png")
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw DesktopBackgroundError.missingRenderedFile(url)
+            }
             var options = NSWorkspace.shared.desktopImageOptions(for: screen) ?? [:]
             options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue; options[.allowClipping] = true
             try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: options)
+            let applied = NSWorkspace.shared.desktopImageURL(for: screen)?.standardizedFileURL
+            guard applied == url.standardizedFileURL else {
+                throw DesktopBackgroundError.notApplied(expected: url, actual: applied)
+            }
+            Self.logger.info("Applied \(url.path, privacy: .public) to display \(id, privacy: .public)")
         }
     }
 
@@ -125,12 +159,31 @@ final class DesktopBackgroundManager {
                 rows.append(.init(title: issue.title, subtitle: issue.repository, group: group, kind: 2, overdue: false))
             }
         }
-        return .init(title:"VIEWS",filters:"\(d.viewsType) · \(d.viewsDate)",mode:d.viewsMode,rows:rows)
+        let groups = d.viewsMode == "Covey"
+            ? ["Do First", "Schedule", "Delegate", "Eliminate"]
+            : (["Untagged"] + vm.kanbanColumns)
+        return .init(title:"VIEWS",filters:"\(d.viewsType) · \(d.viewsDate)",mode:d.viewsMode,
+            groups:groups,rows:rows)
     }
 
     private func persist() {
         if let definition, let data = try? JSONEncoder().encode(definition) {
             UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+}
+
+private enum DesktopBackgroundError: LocalizedError {
+    case renderFailed(String)
+    case missingRenderedFile(URL)
+    case notApplied(expected: URL, actual: URL?)
+
+    var errorDescription: String? {
+        switch self {
+        case .renderFailed(let display): return "Could not render display \(display)."
+        case .missingRenderedFile(let url): return "Rendered image is missing at \(url.path)."
+        case .notApplied(let expected, let actual):
+            return "macOS did not select \(expected.lastPathComponent); current image is \(actual?.lastPathComponent ?? "unknown")."
         }
     }
 }

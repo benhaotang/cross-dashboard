@@ -92,7 +92,11 @@ class BackgroundContentBuilder @Inject constructor(
                 }
             }
         }
-        return BackgroundContent("VIEWS", "${label(t.viewsTypeFilter)} · ${label(t.viewsDateFilter)}", label(t.viewsMode), rows)
+        val groups = if (t.viewsMode == "COVEY") {
+            listOf("Do First", "Schedule", "Delegate", "Eliminate")
+        } else listOf("Untagged") + columns
+        return BackgroundContent("VIEWS", "${label(t.viewsTypeFilter)} · ${label(t.viewsDateFilter)}",
+            label(t.viewsMode), groups, rows)
     }
 
     private fun matchesDate(value: Instant?, filter: String): Boolean {

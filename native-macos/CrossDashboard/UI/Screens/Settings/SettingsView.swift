@@ -294,12 +294,16 @@ private struct DesktopBackgroundSettingsSection: View {
                     get: { definition.enabled },
                     set: { $0 ? manager.enable() : manager.disable() }
                 ))
-                Button("Update now") { Task { await manager.refreshIfEnabled() } }
+                Button("Update now") {
+                    Task { await manager.refreshIfEnabled(reason: "Manual Settings update", force: true) }
+                }
             } else {
                 Text("Use the camera button in Inbox or Views to create a background snapshot.")
                     .foregroundStyle(.secondary)
             }
             Text("Light and dark variants follow the current system appearance. macOS updates the current desktop on each connected display; other Spaces may retain their existing wallpaper.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Generated images are stored in Pictures/Cross-Dashboard/Backgrounds so the macOS desktop service can read them.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

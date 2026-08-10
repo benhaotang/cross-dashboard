@@ -38,6 +38,7 @@ data class BackgroundContent(
     val title: String,
     val filterLabel: String,
     val mode: String? = null,
+    val groups: List<String> = emptyList(),
     val rows: List<BackgroundRow>,
     val totalMinutes: Int = 0,
     val refreshedAt: Long = System.currentTimeMillis(),

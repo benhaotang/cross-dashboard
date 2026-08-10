@@ -202,7 +202,9 @@ background sync; later UI filter changes do not mutate the saved template.
 - Android registers `DashboardWallpaperService`; it redraws light/dark palettes for system
   appearance and stores separate standard, fold-cover, and fold-inner templates.
 - macOS renders light/dark PNG pairs per `NSScreen` and applies the current appearance with
-  `NSWorkspace`. Only the currently addressable Space per screen can be updated.
+  `NSWorkspace`. Generated files live in `~/Pictures/Cross-Dashboard/Backgrounds` under the
+  Pictures read/write sandbox entitlement so the desktop service can read them. Only the currently
+  addressable Space per screen can be updated.
 - Native Linux renders `$XDG_CACHE_HOME/crossdashboard/background.png` in the systemd user service
   and invokes a direct argv command containing `%f`. xwallpaper and swaybg are presets, not special
   integrations. Flatpak does not support automatic host wallpaper commands.
