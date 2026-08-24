@@ -2,7 +2,7 @@
 
 This is an experimental client for self-hosting services like CalDAV, [Gitea](https://gitea.io), [Memos](https://usememos.com), [Nextcloud](https://nextcloud.com), etc.
 
-90% coded by Cursor (Sonnet 4.6, GPT 5.4 and Kimi K2.5)
+95% coded by Cursor (Sonnet 4.6, GPT 5.4 and Kimi K2.5) and T3Code (GPT 5.6 Sol)
 
 |Mac (Swift UI)|Android (Material 3 phone+tablet)| Linux (GTK) |
 |:-:|:-:|:-:|
@@ -44,6 +44,16 @@ with popclip plugin
 name: Capture
 icon: square o
 url: crossdashboard://capture?text={popclip text}
+```
+
+You can also start pomodoro timer with URL Scheme
+
+```yaml
+open 'crossdashboard://timer' # Start a UI picker
+open 'crossdashboard://timer?name=Writing&minutes=45'
+open 'crossdashboard://timer?action=pause/resume/toggle/stop/skip'
+open 'crossdashboard://timer?action=start&type=task&id=TASK-UID'
+open 'crossdashboard://timer?action=start&type=issue&id=owner%2Frepo%23123'
 ```
 
 ## Linux CLI and background service

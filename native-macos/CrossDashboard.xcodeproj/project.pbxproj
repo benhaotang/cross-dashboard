@@ -35,6 +35,7 @@
 		4ACAEDED9DA6EB3B7FCE2C51 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F26B3C275BE1B5FE71ECAB /* InboxViewModel.swift */; };
 		4CD9CFB7677104044D5E71D2 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5486FE670D44A72323FEE980 /* TaskDetailView.swift */; };
 		53E6D109F76F04DE8AE565E0 /* PomodoroViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135BC930364984F290E438C4 /* PomodoroViewModel.swift */; };
+		55921B07E8DD8186F4BDE6C5 /* TimerDeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 560E9F070FF0F2034C4D64A0 /* TimerDeepLinkTests.swift */; };
 		59F4128778F753554E2E3CA7 /* CrossDashboardAgent.app in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 0D364423326F6BBCD2E82F88 /* CrossDashboardAgent.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5B2CFE5D85A8C49C5236C238 /* NextcloudLoginFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */; };
 		61E48A4E77C4BB702942F927 /* MemoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5877BCA60E880220B7CC2EBF /* MemoRepository.swift */; };
@@ -74,6 +75,7 @@
 		B1344B2806F3D650695A480E /* DesktopBackgroundRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5F0A1D567096725D5326FB /* DesktopBackgroundRenderer.swift */; };
 		B171C41B4965205A55000335 /* BiometricLockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100B0D33E360037D075F415D /* BiometricLockView.swift */; };
 		B2D4DDC02783B69011EDA5C3 /* CrossDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E61F0E1DC1C3754E00B2DB /* CrossDashboardApp.swift */; };
+		B950B2AE9FAD4EC6B49ECCE0 /* TimerDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61348E77E94FA571E913D67C /* TimerDeepLink.swift */; };
 		BDB70CDC2B875EE6B2DF1DE9 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E1C0DFCEB4C5CAEA73226E /* ShareViewController.swift */; };
 		BDEF50B97C219027FCE259B0 /* ViewsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C9F86DEC54B1D3BE011ACD /* ViewsView.swift */; };
 		BF7510E9EA80246EAB16BED2 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16CE67B6D747A474B4082058 /* AppViewModel.swift */; };
@@ -232,12 +234,14 @@
 		4E88E52A2ABF7DF52CA483B7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5486FE670D44A72323FEE980 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		549DE8981E5BE4F792A9E0F7 /* CommentOnIssueSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentOnIssueSheet.swift; sourceTree = "<group>"; };
+		560E9F070FF0F2034C4D64A0 /* TimerDeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDeepLinkTests.swift; sourceTree = "<group>"; };
 		584E5C5339A9E03FFBFA86E1 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		5877BCA60E880220B7CC2EBF /* MemoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoRepository.swift; sourceTree = "<group>"; };
 		59357A157CABDA13A9081854 /* MemosShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MemosShareExtension.entitlements; sourceTree = "<group>"; };
 		598920B8F3598627F580ECC9 /* SearchableFilterMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableFilterMenu.swift; sourceTree = "<group>"; };
 		59E026A1A98B47D3EF93B3B3 /* PersistedPomodoroSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedPomodoroSession.swift; sourceTree = "<group>"; };
 		6050AF83428832BBD7420863 /* NextcloudLoginFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextcloudLoginFlow.swift; sourceTree = "<group>"; };
+		61348E77E94FA571E913D67C /* TimerDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDeepLink.swift; sourceTree = "<group>"; };
 		6222B61E17E7AFDD5F4C4457 /* AppPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferencesTests.swift; sourceTree = "<group>"; };
 		66A0A390C1802F0384E7435C /* CalendarColorDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarColorDot.swift; sourceTree = "<group>"; };
 		7073EC024D219CC1F8EB2F24 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -420,6 +424,7 @@
 			children = (
 				6222B61E17E7AFDD5F4C4457 /* AppPreferencesTests.swift */,
 				C1D3E49AFD9AA1E4E30107C1 /* PersistedPomodoroSessionTests.swift */,
+				560E9F070FF0F2034C4D64A0 /* TimerDeepLinkTests.swift */,
 			);
 			path = CrossDashboardTests;
 			sourceTree = "<group>";
@@ -663,6 +668,7 @@
 				25180F43D6271EB52D5A5739 /* BackgroundServiceContract.swift */,
 				F24C2E6BFCBDFBDEDBDF9582 /* Models.swift */,
 				59E026A1A98B47D3EF93B3B3 /* PersistedPomodoroSession.swift */,
+				61348E77E94FA571E913D67C /* TimerDeepLink.swift */,
 				FBFF509DF3F8C23EF45C0FD3 /* WidgetDataStore.swift */,
 			);
 			path = Domain;
@@ -861,6 +867,7 @@
 			files = (
 				6A336490FC1C1AC2CB1926B0 /* AppPreferencesTests.swift in Sources */,
 				8252FA596FFC17AFD0CC8FE2 /* PersistedPomodoroSessionTests.swift in Sources */,
+				55921B07E8DD8186F4BDE6C5 /* TimerDeepLinkTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -875,6 +882,7 @@
 				1E540EFF344808791430730D /* Models.swift in Sources */,
 				F16EAB81426739A5845498B2 /* PersistedPomodoroSession.swift in Sources */,
 				A4FC232AA76A8E04B4257064 /* PersistenceController.swift in Sources */,
+				B950B2AE9FAD4EC6B49ECCE0 /* TimerDeepLink.swift in Sources */,
 				20972339A263E9DC41092EB2 /* WidgetDataStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1193,7 +1201,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20605;
+				CURRENT_PROJECT_VERSION = 20606;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1393,7 +1401,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20605;
+				CURRENT_PROJECT_VERSION = 20606;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 569WLL4Q5F;
 				ENABLE_NS_ASSERTIONS = NO;

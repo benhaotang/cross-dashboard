@@ -10,7 +10,7 @@ options:
 
 settings:
   base:
-    CURRENT_PROJECT_VERSION: 20605
+    CURRENT_PROJECT_VERSION: 20606
     DEVELOPMENT_TEAM: 569WLL4Q5F
     MARKETING_VERSION: 2.6.2
 
@@ -52,6 +52,7 @@ targets:
     sources:
       - CrossDashboard/Domain/Models.swift
       - CrossDashboard/Domain/WidgetDataStore.swift
+      - CrossDashboard/Domain/TimerDeepLink.swift
       - CrossDashboard/Domain/PersistedPomodoroSession.swift
       - CrossDashboard/Domain/BackgroundServiceContract.swift
       - CrossDashboard/Data/Persistence/PersistenceController.swift
@@ -78,6 +79,7 @@ targets:
         excludes:
           - Domain/Models.swift
           - Domain/WidgetDataStore.swift
+          - Domain/TimerDeepLink.swift
           - Domain/PersistedPomodoroSession.swift
           - Domain/BackgroundServiceContract.swift
           - Data/Persistence/PersistenceController.swift

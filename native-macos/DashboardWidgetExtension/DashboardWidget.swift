@@ -142,11 +142,11 @@ private struct SmallWidgetView: View {
             Divider()
 
             HStack(spacing: 10) {
-                Label("\(entry.dueSoonTasks.count) due", systemImage: "checklist")
+                Label("\(entry.dueSoonTasks.count)", systemImage: "checklist")
                     .font(.caption2)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
-                Label("\(entry.openIssuesCount) open", systemImage: "exclamationmark.bubble")
+                Label("\(entry.openIssuesCount)", systemImage: "exclamationmark.bubble")
                     .font(.caption2)
                     .foregroundStyle(entry.openIssuesCount > 0 ? Color.orange : Color.secondary)
             }
