@@ -416,6 +416,8 @@ private struct PomodoroSettingsTab: View {
 
 private struct NotificationsSettingsTab: View {
     @Bindable var viewModel: SettingsViewModel
+    @State private var backgroundService = BackgroundServiceController.shared
+    @State private var agentResponding: Bool?
 
     var body: some View {
         Form {
@@ -439,6 +441,44 @@ private struct NotificationsSettingsTab: View {
                     step: 15
                 )
                 .accessibilityLabel("Sync interval: \(viewModel.syncIntervalMinutes) minutes")
+
+                LabeledContent("Background service", value: backgroundService.statusLabel)
+
+                HStack {
+                    if backgroundService.isEnabled {
+                        Button("Disable Background Service") {
+                            backgroundService.unregister()
+                            agentResponding = nil
+                        }
+
+                        Button("Test Connection") {
+                            Task {
+                                agentResponding = await backgroundService.ping()
+                            }
+                        }
+                    } else {
+                        Button("Enable Background Service") {
+                            backgroundService.register()
+                            agentResponding = nil
+                        }
+                    }
+
+                    if backgroundService.requiresApproval {
+                        Button("Open Login Items Settings") {
+                            backgroundService.openLoginItemsSettings()
+                        }
+                    }
+                }
+
+                if let agentResponding {
+                    Text(agentResponding ? "Agent is responding." : "Agent did not respond.")
+                        .foregroundStyle(agentResponding ? Color.secondary : Color.red)
+                }
+
+                if let lastError = backgroundService.lastError {
+                    Text(lastError)
+                        .foregroundStyle(.red)
+                }
             }
 
             Section {
@@ -449,6 +489,9 @@ private struct NotificationsSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear {
+            backgroundService.refreshStatus()
+        }
     }
 }
 

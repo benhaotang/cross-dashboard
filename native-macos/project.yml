@@ -8,6 +8,12 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
+settings:
+  base:
+    CURRENT_PROJECT_VERSION: 20605
+    DEVELOPMENT_TEAM: 569WLL4Q5F
+    MARKETING_VERSION: 2.6.2
+
 packages:
   swift-markdown-ui:
     url: https://github.com/gonzalezreal/swift-markdown-ui
@@ -28,6 +34,8 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets:
+        - CrossDashboardTests
     profile:
       config: Release
     analyze:
@@ -44,6 +52,8 @@ targets:
     sources:
       - CrossDashboard/Domain/Models.swift
       - CrossDashboard/Domain/WidgetDataStore.swift
+      - CrossDashboard/Domain/PersistedPomodoroSession.swift
+      - CrossDashboard/Domain/BackgroundServiceContract.swift
       - CrossDashboard/Data/Persistence/PersistenceController.swift
       - CrossDashboard/Data/Prefs/AppPreferences.swift
       - CrossDashboard/Data/Prefs/AppTimeZone.swift
@@ -67,16 +77,24 @@ targets:
       - path: CrossDashboard
         excludes:
           - Domain/Models.swift
+          - Domain/WidgetDataStore.swift
+          - Domain/PersistedPomodoroSession.swift
+          - Domain/BackgroundServiceContract.swift
           - Data/Persistence/PersistenceController.swift
           - Data/Prefs/AppPreferences.swift
           - Data/Prefs/AppTimeZone.swift
           - Data/Prefs/KeychainStore.swift
+      - path: CrossDashboardAgent/group.com.crossdashboard.background-agent.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
     info:
       path: CrossDashboard/Info.plist
       properties:
         CFBundleDisplayName: CrossDashboard
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSHumanReadableCopyright: ""
         NSPrincipalClass: NSApplication
         CFBundleURLTypes:
@@ -106,6 +124,7 @@ targets:
           - "$(AppIdentifierPrefix)com.crossdashboard.app"
         com.apple.application-identifier: "$(AppIdentifierPrefix)com.crossdashboard.app"
         com.apple.security.application-groups:
+          - 569WLL4Q5F.com.crossdashboard
           - group.com.crossdashboard
     settings:
       base:
@@ -128,6 +147,52 @@ targets:
         embed: true
       - target: DashboardWidgetExtension
         embed: true
+      - target: CrossDashboardAgent
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: resources
+
+  CrossDashboardAgent:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: CrossDashboardAgent
+        excludes:
+          - "*.plist"
+          - "*.entitlements"
+    info:
+      path: CrossDashboardAgent/Info.plist
+      properties:
+        CFBundleDisplayName: CrossDashboard Background Agent
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSBackgroundOnly: true
+    entitlements:
+      path: CrossDashboardAgent/CrossDashboardAgent.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.assets.pictures.read-write: true
+        com.apple.security.network.client: true
+        com.apple.security.application-groups:
+          - 569WLL4Q5F.com.crossdashboard
+          - group.com.crossdashboard
+        com.apple.security.keychain-access-groups:
+          - "$(AppIdentifierPrefix)com.crossdashboard.app"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crossdashboard.app.background-agent
+        PRODUCT_NAME: CrossDashboardAgent
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+    dependencies:
+      - target: CrossDashboardKit
+        embed: false
 
   MemosShareExtension:
     type: app-extension
@@ -139,8 +204,8 @@ targets:
       path: MemosShareExtension/Info.plist
       properties:
         CFBundleDisplayName: MemosShareExtension
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
@@ -156,12 +221,13 @@ targets:
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.application-groups:
-          - group.com.crossdashboard
+          - 569WLL4Q5F.com.crossdashboard
         com.apple.security.keychain-access-groups:
           - "$(AppIdentifierPrefix)com.crossdashboard.app"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crossdashboard.app.shareextension
+        PRODUCT_NAME: MemosShareExtension
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_STYLE: Automatic
@@ -180,8 +246,8 @@ targets:
       path: DashboardWidgetExtension/Info.plist
       properties:
         CFBundleDisplayName: DashboardWidget
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
@@ -189,10 +255,27 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
-          - group.com.crossdashboard
+          - 569WLL4Q5F.com.crossdashboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crossdashboard.app.widget
+        PRODUCT_NAME: DashboardWidgetExtension
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: CrossDashboardKit
+        embed: false
+
+  CrossDashboardTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - CrossDashboardTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crossdashboard.tests
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_STYLE: Automatic

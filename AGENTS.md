@@ -113,6 +113,10 @@ native-android/
 
 ## Native macOS (`native-macos/`)
 
+For macOS background-service, sync-lifecycle, widget-refresh, desktop-background, notification, or
+Pomodoro ownership work, read [`native-macos/BACKGROUND_SERVICE_PLAN.md`](native-macos/BACKGROUND_SERVICE_PLAN.md)
+before editing. Keep its progress ledger current so work can resume across agent sessions.
+
 **Target**: macOS 26 "Tahoe" — `minimumDeploymentTarget: .macOS(.v26)` (bump `project.yml` to `"26.0"` when Xcode 26 SDK ships; currently `"15.0"` as placeholder)  
 **Language**: Swift 6.2, strict concurrency (`SWIFT_STRICT_CONCURRENCY = complete`)  
 **UI**: SwiftUI (pure — no AppKit wrappers except `NSStatusItem` for Pomodoro menu bar)

@@ -316,7 +316,9 @@ public final class PersistenceController {
     /// Returns the SwiftData store URL inside the shared App Group container so
     /// the widget extension can read the same database as the main app.
     /// Falls back to the default location if the group container is unavailable.
-    public nonisolated static func groupContainerURL(appGroupID: String = "group.com.crossdashboard") -> URL? {
+    public nonisolated static func groupContainerURL(
+        appGroupID: String = AppPreferences.appGroupSuiteName
+    ) -> URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?
             .appendingPathComponent("CrossDashboard.sqlite")
@@ -329,7 +331,7 @@ public final class PersistenceController {
             // the URL-based ModelConfiguration init is not available on macOS 15.
             let config = ModelConfiguration(
                 schema: PersistenceController.schema,
-                groupContainer: .identifier("group.com.crossdashboard")
+                groupContainer: .identifier(AppPreferences.appGroupSuiteName)
             )
             container = try ModelContainer(
                 for: PersistenceController.schema,
