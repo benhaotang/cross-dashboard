@@ -15,6 +15,7 @@ final class DesktopBackgroundManager {
     private let darkImageKey = "desktop_background_dark_image_path"
     private let opacityKey = "desktop_background_glass_opacity"
     private let fitKey = "desktop_background_image_fit"
+    private let defaults: UserDefaults
     var definition: DesktopBackgroundDefinition?
     var lastMessage = "No background snapshot"
     var imagePath: String?
@@ -24,13 +25,15 @@ final class DesktopBackgroundManager {
     var imageFit: DesktopBackgroundImageFit
 
     private init() {
-        imagePath = UserDefaults.standard.string(forKey: imageKey)
-        lightImagePath = UserDefaults.standard.string(forKey: lightImageKey)
-        darkImagePath = UserDefaults.standard.string(forKey: darkImageKey)
-        let storedOpacity = UserDefaults.standard.object(forKey: opacityKey) as? Double
+        let sharedDefaults = UserDefaults(suiteName: AppPreferences.appGroupSuiteName) ?? .standard
+        defaults = sharedDefaults
+        imagePath = sharedDefaults.string(forKey: imageKey)
+        lightImagePath = sharedDefaults.string(forKey: lightImageKey)
+        darkImagePath = sharedDefaults.string(forKey: darkImageKey)
+        let storedOpacity = sharedDefaults.object(forKey: opacityKey) as? Double
         glassOpacity = min(1, max(0.5, storedOpacity ?? 0.8))
-        imageFit = DesktopBackgroundImageFit(rawValue: UserDefaults.standard.string(forKey: fitKey) ?? "") ?? .fill
-        if let data = UserDefaults.standard.data(forKey: key) { definition = try? JSONDecoder().decode(DesktopBackgroundDefinition.self, from: data) }
+        imageFit = DesktopBackgroundImageFit(rawValue: sharedDefaults.string(forKey: fitKey) ?? "") ?? .fill
+        if let data = sharedDefaults.data(forKey: key) { definition = try? JSONDecoder().decode(DesktopBackgroundDefinition.self, from: data) }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.refreshIfEnabled() } }
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { _ in Task { @MainActor in await Self.shared.applyCurrentAppearance() } }
     }
@@ -236,20 +239,20 @@ final class DesktopBackgroundManager {
 
     private func persist() {
         if let definition, let data = try? JSONEncoder().encode(definition) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
     }
 
 
     private func persistAppearance() {
-        if let imagePath { UserDefaults.standard.set(imagePath, forKey: imageKey) }
-        else { UserDefaults.standard.removeObject(forKey: imageKey) }
-        if let lightImagePath { UserDefaults.standard.set(lightImagePath, forKey: lightImageKey) }
-        else { UserDefaults.standard.removeObject(forKey: lightImageKey) }
-        if let darkImagePath { UserDefaults.standard.set(darkImagePath, forKey: darkImageKey) }
-        else { UserDefaults.standard.removeObject(forKey: darkImageKey) }
-        UserDefaults.standard.set(glassOpacity, forKey: opacityKey)
-        UserDefaults.standard.set(imageFit.rawValue, forKey: fitKey)
+        if let imagePath { defaults.set(imagePath, forKey: imageKey) }
+        else { defaults.removeObject(forKey: imageKey) }
+        if let lightImagePath { defaults.set(lightImagePath, forKey: lightImageKey) }
+        else { defaults.removeObject(forKey: lightImageKey) }
+        if let darkImagePath { defaults.set(darkImagePath, forKey: darkImageKey) }
+        else { defaults.removeObject(forKey: darkImageKey) }
+        defaults.set(glassOpacity, forKey: opacityKey)
+        defaults.set(imageFit.rawValue, forKey: fitKey)
     }
 
     func imageSummary(for slot: DesktopBackgroundImageSlot) -> String {

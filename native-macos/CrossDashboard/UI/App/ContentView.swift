@@ -36,6 +36,14 @@ struct ContentView: View {
                     }
             }
         }
+        .sheet(isPresented: Binding(
+            get: { appViewModel.isPomodoroPickerPresented && !appViewModel.isLocked },
+            set: { if !$0 { appViewModel.dismissPomodoroPicker() } }
+        )) {
+            PomodoroModalView(initialName: appViewModel.pomodoroPickerInitialName)
+                .environment(pomodoroVM)
+                .environment(\.appContainer, container)
+        }
     }
 
     /// Views doesn't use a detail pane, so we switch to a two-column split to

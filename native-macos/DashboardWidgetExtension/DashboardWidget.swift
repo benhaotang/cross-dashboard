@@ -1,6 +1,12 @@
 import WidgetKit
 import SwiftUI
 import CrossDashboardKit
+import OSLog
+
+private let widgetTimelineLogger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "com.crossdashboard.app.widget",
+    category: "WidgetTimeline"
+)
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
 
@@ -25,23 +31,31 @@ struct DashboardWidgetProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (DashboardWidgetEntry) -> Void) {
-        completion(context.isPreview ? .placeholder : loadEntry())
+        let entry = context.isPreview ? .placeholder : loadEntry(from: WidgetDataStore.load())
+        widgetTimelineLogger.info(
+            "Snapshot completed, preview=\(context.isPreview), empty=\(entry.isEmpty), events=\(entry.upcomingEvents.count), tasks=\(entry.dueSoonTasks.count), issues=\(entry.openIssuesCount)"
+        )
+        completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<DashboardWidgetEntry>) -> Void) {
-        let entry = loadEntry()
+        let snapshot = WidgetDataStore.load()
+        let entry = loadEntry(from: snapshot)
         // Use the same sync interval the user configured. The main app also calls
         // WidgetCenter.shared.reloadAllTimelines() after each sync, so this is just
         // a safety-net fallback in case the app hasn't run.
-        let intervalMinutes = WidgetDataStore.load()?.syncIntervalMinutes ?? 60
+        let intervalMinutes = snapshot?.syncIntervalMinutes ?? 60
         let nextRefresh = Calendar.current.date(byAdding: .minute, value: intervalMinutes, to: Date()) ?? Date()
+        widgetTimelineLogger.info(
+            "Timeline completed, family=\(String(describing: context.family), privacy: .public), empty=\(entry.isEmpty), events=\(entry.upcomingEvents.count), tasks=\(entry.dueSoonTasks.count), issues=\(entry.openIssuesCount), refreshMinutes=\(intervalMinutes)"
+        )
         completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
     }
 
     // ─── Data loading ─────────────────────────────────────────────────────────
 
-    private func loadEntry() -> DashboardWidgetEntry {
-        guard let snapshot = WidgetDataStore.load() else {
+    private func loadEntry(from snapshot: WidgetSnapshot?) -> DashboardWidgetEntry {
+        guard let snapshot else {
             return DashboardWidgetEntry(date: Date(), upcomingEvents: [], dueSoonTasks: [], openIssuesCount: 0, isEmpty: true)
         }
         return DashboardWidgetEntry(
@@ -92,49 +106,49 @@ struct DashboardWidgetEntryView: View {
     }
 }
 
-// ─── Small: next event + tasks count ─────────────────────────────────────────
+// ─── Small: next event + workload counts ─────────────────────────────────────
 
 private struct SmallWidgetView: View {
     let entry: DashboardWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("CrossDashboard", systemImage: "square.grid.2x2.fill")
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Next event", systemImage: "calendar")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-
-            Spacer()
 
             if entry.isEmpty {
                 Text("Open the app to sync")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .frame(maxHeight: .infinity, alignment: .center)
             } else if let next = entry.upcomingEvents.first {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(next.summary)
-                        .font(.caption.weight(.medium))
+                        .font(.caption.weight(.semibold))
                         .lineLimit(2)
                     Text(Date(timeIntervalSince1970: next.startEpoch), style: .relative)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                .frame(maxHeight: .infinity, alignment: .center)
             } else {
-                Text("No upcoming events")
-                    .font(.caption2)
+                Text("Nothing upcoming")
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
+                    .frame(maxHeight: .infinity, alignment: .center)
             }
 
-            Spacer()
+            Divider()
 
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Label("\(entry.dueSoonTasks.count)", systemImage: "checklist")
                     .font(.caption2)
                     .foregroundStyle(.primary)
-                if entry.openIssuesCount > 0 {
-                    Label("\(entry.openIssuesCount)", systemImage: "exclamationmark.bubble")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
+                Spacer(minLength: 0)
+                Label("\(entry.openIssuesCount)", systemImage: "exclamationmark.bubble")
+                    .font(.caption2)
+                    .foregroundStyle(entry.openIssuesCount > 0 ? Color.orange : Color.secondary)
             }
         }
         .padding()
@@ -144,65 +158,48 @@ private struct SmallWidgetView: View {
     }
 }
 
-// ─── Medium: next 3 events + 3 tasks ─────────────────────────────────────────
+// ─── Medium: paired lists + issue footer ─────────────────────────────────────
 
 private struct MediumWidgetView: View {
     let entry: DashboardWidgetEntry
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Events", systemImage: "calendar")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ForEach(Array(entry.upcomingEvents.prefix(3))) { event in
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 6, height: 6)
-                        Text(event.summary)
-                            .font(.caption)
-                            .lineLimit(1)
+        VStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    SectionHeader(title: "Events", icon: "calendar")
+                    ForEach(Array(entry.upcomingEvents.prefix(2))) { event in
+                        EventWidgetRow(event: event, showsDate: false)
                     }
-                    Text(Date(timeIntervalSince1970: event.startEpoch).formatted(date: .omitted, time: .shortened))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 10)
+                    if entry.upcomingEvents.isEmpty {
+                        Text(entry.isEmpty ? "Sync to load" : "None upcoming")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                if entry.upcomingEvents.isEmpty {
-                    Text(entry.isEmpty ? "Sync to load" : "None upcoming")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 5) {
+                    SectionHeader(title: "Due soon", icon: "checklist")
+                    ForEach(Array(entry.dueSoonTasks.prefix(2))) { task in
+                        TaskWidgetRow(task: task, showsDueDate: false)
+                    }
+                    if entry.dueSoonTasks.isEmpty {
+                        Text(entry.isEmpty ? "Sync to load" : "All caught up")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Tasks", systemImage: "checklist")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ForEach(Array(entry.dueSoonTasks.prefix(3))) { task in
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(task.isOverdue ? Color.red : Color.accentColor)
-                            .frame(width: 6, height: 6)
-                        Text(task.summary)
-                            .font(.caption)
-                            .lineLimit(1)
-                            .foregroundStyle(task.isOverdue ? .red : .primary)
-                    }
-                }
-                if entry.dueSoonTasks.isEmpty {
-                    Text(entry.isEmpty ? "Sync to load" : "All caught up!")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            IssueSummary(openIssuesCount: entry.openIssuesCount)
         }
         .padding()
         .containerBackground(for: .widget) {
@@ -211,74 +208,137 @@ private struct MediumWidgetView: View {
     }
 }
 
-// ─── Large: events + tasks + issues count ─────────────────────────────────────
+// ─── Large: two-column day board ─────────────────────────────────────────────
 
 private struct LargeWidgetView: View {
     let entry: DashboardWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("CrossDashboard", systemImage: "square.grid.2x2.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Divider()
-
-            SectionHeader(title: "Upcoming Events", icon: "calendar")
-            ForEach(Array(entry.upcomingEvents.prefix(3))) { event in
-                HStack {
-                    Circle().fill(Color.accentColor).frame(width: 7, height: 7)
-                    Text(event.summary).font(.caption).lineLimit(1)
-                    Spacer()
-                    Text(Date(timeIntervalSince1970: event.startEpoch), style: .time)
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            if entry.upcomingEvents.isEmpty {
-                Text(entry.isEmpty ? "Open app and sync" : "No upcoming events")
-                    .font(.caption2).foregroundStyle(.tertiary)
-            }
-
-            Divider()
-
-            SectionHeader(title: "Due Soon", icon: "checklist")
-            ForEach(Array(entry.dueSoonTasks.prefix(3))) { task in
-                HStack {
-                    Circle()
-                        .fill(task.isOverdue ? Color.red : Color.accentColor)
-                        .frame(width: 7, height: 7)
-                    Text(task.summary)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .foregroundStyle(task.isOverdue ? .red : .primary)
-                    Spacer()
-                    if let dueEpoch = task.dueEpoch {
-                        Text(Date(timeIntervalSince1970: dueEpoch), style: .relative)
-                            .font(.caption2)
-                            .foregroundStyle(task.isOverdue ? .red : .secondary)
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(title: "Upcoming", icon: "calendar")
+                    ForEach(Array(entry.upcomingEvents.prefix(5))) { event in
+                        EventWidgetRow(event: event, showsDate: true)
                     }
+                    if entry.upcomingEvents.isEmpty {
+                        EmptySectionMessage(
+                            text: entry.isEmpty ? "Open the app to sync" : "No upcoming events"
+                        )
+                    }
+                    Spacer(minLength: 0)
                 }
-            }
-            if entry.dueSoonTasks.isEmpty {
-                Text(entry.isEmpty ? "Open app and sync" : "All caught up!")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(title: "Due soon", icon: "checklist")
+                    ForEach(Array(entry.dueSoonTasks.prefix(5))) { task in
+                        TaskWidgetRow(task: task, showsDueDate: true)
+                    }
+                    if entry.dueSoonTasks.isEmpty {
+                        EmptySectionMessage(
+                            text: entry.isEmpty ? "Open the app to sync" : "All caught up"
+                        )
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
             Divider()
 
-            HStack {
-                Image(systemName: "exclamationmark.bubble")
-                    .foregroundStyle(.orange)
-                Text("\(entry.openIssuesCount) open issue\(entry.openIssuesCount == 1 ? "" : "s")")
-                    .font(.caption)
-            }
-
-            Spacer()
+            IssueSummary(openIssuesCount: entry.openIssuesCount)
         }
         .padding()
         .containerBackground(for: .widget) {
             Color(.windowBackgroundColor)
         }
+    }
+}
+
+private struct EventWidgetRow: View {
+    let event: WidgetUpcomingEvent
+    let showsDate: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            RoundedRectangle(cornerRadius: 1)
+                .fill(Color.accentColor)
+                .frame(width: 3, height: showsDate ? 30 : 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.summary)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(showsDate ? 2 : 1)
+                Text(eventDate.formatted(
+                    showsDate
+                        ? .dateTime.weekday(.abbreviated).hour().minute()
+                        : .dateTime.hour().minute()
+                ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var eventDate: Date {
+        Date(timeIntervalSince1970: event.startEpoch)
+    }
+}
+
+private struct TaskWidgetRow: View {
+    let task: WidgetDueTask
+    let showsDueDate: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Circle()
+                .strokeBorder(task.isOverdue ? Color.red : Color.accentColor, lineWidth: 1.5)
+                .frame(width: 8, height: 8)
+                .padding(.top, 3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.summary)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(showsDueDate ? 2 : 1)
+                    .foregroundStyle(task.isOverdue ? Color.red : Color.primary)
+                if showsDueDate, let dueEpoch = task.dueEpoch {
+                    Text(Date(timeIntervalSince1970: dueEpoch), style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(task.isOverdue ? Color.red : Color.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct EmptySectionMessage: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .multilineTextAlignment(.center)
+    }
+}
+
+private struct IssueSummary: View {
+    let openIssuesCount: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.bubble")
+            Text("\(openIssuesCount)")
+                .font(.caption.weight(.semibold))
+            Text(openIssuesCount == 1 ? "open issue" : "open issues")
+                .font(.caption2)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(openIssuesCount > 0 ? Color.orange : Color.secondary)
     }
 }
 

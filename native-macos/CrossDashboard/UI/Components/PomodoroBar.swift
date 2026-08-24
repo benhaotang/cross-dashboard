@@ -120,13 +120,19 @@ struct PomodoroBarView: View {
 struct PomodoroModalView: View {
 
     @Environment(PomodoroViewModel.self) private var vm
+    @Environment(\.appContainer) private var container
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTargetKey = "timer:"
+    @State private var customName: String
+
+    init(initialName: String = "") {
+        _customName = State(initialValue: initialName)
+    }
 
     var body: some View {
         VStack(spacing: 24) {
-            // Header
             HStack {
-                Text("Pomodoro")
+                Text(vm.state.active ? "Focus timer" : "Start a focus timer")
                     .font(.title2).bold()
                 Spacer()
                 Button("Done") { dismiss() }
@@ -136,7 +142,19 @@ struct PomodoroModalView: View {
 
             Divider()
 
-            // Large countdown
+            if vm.state.active {
+                activeTimer
+            } else {
+                timerPicker
+            }
+
+            Spacer()
+        }
+        .frame(width: 380, height: 420)
+    }
+
+    private var activeTimer: some View {
+        VStack(spacing: 24) {
             VStack(spacing: 8) {
                 Text(vm.state.phase.label)
                     .font(.headline)
@@ -148,7 +166,6 @@ struct PomodoroModalView: View {
                     .font(.system(size: 72, weight: .bold, design: .monospaced))
                     .accessibilityLabel("Time remaining: \(vm.timerLabel)")
 
-                // Session progress dots
                 HStack(spacing: 8) {
                     let total = vm.state.settings.sessionsUntilLongBreak
                     ForEach(0..<total, id: \.self) { i in
@@ -163,14 +180,12 @@ struct PomodoroModalView: View {
             .background(phaseColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal)
 
-            // Task name
             if !vm.state.itemTitle.isEmpty {
                 Label(vm.state.itemTitle, systemImage: "checkmark.circle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            // Controls
             HStack(spacing: 24) {
                 Button {
                     if vm.state.running { vm.pause() } else { vm.resume() }
@@ -190,7 +205,7 @@ struct PomodoroModalView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Skip phase")
 
-                Button { vm.stop(); dismiss() } label: {
+                Button { vm.stop() } label: {
                     Image(systemName: "stop.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(.red)
@@ -198,10 +213,82 @@ struct PomodoroModalView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Stop timer")
             }
-
-            Spacer()
         }
-        .frame(width: 380, height: 420)
+    }
+
+    private var timerPicker: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Picker("Track", selection: $selectedTargetKey) {
+                Text("No linked item").tag("timer:")
+                if !activeTasks.isEmpty {
+                    Section("Tasks") {
+                        ForEach(activeTasks) { task in
+                            Text(task.summary).tag("task:\(task.uid)")
+                        }
+                    }
+                }
+                if !openIssues.isEmpty {
+                    Section("Issues") {
+                        ForEach(openIssues) { issue in
+                            Text("\(issue.title) · \(issue.repository)#\(issue.number)")
+                                .tag("issue:\(issue.id)")
+                        }
+                    }
+                }
+            }
+            .pickerStyle(.menu)
+
+            if selectedTargetKey == "timer:" {
+                TextField("Timer name, optional", text: $customName)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            Text("Uses your configured focus duration of \(container.preferences.pomodoroSettings.workMinutes) minutes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button {
+                startSelectedTimer()
+            } label: {
+                Label("Start focus", systemImage: "play.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+        .padding(.horizontal)
+    }
+
+    private var activeTasks: [CalDavTask] {
+        container.taskRepository.activeTasks.sorted {
+            $0.summary.localizedCaseInsensitiveCompare($1.summary) == .orderedAscending
+        }
+    }
+
+    private var openIssues: [GiteaIssue] {
+        container.issueRepository.openIssues.sorted {
+            $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private func startSelectedTimer() {
+        if selectedTargetKey.hasPrefix("task:") {
+            let uid = String(selectedTargetKey.dropFirst("task:".count))
+            if let task = activeTasks.first(where: { $0.uid == uid }) {
+                vm.start(for: task)
+            }
+            return
+        }
+
+        if selectedTargetKey.hasPrefix("issue:") {
+            let rawID = String(selectedTargetKey.dropFirst("issue:".count))
+            if let id = Int64(rawID), let issue = openIssues.first(where: { $0.id == id }) {
+                vm.startForIssue(title: issue.title)
+            }
+            return
+        }
+
+        vm.startNamed(customName.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private var phaseColor: Color {

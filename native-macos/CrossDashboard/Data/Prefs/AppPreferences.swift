@@ -6,7 +6,23 @@ import Observation
 @Observable
 @MainActor
 public final class AppPreferences {
-    public static let shared = AppPreferences()
+    /// Team-ID app groups are authorized directly by macOS and do not depend on a provisioning
+    /// profile containing a separately registered `group.*` identifier.
+    public nonisolated static let appGroupSuiteName = "569WLL4Q5F.com.crossdashboard"
+    private nonisolated static let legacyAppGroupSuiteName = "group.com.crossdashboard"
+
+    public static let shared: AppPreferences = {
+        let sharedDefaults = UserDefaults(suiteName: appGroupSuiteName) ?? .standard
+        if let legacyAppGroup = UserDefaults(suiteName: legacyAppGroupSuiteName) {
+            migrateLegacyDefaults(
+                from: legacyAppGroup,
+                to: sharedDefaults,
+                migrationKey: teamAppGroupMigrationKey
+            )
+        }
+        migrateLegacyDefaults(from: .standard, to: sharedDefaults)
+        return AppPreferences(defaults: sharedDefaults)
+    }()
 
     private let defaults: UserDefaults
 
@@ -105,7 +121,10 @@ public final class AppPreferences {
 
     // ─── Init ─────────────────────────────────────────────────────────────────
 
-    private init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults, legacyDefaults: UserDefaults? = nil) {
+        if let legacyDefaults {
+            Self.migrateLegacyDefaults(from: legacyDefaults, to: defaults)
+        }
         self.defaults = defaults
 
         let rawTheme = defaults.string(forKey: Keys.theme) ?? ""
@@ -170,6 +189,42 @@ public final class AppPreferences {
         static let biometricLock       = "pref_biometric_lock"
         static let pomodoroMenuBar     = "pref_pomodoro_menu_bar"
         static let lastSync            = "pref_last_sync"
+
+        static let all = [
+            theme, timeZoneOverride, visibleScreens, kanbanColumns,
+            pomodoroWork, pomodoroShort, pomodoroLong, pomodoroSessions,
+            taskMorningHour, taskAfternoonHour, taskNightHour, taskDefaultHour,
+            notifEnabled, notifMinutes, syncInterval, biometricLock,
+            pomodoroMenuBar, lastSync,
+        ]
+    }
+
+    private nonisolated static let appGroupMigrationKey = "migration_app_group_defaults_v1"
+    private nonisolated static let teamAppGroupMigrationKey = "migration_team_app_group_defaults_v2"
+
+    // DesktopBackgroundManager belongs to the app target, but its persisted settings must move in
+    // the same one-time migration so the future agent can read them from the shared suite.
+    private static let desktopBackgroundKeys = [
+        "desktop_background_definition",
+        "desktop_background_image_path",
+        "desktop_background_light_image_path",
+        "desktop_background_dark_image_path",
+        "desktop_background_glass_opacity",
+        "desktop_background_image_fit",
+    ]
+
+    private static func migrateLegacyDefaults(
+        from legacy: UserDefaults,
+        to shared: UserDefaults,
+        migrationKey: String = appGroupMigrationKey
+    ) {
+        guard !shared.bool(forKey: migrationKey) else { return }
+        for key in Keys.all + desktopBackgroundKeys where shared.object(forKey: key) == nil {
+            if let value = legacy.object(forKey: key) {
+                shared.set(value, forKey: key)
+            }
+        }
+        shared.set(true, forKey: migrationKey)
     }
 }
 

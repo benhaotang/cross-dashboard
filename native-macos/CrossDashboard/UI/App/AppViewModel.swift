@@ -87,6 +87,20 @@ final class AppViewModel {
     func consumeCaptureTrigger() {
         captureInitialText = nil
     }
+
+    /// Set by `crossdashboard://timer` when the user needs to choose a timer target.
+    private(set) var isPomodoroPickerPresented = false
+    private(set) var pomodoroPickerInitialName = ""
+
+    func presentPomodoroPicker(initialName: String = "") {
+        pomodoroPickerInitialName = initialName
+        isPomodoroPickerPresented = true
+    }
+
+    func dismissPomodoroPicker() {
+        isPomodoroPickerPresented = false
+        pomodoroPickerInitialName = ""
+    }
 }
 
 // ─── Screen enum ─────────────────────────────────────────────────────────────

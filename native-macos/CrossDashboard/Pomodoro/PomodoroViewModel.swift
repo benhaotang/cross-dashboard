@@ -32,29 +32,29 @@ final class PomodoroViewModel {
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
-    func start(for task: CalDavTask? = nil) {
+    @discardableResult
+    func start(for task: CalDavTask? = nil, minutes: Int? = nil) -> Bool {
+        start(title: task?.summary ?? "", task: task, minutes: minutes)
+    }
+
+    @discardableResult
+    func startNamed(_ name: String, minutes: Int? = nil) -> Bool {
+        start(title: name, task: nil, minutes: minutes)
+    }
+
+    @discardableResult
+    func startForIssue(title: String, minutes: Int? = nil) -> Bool {
+        start(title: title, task: nil, minutes: minutes)
+    }
+
+    private func start(title: String, task: CalDavTask?, minutes: Int?) -> Bool {
+        guard !state.active else { return false }
         let settings = container.preferences.pomodoroSettings
+        let focusMinutes = min(max(minutes ?? settings.workMinutes, 1), 24 * 60)
         currentTask = task
         state = PomodoroState(
             phase: .work,
-            secondsLeft: settings.workMinutes * 60,
-            running: true,
-            currentSession: 1,
-            completedSessions: 0,
-            itemTitle: task?.summary ?? "",
-            active: true,
-            settings: settings
-        )
-        scheduleTimer()
-        PomodoroStatusItem.shared.show()
-    }
-
-    func startForIssue(title: String) {
-        let settings = container.preferences.pomodoroSettings
-        currentTask = nil
-        state = PomodoroState(
-            phase: .work,
-            secondsLeft: settings.workMinutes * 60,
+            secondsLeft: focusMinutes * 60,
             running: true,
             currentSession: 1,
             completedSessions: 0,
@@ -64,6 +64,7 @@ final class PomodoroViewModel {
         )
         scheduleTimer()
         PomodoroStatusItem.shared.show()
+        return true
     }
 
     func pause() {

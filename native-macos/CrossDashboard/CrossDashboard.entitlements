@@ -8,6 +8,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
+		<string>569WLL4Q5F.com.crossdashboard</string>
 		<string>group.com.crossdashboard</string>
 	</array>
 	<key>com.apple.security.assets.pictures.read-write</key>
