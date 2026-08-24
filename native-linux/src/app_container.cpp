@@ -24,6 +24,7 @@ AppContainer::AppContainer()
     caldav_.emplace(secrets_, soup_.get());
     gitea_.emplace(secrets_, soup_.get());
     memos_client_.emplace(secrets_, soup_.get());
+    karakeep_.emplace(secrets_, soup_.get());
     nextcloud_.emplace(soup_.get());
 
     event_repo_.emplace(event_dao_, *caldav_, secrets_);

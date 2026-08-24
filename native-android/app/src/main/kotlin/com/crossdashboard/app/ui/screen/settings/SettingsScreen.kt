@@ -127,6 +127,9 @@ fun SettingsScreen(
             item { SectionHeader("Memos") }
             item { MemosSection(state = state, vm = vm) }
 
+            item { SectionHeader("Karakeep") }
+            item { KarakeepSection(state = state, vm = vm) }
+
             // ── Appearance ───────────────────────────────────────────────────
             item { SectionHeader("Appearance") }
             item { AppearanceSection(state = state, vm = vm) }
@@ -776,6 +779,58 @@ private fun MemosSection(state: SettingsUiState, vm: SettingsViewModel) {
                 enabled = state.memosConnectionStatus != CalDavConnectionStatus.TESTING,
             ) { Text("Test") }
             Button(onClick = vm::saveMemos, modifier = Modifier.weight(1f)) { Text("Save") }
+        }
+    }
+}
+
+@Composable
+private fun KarakeepSection(state: SettingsUiState, vm: SettingsViewModel) {
+    var showToken by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = state.karakeepHost,
+            onValueChange = vm::setKarakeepHost,
+            label = { Text("Server URL") },
+            placeholder = { Text("https://karakeep.example.com") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = state.karakeepToken,
+            onValueChange = vm::setKarakeepToken,
+            label = { Text("API Key") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { showToken = !showToken }) {
+                    Icon(
+                        if (showToken) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (showToken) "Hide API key" else "Show API key",
+                    )
+                }
+            },
+        )
+        if (state.karakeepConnectionStatus != CalDavConnectionStatus.IDLE) {
+            val color = when (state.karakeepConnectionStatus) {
+                CalDavConnectionStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+                CalDavConnectionStatus.ERROR -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(
+                if (state.karakeepConnectionStatus == CalDavConnectionStatus.TESTING) "Testing…" else state.karakeepConnectionMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = color,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = vm::testKarakeepConnection,
+                enabled = state.karakeepConnectionStatus != CalDavConnectionStatus.TESTING,
+                modifier = Modifier.weight(1f),
+            ) { Text("Test") }
+            Button(onClick = vm::saveKarakeep, modifier = Modifier.weight(1f)) { Text("Save") }
         }
     }
 }

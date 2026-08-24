@@ -49,6 +49,12 @@ fun MemosScreen(
             vm.clearSnackbar()
         }
     }
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearError()
+        }
+    }
 
     var selectedMemoName by remember { mutableStateOf<String?>(null) }
     var showCreateSheet by remember { mutableStateOf(false) }
@@ -111,7 +117,6 @@ fun MemosScreen(
                             onArchive = { vm.archiveMemo(memo.name) },
                             onExtractTasks = vm::extractTasks,
                             onDetectDate = vm::detectFirstDate,
-                            onFirstUrl = vm::firstUrl,
                             vm = vm,
                         )
                     } else {

@@ -7,6 +7,7 @@
 #include "create_memo_dialog.h"
 #include "extract_tasks_dialog.h"
 #include "memo_detail_view.h"
+#include "save_to_karakeep_dialog.h"
 #include "background/sync_scheduler.h"
 #include "components/searchable_filter_menu.h"
 #include "components/tag_flow.h"
@@ -16,11 +17,13 @@
 
 #include <glib.h>
 #include <gtk/gtk.h>
+#include <gtkmm/messagedialog.h>
 
 #include <algorithm>
 #include <cctype>
 #include <optional>
 #include <set>
+#include <regex>
 
 namespace cd {
 
@@ -35,15 +38,16 @@ bool contains_ci(std::string text, std::string needle)
     return needle.empty() || text.find(needle) != std::string::npos;
 }
 
-std::optional<std::string> detect_url(std::string const& text)
+std::vector<std::string> detect_urls(std::string const& text)
 {
-    auto p = text.find("http://");
-    if (p == std::string::npos)
-        p = text.find("https://");
-    if (p == std::string::npos)
-        return std::nullopt;
-    auto end = text.find_first_of(" \n\t", p);
-    return text.substr(p, end == std::string::npos ? std::string::npos : end - p);
+    static std::regex const pattern(R"(https?://[^\s]+)");
+    std::vector<std::string> urls;
+    for (std::sregex_iterator it(text.begin(), text.end(), pattern), end; it != end; ++it) {
+        std::string url = it->str();
+        while (!url.empty() && std::string(".,;:!?)]}").find(url.back()) != std::string::npos) url.pop_back();
+        if (!url.empty() && std::find(urls.begin(), urls.end(), url) == urls.end()) urls.push_back(url);
+    }
+    return urls;
 }
 
 std::string memo_preview_text(MemosMemo const& m)
@@ -211,13 +215,25 @@ MemosView::MemosView(AppContainer& app, AppViewModel& vm, SyncScheduler& sync)
     detail_->on_open_url = [this] {
         if (!detail_->selected_memo().has_value())
             return;
-        auto url = detect_url(detail_->selected_memo()->content);
-        if (!url.has_value())
-            return;
-        GError* error = nullptr;
-        gtk_show_uri_on_window(nullptr, url->c_str(), GDK_CURRENT_TIME, &error);
-        if (error)
-            g_error_free(error);
+        for (auto const& url : detect_urls(detail_->selected_memo()->content)) {
+            GError* error = nullptr;
+            gtk_show_uri_on_window(nullptr, url.c_str(), GDK_CURRENT_TIME, &error);
+            if (error) g_error_free(error);
+        }
+    };
+    detail_->on_save_karakeep = [this] {
+        if (!detail_->selected_memo().has_value()) return;
+        auto* top = dynamic_cast<Gtk::Window*>(get_toplevel());
+        if (!top) return;
+        SaveToKarakeepDialog dialog(*top, app_, detect_urls(detail_->selected_memo()->content));
+        if (dialog.run() != Gtk::RESPONSE_OK) return;
+        try {
+            dialog.save();
+        }
+        catch (std::exception const& error) {
+            Gtk::MessageDialog message(*top, error.what(), false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE);
+            message.run();
+        }
     };
     detail_->on_copy_link = [this] {
         if (!detail_->selected_memo().has_value())

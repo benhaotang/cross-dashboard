@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.*
 import com.crossdashboard.app.data.network.CalDavClient
 import com.crossdashboard.app.data.network.MemosClient
+import com.crossdashboard.app.data.network.KarakeepClient
 import com.crossdashboard.app.data.network.NextcloudLoginFlow
 import com.crossdashboard.app.data.network.NextcloudSsoHelper
 import com.crossdashboard.app.data.network.SsoResultBus
@@ -66,6 +67,11 @@ data class SettingsUiState(
     val memosConnectionStatus: CalDavConnectionStatus = CalDavConnectionStatus.IDLE,
     val memosConnectionMessage: String = "",
 
+    val karakeepHost: String = "",
+    val karakeepToken: String = "",
+    val karakeepConnectionStatus: CalDavConnectionStatus = CalDavConnectionStatus.IDLE,
+    val karakeepConnectionMessage: String = "",
+
     // ── Appearance ────────────────────────────────────────────────────────────
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val backgroundStandard: BackgroundTemplate? = null,
@@ -120,6 +126,7 @@ class SettingsViewModel @Inject constructor(
     private val prefs: AppPreferences,
     private val calDavClient: CalDavClient,
     private val memosClient: MemosClient,
+    private val karakeepClient: KarakeepClient,
     private val ssoHelper: NextcloudSsoHelper,
     private val loginFlow: NextcloudLoginFlow,
     private val workManager: WorkManager,
@@ -198,6 +205,8 @@ class SettingsViewModel @Inject constructor(
                     giteaRepos = secureStore.get(CredentialKey.GITEA_REPOS) ?: "",
                     memosHost = secureStore.get(CredentialKey.MEMOS_HOST) ?: "",
                     memosToken = secureStore.get(CredentialKey.MEMOS_TOKEN) ?: "",
+                    karakeepHost = secureStore.get(CredentialKey.KARAKEEP_HOST) ?: "",
+                    karakeepToken = secureStore.get(CredentialKey.KARAKEEP_TOKEN) ?: "",
                 )
             }
         }
@@ -552,6 +561,31 @@ class SettingsViewModel @Inject constructor(
             } else {
                 _state.update { it.copy(memosConnectionStatus = CalDavConnectionStatus.ERROR, memosConnectionMessage = "Connection failed — check host and token") }
             }
+        }
+    }
+
+    fun setKarakeepHost(v: String) = _state.update { it.copy(karakeepHost = v) }
+    fun setKarakeepToken(v: String) = _state.update { it.copy(karakeepToken = v) }
+
+    fun saveKarakeep() {
+        val s = _state.value
+        secureStore.set(CredentialKey.KARAKEEP_HOST, s.karakeepHost.trimEnd('/'))
+        secureStore.set(CredentialKey.KARAKEEP_TOKEN, s.karakeepToken)
+        _state.update { it.copy(infoMessage = "Karakeep settings saved") }
+    }
+
+    fun testKarakeepConnection() {
+        val s = _state.value
+        if (s.karakeepHost.isBlank() || s.karakeepToken.isBlank()) {
+            _state.update { it.copy(karakeepConnectionStatus = CalDavConnectionStatus.ERROR, karakeepConnectionMessage = "Server and API key required") }
+            return
+        }
+        saveKarakeep()
+        _state.update { it.copy(karakeepConnectionStatus = CalDavConnectionStatus.TESTING, karakeepConnectionMessage = "") }
+        viewModelScope.launch {
+            runCatching { karakeepClient.listFolders() }
+                .onSuccess { _state.update { it.copy(karakeepConnectionStatus = CalDavConnectionStatus.SUCCESS, karakeepConnectionMessage = "Connected") } }
+                .onFailure { error -> _state.update { it.copy(karakeepConnectionStatus = CalDavConnectionStatus.ERROR, karakeepConnectionMessage = error.message ?: "Connection failed") } }
         }
     }
 

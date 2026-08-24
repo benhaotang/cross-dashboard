@@ -3,6 +3,8 @@ package com.crossdashboard.app.ui.screen.memos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.crossdashboard.app.data.parser.TaskInputParser
+import com.crossdashboard.app.data.network.KarakeepClient
+import com.crossdashboard.app.data.network.KarakeepFolder
 import com.crossdashboard.app.data.prefs.CredentialKey
 import com.crossdashboard.app.data.prefs.SecureStore
 import com.crossdashboard.app.data.repository.EventRepository
@@ -36,6 +38,10 @@ data class MemosUiState(
     val configuredRepos: List<String> = emptyList(),
     val memosHost: String = "",
     val memosToken: String = "",
+    val karakeepConfigured: Boolean = false,
+    val karakeepFolders: List<KarakeepFolder> = emptyList(),
+    val karakeepFoldersLoading: Boolean = false,
+    val karakeepError: String? = null,
     /** Open issues from Room, grouped by "owner/repo", used by CommentOnIssueSheet. */
     val issuesByRepo: Map<String, List<GiteaIssue>> = emptyMap(),
 )
@@ -46,6 +52,7 @@ class MemosViewModel @Inject constructor(
     private val taskRepo: TaskRepository,
     private val eventRepo: EventRepository,
     private val issueRepo: IssueRepository,
+    private val karakeepClient: KarakeepClient,
     private val secureStore: SecureStore,
 ) : ViewModel() {
 
@@ -58,7 +65,14 @@ class MemosViewModel @Inject constructor(
         val repos = secureStore.get(CredentialKey.GITEA_REPOS)
             ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
             ?: emptyList()
-        _state.update { it.copy(memosHost = host, memosToken = token, configuredRepos = repos) }
+        val karakeepConfigured = !secureStore.get(CredentialKey.KARAKEEP_HOST).isNullOrBlank() &&
+            !secureStore.get(CredentialKey.KARAKEEP_TOKEN).isNullOrBlank()
+        _state.update { it.copy(
+            memosHost = host,
+            memosToken = token,
+            configuredRepos = repos,
+            karakeepConfigured = karakeepConfigured,
+        ) }
 
         viewModelScope.launch {
             memoRepo.allMemos.collect { all ->
@@ -245,9 +259,38 @@ class MemosViewModel @Inject constructor(
     }
 
     /** Return first URL found in memo content, or null. */
-    fun firstUrl(memo: MemosMemo): String? {
-        val urlRegex = Regex("""https?://\S+""")
-        return urlRegex.find(memo.content)?.value
+    fun urls(memo: MemosMemo): List<String> {
+        val trailingPunctuation = charArrayOf('.', ',', ';', ':', '!', '?', ')', ']', '}')
+        return Regex("""https?://\S+""")
+            .findAll(memo.content)
+            .map { it.value.trimEnd(*trailingPunctuation) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+    }
+
+    fun loadKarakeepFolders() {
+        if (_state.value.karakeepFoldersLoading) return
+        viewModelScope.launch {
+            _state.update { it.copy(karakeepFoldersLoading = true, karakeepError = null) }
+            runCatching { karakeepClient.listFolders() }
+                .onSuccess { folders -> _state.update { it.copy(karakeepFolders = folders) } }
+                .onFailure { error -> _state.update { it.copy(karakeepError = error.message ?: "Could not load Karakeep folders") } }
+            _state.update { it.copy(karakeepFoldersLoading = false) }
+        }
+    }
+
+    fun saveUrlsToKarakeep(urls: List<String>, folderId: String?, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, karakeepError = null) }
+            runCatching { karakeepClient.saveUrls(urls, folderId) }
+                .onSuccess {
+                    _state.update { it.copy(snackbarMessage = if (urls.size == 1) "Saved to Karakeep" else "${urls.size} links saved to Karakeep") }
+                    onComplete()
+                }
+                .onFailure { error -> _state.update { it.copy(karakeepError = error.message ?: "Could not save to Karakeep") } }
+            _state.update { it.copy(isLoading = false) }
+        }
     }
 
     fun createTaskFromParsed(parsed: ParsedTask) {

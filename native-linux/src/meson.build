@@ -38,6 +38,7 @@ core_sources = files(
   'data/network/caldav_client.cpp',
   'data/network/gitea_client.cpp',
   'data/network/memos_client.cpp',
+  'data/network/karakeep_client.cpp',
   'data/network/nextcloud_login_flow.cpp',
   'data/parser/ical_parser.cpp',
   'data/parser/task_input_parser.cpp',
@@ -84,6 +85,7 @@ gui_sources = core_sources + files(
   'ui/screens/memos/extract_tasks_dialog.cpp',
   'ui/screens/memos/create_event_from_memo_dialog.cpp',
   'ui/screens/memos/comment_on_issue_dialog.cpp',
+  'ui/screens/memos/save_to_karakeep_dialog.cpp',
   'ui/components/attachment_row.cpp',
 )
 

@@ -89,6 +89,9 @@ private:
     Gtk::Entry gitea_repos_;
     Gtk::Entry memos_host_;
     Gtk::Entry memos_token_;
+    Gtk::Entry karakeep_host_;
+    Gtk::Entry karakeep_token_;
+    Gtk::Label karakeep_status_;
 
     Gtk::Entry nc_server_entry_;
     Gtk::Button nc_login_btn_{"Nextcloud browser login…"};

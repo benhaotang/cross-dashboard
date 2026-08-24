@@ -38,6 +38,12 @@ final class SettingsViewModel {
     var memosConnectionTesting: Bool = false
     var memosConnectionSuccess: Bool = false
 
+    var karakeepHost: String = ""
+    var karakeepToken: String = ""
+    var karakeepConnectionMessage: String? = nil
+    var karakeepConnectionTesting = false
+    var karakeepConnectionSuccess = false
+
     // ─── Appearance ───────────────────────────────────────────────────────────
 
     /// Visible screens in display order. Screens not in this list are hidden.
@@ -118,6 +124,8 @@ final class SettingsViewModel {
         // Memos
         memosHost  = keychain.get(CredentialKey.memosHost)  ?? ""
         memosToken = keychain.get(CredentialKey.memosToken) ?? ""
+        karakeepHost = keychain.get(CredentialKey.karakeepHost) ?? ""
+        karakeepToken = keychain.get(CredentialKey.karakeepToken) ?? ""
 
         // Appearance
         orderedVisibleScreens = prefs.visibleScreens.isEmpty ? allScreens : prefs.visibleScreens
@@ -268,6 +276,34 @@ final class SettingsViewModel {
         } else {
             memosConnectionSuccess = false
             memosConnectionMessage = "Connection failed — check host and token"
+        }
+    }
+
+    func saveKarakeep() {
+        container.keychain.set(
+            CredentialKey.karakeepHost,
+            value: karakeepHost.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        )
+        container.keychain.set(CredentialKey.karakeepToken, value: karakeepToken)
+    }
+
+    func testKarakeepConnection() async {
+        guard !karakeepHost.isEmpty, !karakeepToken.isEmpty else {
+            karakeepConnectionMessage = "Server and API key are required"
+            karakeepConnectionSuccess = false
+            return
+        }
+        saveKarakeep()
+        karakeepConnectionTesting = true
+        karakeepConnectionMessage = nil
+        defer { karakeepConnectionTesting = false }
+        do {
+            _ = try await container.karakeepClient.listFolders()
+            karakeepConnectionSuccess = true
+            karakeepConnectionMessage = "Connected"
+        } catch {
+            karakeepConnectionSuccess = false
+            karakeepConnectionMessage = error.localizedDescription
         }
     }
 
