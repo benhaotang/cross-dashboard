@@ -185,7 +185,7 @@ struct MemoDetailView: View {
                 }
                 if viewModel.karakeepConfigured && !detectedURLs.isEmpty {
                     Button { showKarakeepSheet = true } label: {
-                        Label("Save to Karakeep", systemImage: "bookmark.badge.plus")
+                        Label("Save to Karakeep", systemImage: "bookmark")
                     }
                     .accessibilityLabel("Save links to Karakeep")
                 }

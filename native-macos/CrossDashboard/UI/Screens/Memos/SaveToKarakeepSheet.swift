@@ -10,7 +10,7 @@ struct SaveToKarakeepSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Label(
                 urls.count == 1 ? "Save link to Karakeep" : "Save \(urls.count) links to Karakeep",
-                systemImage: "bookmark.badge.plus"
+                systemImage: "bookmark"
             )
             .font(.title2)
 
