@@ -14,6 +14,7 @@ struct MemoDetailView: View {
     @State private var showExtractSheet = false
     @State private var showEventSheet = false
     @State private var showCommentIssueSheet = false
+    @State private var showKarakeepSheet = false
 
     private var memo: MemosMemo? {
         viewModel.memoRepo.allMemos.first { $0.name == memoName }
@@ -35,6 +36,7 @@ struct MemoDetailView: View {
 
     @ViewBuilder
     private func detail(memo: MemosMemo) -> some View {
+        let detectedURLs = viewModel.urls(in: memo)
         let dateStr: String = {
             let fmt = DateFormatter(); fmt.dateStyle = .medium; fmt.timeStyle = .short
             return fmt.string(from: memo.displayTime)
@@ -173,11 +175,19 @@ struct MemoDetailView: View {
                     }
                     .accessibilityLabel("Comment on Gitea issue")
                 }
-                if let url = viewModel.firstURL(in: memo) {
-                    Button { NSWorkspace.shared.open(url) } label: {
+                if !detectedURLs.isEmpty {
+                    Button {
+                        detectedURLs.forEach { NSWorkspace.shared.open($0) }
+                    } label: {
                         Label("Open URL", systemImage: "safari")
                     }
-                    .accessibilityLabel("Open link in browser")
+                    .accessibilityLabel("Open links in browser")
+                }
+                if viewModel.karakeepConfigured && !detectedURLs.isEmpty {
+                    Button { showKarakeepSheet = true } label: {
+                        Label("Save to Karakeep", systemImage: "bookmark.badge.plus")
+                    }
+                    .accessibilityLabel("Save links to Karakeep")
                 }
                 Button {
                     let host = viewModel.memosHost
@@ -221,6 +231,9 @@ struct MemoDetailView: View {
         }
         .sheet(isPresented: $showCommentIssueSheet) {
             CommentOnIssueSheetMac(memo: memo, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showKarakeepSheet) {
+            SaveToKarakeepSheet(urls: detectedURLs, viewModel: viewModel)
         }
     }
 

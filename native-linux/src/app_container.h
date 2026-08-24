@@ -9,6 +9,7 @@
 #include "data/db/task_dao.h"
 #include "data/network/caldav_client.h"
 #include "data/network/gitea_client.h"
+#include "data/network/karakeep_client.h"
 #include "data/network/memos_client.h"
 #include "data/network/nextcloud_login_flow.h"
 #include "data/prefs/prefs.h"
@@ -48,6 +49,7 @@ public:
     CalDavClient& caldav() { return *caldav_; }
     GiteaClient& gitea() { return *gitea_; }
     MemosClient& memos_client() { return *memos_client_; }
+    KarakeepClient& karakeep() { return *karakeep_; }
 
     NextcloudLoginFlow& nextcloud_login_flow() { return *nextcloud_; }
 
@@ -67,6 +69,7 @@ private:
     std::optional<CalDavClient> caldav_;
     std::optional<GiteaClient> gitea_;
     std::optional<MemosClient> memos_client_;
+    std::optional<KarakeepClient> karakeep_;
     std::optional<NextcloudLoginFlow> nextcloud_;
 
     EventDao event_dao_;

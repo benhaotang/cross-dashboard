@@ -9,6 +9,9 @@
 #include "data/repository/repositories.h"
 
 #include <exception>
+#include <algorithm>
+#include <regex>
+#include <vector>
 
 #include <gtkmm/messagedialog.h>
 #include <gtkmm/separator.h>
@@ -20,15 +23,16 @@ namespace cd {
 
 namespace {
 
-std::optional<std::string> detect_url(std::string const& text)
+std::vector<std::string> detect_urls(std::string const& text)
 {
-    auto p = text.find("http://");
-    if (p == std::string::npos)
-        p = text.find("https://");
-    if (p == std::string::npos)
-        return std::nullopt;
-    auto end = text.find_first_of(" \n\t", p);
-    return text.substr(p, end == std::string::npos ? std::string::npos : end - p);
+    static std::regex const pattern(R"(https?://[^\s]+)");
+    std::vector<std::string> urls;
+    for (std::sregex_iterator it(text.begin(), text.end(), pattern), end; it != end; ++it) {
+        std::string url = it->str();
+        while (!url.empty() && std::string(".,;:!?)]}").find(url.back()) != std::string::npos) url.pop_back();
+        if (!url.empty() && std::find(urls.begin(), urls.end(), url) == urls.end()) urls.push_back(url);
+    }
+    return urls;
 }
 
 } // namespace
@@ -66,6 +70,7 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     setup_icon_btn(create_event_btn_,  "appointment-new-symbolic",  "Create event",        "Create event");
     setup_icon_btn(comment_issue_btn_, "insert-text-symbolic",      "Comment on issue",    "Comment on issue");
     setup_icon_btn(open_url_btn_,      "web-browser-symbolic",      "Open URL",            "Open URL");
+    setup_icon_btn(save_karakeep_btn_, "bookmark-new-symbolic",     "Save to Karakeep",     "Save links to Karakeep");
     setup_icon_btn(copy_link_btn_,     "edit-copy-symbolic",        "Copy link",           "Copy link");
     setup_icon_btn(edit_btn_,          "document-edit-symbolic",    "Edit memo",           "Edit memo");
     setup_icon_btn(archive_btn_,       "mail-mark-read-symbolic",   "Archive",             "Archive");
@@ -84,6 +89,9 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     });
     open_url_btn_.signal_clicked().connect([this] {
         if (on_open_url) on_open_url();
+    });
+    save_karakeep_btn_.signal_clicked().connect([this] {
+        if (on_save_karakeep) on_save_karakeep();
     });
     copy_link_btn_.signal_clicked().connect([this] {
         if (on_copy_link) on_copy_link();
@@ -191,6 +199,7 @@ MemoDetailView::MemoDetailView(AppContainer& app)
 
     // Group 2: link actions
     toolbar_.pack_start(open_url_btn_,  false, false);
+    toolbar_.pack_start(save_karakeep_btn_, false, false);
     toolbar_.pack_start(copy_link_btn_, false, false);
 
     // Group 3: memo state actions — right aligned
@@ -233,6 +242,7 @@ MemoDetailView::MemoDetailView(AppContainer& app)
     pack_start(*sep, false, false);
     pack_start(content_scroll_, true, true);
     pack_start(composer_, false, false);
+    signal_map().connect([this] { rebuild(); });
 }
 
 void MemoDetailView::set_memo(std::optional<MemosMemo> memo)
@@ -311,9 +321,13 @@ void MemoDetailView::rebuild()
     catch (...) {
     }
 
-    open_url_btn_.set_sensitive(detect_url(memo.content).has_value());
+    auto urls = detect_urls(memo.content);
+    open_url_btn_.set_sensitive(!urls.empty());
     set_action_sensitivity();
     show_all_children();
+    bool karakeep_configured = app_.secrets().get(CredentialKey::KARAKEEP_HOST).has_value()
+        && app_.secrets().get(CredentialKey::KARAKEEP_TOKEN).has_value();
+    save_karakeep_btn_.set_visible(!urls.empty() && karakeep_configured);
 }
 
 } // namespace cd

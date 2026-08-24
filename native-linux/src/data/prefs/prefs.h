@@ -23,6 +23,8 @@ inline constexpr char GITEA_INSTANCE[] = "gitea_instance";
 inline constexpr char GITEA_REPOS[] = "gitea_repos";
 inline constexpr char MEMOS_HOST[] = "memos_host";
 inline constexpr char MEMOS_TOKEN[] = "memos_token";
+inline constexpr char KARAKEEP_HOST[] = "karakeep_host";
+inline constexpr char KARAKEEP_TOKEN[] = "karakeep_token";
 } // namespace CredentialKey
 
 /** Credential storage backed by Secret Service (`libsecret-1`). */

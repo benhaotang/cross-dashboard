@@ -128,10 +128,17 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     if (auto v = app_.secrets().get(CredentialKey::GITEA_REPOS)) gitea_repos_.set_text(*v);
     if (auto v = app_.secrets().get(CredentialKey::MEMOS_HOST)) memos_host_.set_text(*v);
     if (auto v = app_.secrets().get(CredentialKey::MEMOS_TOKEN)) memos_token_.set_text(*v);
+    if (auto v = app_.secrets().get(CredentialKey::KARAKEEP_HOST)) karakeep_host_.set_text(*v);
+    if (auto v = app_.secrets().get(CredentialKey::KARAKEEP_TOKEN)) karakeep_token_.set_text(*v);
 
     caldav_password_.set_visibility(false);
     gitea_token_.set_visibility(false);
     memos_token_.set_visibility(false);
+    karakeep_token_.set_visibility(false);
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(karakeep_host_.gobj())))
+        atk_object_set_name(a, "Karakeep server URL");
+    if (AtkObject* a = gtk_widget_get_accessible(GTK_WIDGET(karakeep_token_.gobj())))
+        atk_object_set_name(a, "Karakeep API key");
 
     if (auto v = app_.secrets().get(CredentialKey::CALDAV_SERVER)) nc_server_entry_.set_text(*v);
 
@@ -279,6 +286,48 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     });
     memos_page->pack_start(*save_memos, false, false);
 
+    auto* karakeep_page = page_box();
+    pack_section_title(*karakeep_page, "Karakeep");
+    auto* k_grid = Gtk::manage(new Gtk::Grid());
+    k_grid->set_column_spacing(10);
+    k_grid->set_row_spacing(8);
+    k_grid->attach(*Gtk::manage(new Gtk::Label("Server URL")), 0, 0, 1, 1);
+    k_grid->attach(karakeep_host_, 1, 0, 1, 1);
+    karakeep_host_.set_hexpand(true);
+    k_grid->attach(*Gtk::manage(new Gtk::Label("API key")), 0, 1, 1, 1);
+    k_grid->attach(karakeep_token_, 1, 1, 1, 1);
+    karakeep_token_.set_hexpand(true);
+    karakeep_page->pack_start(*k_grid, false, false);
+    auto save_karakeep_credentials = [this] {
+        std::string host = karakeep_host_.get_text();
+        while (!host.empty() && host.back() == '/') host.pop_back();
+        (void)app_.secrets().set(CredentialKey::KARAKEEP_HOST, host);
+        (void)app_.secrets().set(CredentialKey::KARAKEEP_TOKEN, std::string(karakeep_token_.get_text()));
+    };
+    auto* actions = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 8));
+    auto* test_karakeep = Gtk::manage(new Gtk::Button("Test"));
+    test_karakeep->signal_clicked().connect([this, save_karakeep_credentials] {
+        save_karakeep_credentials();
+        try {
+            (void)app_.karakeep().list_folders();
+            karakeep_status_.set_text("Connected");
+            gtk_style_context_remove_class(
+                gtk_widget_get_style_context(GTK_WIDGET(karakeep_status_.gobj())), "error");
+        }
+        catch (std::exception const& error) {
+            karakeep_status_.set_text(error.what());
+            gtk_style_context_add_class(
+                gtk_widget_get_style_context(GTK_WIDGET(karakeep_status_.gobj())), "error");
+        }
+    });
+    auto* save_karakeep = Gtk::manage(new Gtk::Button("Save"));
+    save_karakeep->signal_clicked().connect(save_karakeep_credentials);
+    actions->pack_start(*test_karakeep, false, false);
+    actions->pack_start(*save_karakeep, false, false);
+    karakeep_page->pack_start(*actions, false, false);
+    karakeep_status_.set_halign(Gtk::ALIGN_START);
+    karakeep_page->pack_start(karakeep_status_, false, false);
+
     // Appearance
     auto* appear_page = page_box();
     pack_section_title(*appear_page, "Theme");
@@ -392,6 +441,7 @@ SettingsView::SettingsView(AppContainer& app, SyncScheduler& sync, ThemeApplyFn 
     tabs_.append_page(*make_scrolled(*caldav_page), "CalDAV");
     tabs_.append_page(*make_scrolled(*gitea_page), "Gitea");
     tabs_.append_page(*make_scrolled(*memos_page), "Capture");
+    tabs_.append_page(*make_scrolled(*karakeep_page), "Karakeep");
     tabs_.append_page(*make_scrolled(*appear_page), "Appearance");
     tabs_.append_page(*make_scrolled(*general_page), "General");
     tabs_.append_page(*make_scrolled(*pom_page), "Pomodoro");

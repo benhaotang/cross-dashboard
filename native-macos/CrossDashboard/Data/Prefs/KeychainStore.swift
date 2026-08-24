@@ -95,4 +95,6 @@ public enum CredentialKey {
     public static let pinHash                     = "biometric_pin_hash"
     public static let memosHost                   = "memos_host"
     public static let memosToken                  = "memos_token"
+    public static let karakeepHost                = "karakeep_host"
+    public static let karakeepToken               = "karakeep_token"
 }

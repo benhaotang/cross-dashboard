@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -54,7 +56,6 @@ fun MemoPropertySheet(
     onArchive: () -> Unit,
     onExtractTasks: (MemosMemo) -> List<ParsedTask>,
     onDetectDate: (MemosMemo) -> java.time.Instant?,
-    onFirstUrl: (MemosMemo) -> String?,
     vm: MemosViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -64,10 +65,12 @@ fun MemoPropertySheet(
     LaunchedEffect(memo.name) { onLoadComments() }
 
     val context = LocalContext.current
+    val viewModelState by vm.state.collectAsState()
     var commentInput by remember { mutableStateOf("") }
     var showExtractSheet by remember { mutableStateOf(false) }
     var showEventSheet by remember { mutableStateOf(false) }
     var showCommentIssueSheet by remember { mutableStateOf(false) }
+    var showKarakeepSheet by remember { mutableStateOf(false) }
 
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm").withZone(ZoneId.systemDefault())
     val memoId = memo.name   // "memos/{id}"
@@ -79,7 +82,7 @@ fun MemoPropertySheet(
     // Mirror macOS: show the button whenever Gitea repos are configured, even if no issues are synced yet
     val hasGitea = configuredRepos.isNotEmpty()
     // Detect links directly from content rather than relying on the server-computed flag
-    val firstUrl = onFirstUrl(memo)
+    val detectedUrls = vm.urls(memo)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -116,7 +119,9 @@ fun MemoPropertySheet(
             if (isExpanded) {
                 // Tablet / expanded: labeled buttons
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (hasIncompleteTasks) {
@@ -140,13 +145,22 @@ fun MemoPropertySheet(
                             Text("Comment Issue")
                         }
                     }
-                    if (firstUrl != null) {
+                    if (detectedUrls.isNotEmpty()) {
                         FilledTonalButton(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(firstUrl)))
+                            detectedUrls.forEach { url ->
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            }
                         }) {
                             Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Open URL")
+                        }
+                    }
+                    if (detectedUrls.isNotEmpty() && viewModelState.karakeepConfigured) {
+                        FilledTonalButton(onClick = { showKarakeepSheet = true }) {
+                            Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Save to Karakeep")
                         }
                     }
                     if (memoUrl != null) {
@@ -184,12 +198,24 @@ fun MemoPropertySheet(
                             Icon(Icons.AutoMirrored.Outlined.Comment, contentDescription = null)
                         }
                     }
-                    if (firstUrl != null) {
+                    if (detectedUrls.isNotEmpty()) {
                         IconButton(
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(firstUrl))) },
-                            modifier = Modifier.semantics { contentDescription = "Open URL" },
+                            onClick = {
+                                detectedUrls.forEach { url ->
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            },
+                            modifier = Modifier.semantics { contentDescription = "Open URLs" },
                         ) {
                             Icon(Icons.Outlined.OpenInBrowser, contentDescription = null)
+                        }
+                    }
+                    if (detectedUrls.isNotEmpty() && viewModelState.karakeepConfigured) {
+                        IconButton(
+                            onClick = { showKarakeepSheet = true },
+                            modifier = Modifier.semantics { contentDescription = "Save links to Karakeep" },
+                        ) {
+                            Icon(Icons.Outlined.BookmarkAdd, contentDescription = null)
                         }
                     }
                     if (memoUrl != null) {
@@ -328,6 +354,18 @@ fun MemoPropertySheet(
             issuesByRepo = issuesByRepo,
             onDismiss = { showCommentIssueSheet = false },
             vm = vm,
+        )
+    }
+    if (showKarakeepSheet) {
+        SaveToKarakeepSheet(
+            urls = detectedUrls,
+            folders = viewModelState.karakeepFolders,
+            loading = viewModelState.karakeepFoldersLoading,
+            saving = viewModelState.isLoading,
+            error = viewModelState.karakeepError,
+            onLoadFolders = vm::loadKarakeepFolders,
+            onSave = { folderId -> vm.saveUrlsToKarakeep(detectedUrls, folderId) { showKarakeepSheet = false } },
+            onDismiss = { showKarakeepSheet = false },
         )
     }
 }

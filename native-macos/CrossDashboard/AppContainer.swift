@@ -23,6 +23,7 @@ final class AppContainer {
     let calDavClient: CalDavClient
     let giteaClient: GiteaClient
     let memosClient: MemosClient
+    let karakeepClient: KarakeepClient
     let loginFlow: NextcloudLoginFlow
 
     let statsRepository: StatsRepository
@@ -42,6 +43,7 @@ final class AppContainer {
         calDavClient = CalDavClient(keychain: keychain)
         giteaClient  = GiteaClient(keychain: keychain)
         memosClient  = MemosClient(keychain: keychain)
+        karakeepClient = KarakeepClient(keychain: keychain)
         loginFlow    = NextcloudLoginFlow()
 
         let ctx = persistence.container.mainContext

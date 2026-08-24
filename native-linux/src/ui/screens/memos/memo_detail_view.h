@@ -29,6 +29,7 @@ public:
     std::function<void()> on_create_event;
     std::function<void()> on_comment_issue;
     std::function<void()> on_open_url;
+    std::function<void()> on_save_karakeep;
     std::function<void()> on_copy_link;
     /** Called after archive/delete/restore/edit/comment so the list can sync. */
     std::function<void()> on_memo_changed;
@@ -44,6 +45,7 @@ private:
     Gtk::Button create_event_btn_{};
     Gtk::Button comment_issue_btn_{};
     Gtk::Button open_url_btn_{};
+    Gtk::Button save_karakeep_btn_{};
     Gtk::Button copy_link_btn_{};
     Gtk::Button edit_btn_{};
     Gtk::Button archive_btn_{};

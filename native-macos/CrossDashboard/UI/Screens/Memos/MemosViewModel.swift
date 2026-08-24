@@ -23,6 +23,9 @@ final class MemosViewModel {
     var isLoading: Bool = false
     var error: String? = nil
     var snackbarMessage: String? = nil
+    var karakeepFolders: [KarakeepFolder] = []
+    var karakeepFoldersLoading = false
+    var karakeepSaving = false
 
     /// Comments keyed by memo name — loaded lazily.
     var comments: [String: [MemosMemo]] = [:]
@@ -55,6 +58,11 @@ final class MemosViewModel {
 
     var memosToken: String {
         container.keychain.get(CredentialKey.memosToken) ?? ""
+    }
+
+    var karakeepConfigured: Bool {
+        !(container.keychain.get(CredentialKey.karakeepHost) ?? "").isEmpty &&
+            !(container.keychain.get(CredentialKey.karakeepToken) ?? "").isEmpty
     }
 
     var configuredRepos: [String] {
@@ -168,12 +176,39 @@ final class MemosViewModel {
         return nil
     }
 
-    func firstURL(in memo: MemosMemo) -> URL? {
+    func urls(in memo: MemosMemo) -> [URL] {
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
         let range = NSRange(memo.content.startIndex..., in: memo.content)
-        return detector?.firstMatch(in: memo.content, range: range)
-            .flatMap { Range($0.range, in: memo.content) }
-            .flatMap { URL(string: String(memo.content[$0])) }
+        let matches = detector?.matches(in: memo.content, range: range) ?? []
+        var seen: Set<URL> = []
+        return matches.compactMap { match in
+            guard let url = match.url, seen.insert(url).inserted else { return nil }
+            return url
+        }
+    }
+
+    func loadKarakeepFolders() async {
+        guard !karakeepFoldersLoading else { return }
+        karakeepFoldersLoading = true
+        defer { karakeepFoldersLoading = false }
+        do {
+            karakeepFolders = try await container.karakeepClient.listFolders()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func saveToKarakeep(urls: [URL], folderId: String?) async -> Bool {
+        karakeepSaving = true
+        defer { karakeepSaving = false }
+        do {
+            try await container.karakeepClient.save(urls: urls, folderId: folderId)
+            snackbarMessage = urls.count == 1 ? "Saved to Karakeep" : "\(urls.count) links saved to Karakeep"
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
     }
 
     func memoURL(for memo: MemosMemo) -> URL? {

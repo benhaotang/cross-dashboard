@@ -19,6 +19,9 @@ struct SettingsView: View {
             MemosSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Memos", systemImage: "tray.and.arrow.down") }
 
+            KarakeepSettingsTab(viewModel: viewModel)
+                .tabItem { Label("Karakeep", systemImage: "bookmark") }
+
             AppearanceSettingsTab(viewModel: viewModel)
                 .tabItem { Label("Appearance", systemImage: "paintbrush") }
 
@@ -479,6 +482,36 @@ private struct MemosSettingsTab: View {
                     Button("Save") {
                         viewModel.saveMemos()
                     }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+private struct KarakeepSettingsTab: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        Form {
+            Section("Connection") {
+                TextField("Server URL", text: $viewModel.karakeepHost, prompt: Text("https://karakeep.example.com"))
+                    .textContentType(.URL)
+                    .accessibilityLabel("Karakeep server URL")
+                SecureField("API Key", text: $viewModel.karakeepToken)
+                    .accessibilityLabel("Karakeep API key")
+
+                if let message = viewModel.karakeepConnectionMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(viewModel.karakeepConnectionSuccess ? Color.green : Color.red)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Test") { Task { await viewModel.testKarakeepConnection() } }
+                        .disabled(viewModel.karakeepConnectionTesting)
+                    Button("Save") { viewModel.saveKarakeep() }
                 }
             }
         }

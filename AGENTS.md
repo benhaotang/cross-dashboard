@@ -240,12 +240,14 @@ and subscribes to its `SettingChanged` signal so theme switches refresh the back
 - **`SecureStore`** (`data/prefs/SecureStore.kt`): AES-256-GCM key in Android Keystore (hardware-backed on API 36). Encrypts all credential values before writing to a plain `SharedPreferences` file excluded from Auto Backup.
 - **`AppPreferences`** (`data/prefs/AppPreferences.kt`): Preferences DataStore for non-sensitive settings (theme, visible screens, kanban columns, pomodoro, notifications, sync interval, biometric lock).
 - `CredentialKey` constants use stable string keys shared across Android, macOS, and Linux.
+- Karakeep credentials use `karakeep_host` and `karakeep_token`. Store both in the platform credential store.
 
 ### Network
 - `CalDavClient` uses raw OkHttp 5 — no Retrofit. CalDAV uses non-standard HTTP methods (`PROPFIND`, `REPORT`, `MKCALENDAR`) that require direct `Request.Builder` usage.
 - `ICalParser` is a hand-written RFC 5545 line-by-line parser (no third-party iCal library) supporting VEVENT/VTODO/VJOURNAL read + serialization.
 - `GiteaClient` uses kotlinx.serialization DTOs with `toDomain()` mappers. Multipart uploads (OkHttp `MultipartBody`) are used for issue and comment attachments.
 - `MemosClient` talks to the Memos REST API v1 (`/api/v1/memos`). Auth is `Authorization: Bearer <token>`. Uses OkHttp (Android) / URLSession (macOS). All DTO fields that can be absent in proto3 JSON must be `nullable` (Android) or `Optional` (Swift) with defaults — never non-optional for fields the server omits.
+- `KarakeepClient` creates link bookmarks through `/api/v1/bookmarks`, loads folders from `/api/v1/lists`, and adds bookmarks to manual folders with `PUT /api/v1/lists/{listId}/bookmarks/{bookmarkId}`.
 
 ### Nextcloud Auth (three options)
 1. **Nextcloud SSO** (`NextcloudSsoHelper`) — AIDL IPC via `Android-SingleSignOn`; preferred when NC app is installed (e.g. LineageOS + F-Droid).
@@ -357,7 +359,8 @@ The **Capture** screen (`Destination.Memos` / `Screen.memos`) integrates with a 
   - **Extract Tasks** — parses `- [ ] …` lines via `TaskInputParser`, shows confirmation sheet.
   - **Create Event** — seeds an event from detected dates/keywords in memo content.
   - **Comment on Issue** — picks a Gitea repo (from `GITEA_REPOS` credential, decoded from JSON array) then picks an open issue from the locally-synced `IssueRepository`; no free-form issue number input.
-  - **Open URL** — shown when `NSDataDetector` / URL regex finds a URL in content (regardless of `property.hasLink` flag).
+  - **Open URL** — shown when `NSDataDetector` / URL regex finds URLs in content and opens every distinct detected URL (regardless of `property.hasLink` flag).
+  - **Save to Karakeep** — creates a bookmark for every distinct detected URL, then optionally adds each bookmark to the selected manual Karakeep folder. The picker includes No folder and shows only writable manual folders.
   - **Copy Link** — copies `{memosHost}/{memo.name}` to the clipboard; shows a 2-second toast. Does **not** call the share API.
 - **Visibility badge** in `MemoListRow` / list rows: `lock.fill` (private, secondary), `person.2.fill` (protected, orange), `globe` (public, tint).
 - **Share Extension** (Android `MemosShareExtension` / macOS `MemosShareExtension`): handles `ACTION_SEND`/share-services intent to create a new memo pre-filled with shared text/URL. Android accepts `text/plain` and `*/*` (any file type) for both `ACTION_SEND` and `ACTION_SEND_MULTIPLE`.
