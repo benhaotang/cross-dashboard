@@ -283,7 +283,7 @@ struct PomodoroModalView: View {
         if selectedTargetKey.hasPrefix("issue:") {
             let rawID = String(selectedTargetKey.dropFirst("issue:".count))
             if let id = Int64(rawID), let issue = openIssues.first(where: { $0.id == id }) {
-                vm.startForIssue(title: issue.title)
+                vm.startForIssue(title: issue.title, id: String(issue.id))
             }
             return
         }

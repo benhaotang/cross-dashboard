@@ -10,7 +10,7 @@ options:
 
 settings:
   base:
-    CURRENT_PROJECT_VERSION: 20606
+    CURRENT_PROJECT_VERSION: 20608
     DEVELOPMENT_TEAM: 569WLL4Q5F
     MARKETING_VERSION: 2.6.2
 
@@ -165,6 +165,18 @@ targets:
         excludes:
           - "*.plist"
           - "*.entitlements"
+      - CrossDashboard/Data/Network/CalDavClient.swift
+      - CrossDashboard/Data/Network/GiteaClient.swift
+      - CrossDashboard/Data/Network/MemosClient.swift
+      - CrossDashboard/Data/Parser/ICalParser.swift
+      - CrossDashboard/Data/Repository/EventRepository.swift
+      - CrossDashboard/Data/Repository/TaskRepository.swift
+      - CrossDashboard/Data/Repository/NoteRepository.swift
+      - CrossDashboard/Data/Repository/IssueRepository.swift
+      - CrossDashboard/Data/Repository/MemoRepository.swift
+      - CrossDashboard/Data/Repository/StatsRepository.swift
+      - CrossDashboard/Background/DesktopBackgroundDefinition.swift
+      - CrossDashboard/Background/DesktopBackgroundRenderer.swift
     info:
       path: CrossDashboardAgent/Info.plist
       properties:

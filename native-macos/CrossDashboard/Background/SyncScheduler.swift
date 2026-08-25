@@ -23,6 +23,13 @@ final class SyncScheduler {
 
     /// Creates or replaces the background activity if it is not already running.
     func scheduleIfNeeded() {
+        BackgroundServiceController.shared.refreshStatus()
+        if BackgroundServiceController.shared.isEnabled {
+            activity?.invalidate()
+            activity = nil
+            BackgroundServiceController.shared.reloadSchedule()
+            return
+        }
         guard activity == nil else { return }
         let scheduler = NSBackgroundActivityScheduler(identifier: activityIdentifier)
         scheduler.repeats = true

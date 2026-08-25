@@ -22,22 +22,32 @@ final class EventRepository {
     }
 
     func loadFromDB() {
-        let models = (try? context.fetch(FetchDescriptor<EventModel>())) ?? []
+        var descriptor = FetchDescriptor<EventModel>()
+        descriptor.includePendingChanges = false
+        let models = (try? context.fetch(descriptor)) ?? []
         events = models.map { $0.toDomain() }
     }
 
-    func sync(calendarHrefs: [String]) async {
-        guard !calendarHrefs.isEmpty else { return }
+    @discardableResult
+    func sync(calendarHrefs: [String]) async -> Bool {
+        guard !calendarHrefs.isEmpty else { return true }
         let thirtyDaysAgo = Date().addingTimeInterval(-30 * 86400)
         let sixMonthsOut  = Date().addingTimeInterval(180 * 86400)
-        let fresh = await client.fetchEvents(calendarHrefs: calendarHrefs, from: thirtyDaysAgo, to: sixMonthsOut)
-        await MainActor.run {
-            if !fresh.isEmpty || !(events.isEmpty) {
-                try? context.delete(model: EventModel.self)
+        guard let fresh = await client.fetchEvents(
+            calendarHrefs: calendarHrefs,
+            from: thirtyDaysAgo,
+            to: sixMonthsOut
+        ) else { return false }
+        do {
+            try context.transaction {
+                try context.delete(model: EventModel.self)
                 fresh.forEach { context.insert(EventModel(from: $0)) }
-                try? context.save()
-                loadFromDB()
             }
+            loadFromDB()
+            return true
+        } catch {
+            context.rollback()
+            return false
         }
     }
 

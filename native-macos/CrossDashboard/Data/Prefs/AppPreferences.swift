@@ -119,6 +119,31 @@ public final class AppPreferences {
         }
     }
 
+    /// Refreshes the in-memory observable values after another process writes the
+    /// shared App Group defaults.
+    public func refreshFromStore() {
+        theme = ThemePreference(rawValue: defaults.string(forKey: Keys.theme) ?? "") ?? .system
+        timeZoneOverride = defaults.string(forKey: Keys.timeZoneOverride)
+        visibleScreens = defaults.string(forKey: Keys.visibleScreens).map {
+            $0.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        } ?? allScreens
+        kanbanColumns = defaults.string(forKey: Keys.kanbanColumns).map {
+            $0.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        } ?? defaultKanbanColumns
+        pomodoroSettings = PomodoroSettings(
+            workMinutes: defaults.integer(forKey: Keys.pomodoroWork).nonZero ?? 25,
+            shortBreakMinutes: defaults.integer(forKey: Keys.pomodoroShort).nonZero ?? 5,
+            longBreakMinutes: defaults.integer(forKey: Keys.pomodoroLong).nonZero ?? 15,
+            sessionsUntilLongBreak: defaults.integer(forKey: Keys.pomodoroSessions).nonZero ?? 4
+        )
+        notificationMinutesBefore = defaults.integer(forKey: Keys.notifMinutes).nonZero ?? 15
+        notificationsEnabled = defaults.object(forKey: Keys.notifEnabled) as? Bool ?? true
+        syncIntervalMinutes = defaults.integer(forKey: Keys.syncInterval).nonZero ?? 60
+        showPomodoroInMenuBar = defaults.object(forKey: Keys.pomodoroMenuBar) as? Bool ?? true
+        let epoch = defaults.double(forKey: Keys.lastSync)
+        lastSyncDate = epoch > 0 ? Date(timeIntervalSince1970: epoch) : nil
+    }
+
     // ─── Init ─────────────────────────────────────────────────────────────────
 
     init(defaults: UserDefaults, legacyDefaults: UserDefaults? = nil) {

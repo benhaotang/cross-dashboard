@@ -48,7 +48,7 @@ struct IssueDetailView: View {
                 }
                 ToolbarItem(placement: .secondaryAction) {
                     Button {
-                        pomodoroVM.startForIssue(title: issue.title)
+                        pomodoroVM.startForIssue(title: issue.title, id: String(issue.id))
                     } label: {
                         Label("Start Pomodoro", systemImage: "timer")
                     }

@@ -29,7 +29,9 @@ final class TaskRepository {
     }
 
     func loadFromDB() {
-        let models = (try? context.fetch(FetchDescriptor<TaskModel>())) ?? []
+        var descriptor = FetchDescriptor<TaskModel>()
+        descriptor.includePendingChanges = false
+        let models = (try? context.fetch(descriptor)) ?? []
         allTasks = models.map { $0.toDomain() }
     }
 
@@ -37,16 +39,20 @@ final class TaskRepository {
         allTasks.filter { $0.parentUid == parentUid }
     }
 
-    func sync(calendarHrefs: [String]) async {
-        guard !calendarHrefs.isEmpty else { return }
-        let fresh = await client.fetchTasks(calendarHrefs: calendarHrefs)
-        await MainActor.run {
-            if !fresh.isEmpty || !allTasks.isEmpty {
-                try? context.delete(model: TaskModel.self)
+    @discardableResult
+    func sync(calendarHrefs: [String]) async -> Bool {
+        guard !calendarHrefs.isEmpty else { return true }
+        guard let fresh = await client.fetchTasks(calendarHrefs: calendarHrefs) else { return false }
+        do {
+            try context.transaction {
+                try context.delete(model: TaskModel.self)
                 fresh.forEach { context.insert(TaskModel(from: $0)) }
-                try? context.save()
-                loadFromDB()
             }
+            loadFromDB()
+            return true
+        } catch {
+            context.rollback()
+            return false
         }
     }
 

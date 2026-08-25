@@ -310,6 +310,7 @@ UI/Screens/        Dashboard/, Events/, Tasks/, Notes/, Issues/, Inbox/, Views/,
 UI/Components/     PropertyDetailShell, ReadField, ReadMarkdownField, MathView, LatexContentParser, CalendarColorDot, StatusBadge, PriorityChip, TagChip, PomodoroBar, SearchableFilterMenu
 Background/        SyncScheduler, NotificationScheduler, DesktopBackground*, BackgroundServiceController
 Pomodoro/          PomodoroViewModel (@Observable singleton), PomodoroStatusItem (NSStatusItem + NSPopover)
+CrossDashboardAgent/ Service-owned sync, widget/background refresh, notifications, and Pomodoro phases
 ```
 
 ### Navigation and deep links
@@ -328,7 +329,7 @@ Handled links:
   `timer?action=start&type=issue&id=<owner/repo#number>` (or numeric issue id) links an open
   issue; `action=pause|resume|toggle|stop|skip` controls the running timer, and idle `toggle`
   opens the picker. Name matching is case-insensitive and exact; unresolved targets open the
-  picker rather than starting the wrong item. The app process still owns the countdown.
+  picker rather than starting the wrong item.
 
 Cold-start rule: triggers like `triggerCapture(text:)` can fire before `MemosView` appears, and
 SwiftUI `.onChange` misses pre-appearance values — observe such triggers with **both**
@@ -336,14 +337,21 @@ SwiftUI `.onChange` misses pre-appearance values — observe such triggers with 
 
 ### Background agent and widget sharing
 
-- `CrossDashboardAgent.app` is an `LSBackgroundOnly` helper embedded in the main app Resources
-  and registered with `SMAppService.agent(plistName:)` (plist
-  `group.com.crossdashboard.background-agent.plist`). Keep the app-wrapper shape: a bare
-  executable lacks bundle identity under App Sandbox and crashes in `libsystem_secinit`.
-  Label/Mach name: `group.com.crossdashboard.background-agent`; inspect with
-  `launchctl print "gui/$(id -u)/group.com.crossdashboard.background-agent"` — healthy means
-  `job state = running` plus a successful Settings connection test. Today the agent is a
-  health/XPC shell only; sync and the Pomodoro countdown stay in the app process.
+- `CrossDashboardAgent.app` is the sole owner of periodic sync, widget snapshots, automatic
+  wallpaper rendering, event-notification scheduling, and Pomodoro phase transitions. The GUI
+  requests immediate sync and schedule reloads over XPC, then reloads SwiftData after the agent's
+  distributed completion notification. Keep the GUI's `NSBackgroundActivityScheduler` only as a
+  fallback while the service is disabled or unavailable.
+- The agent is an `LSBackgroundOnly` app embedded in the main app Resources and registered with
+  `SMAppService.agent(plistName:)` using `group.com.crossdashboard.background-agent.plist`.
+  Keep the app wrapper: a bare executable lacks bundle identity under App Sandbox and crashes in
+  `libsystem_secinit`. Inspect it with
+  `launchctl print "gui/$(id -u)/group.com.crossdashboard.background-agent"`; healthy means
+  `job state = running` plus a successful Settings connection test.
+- Sync fetches distinguish an authoritative empty response from transport, HTTP, authentication,
+  and decoding failure. Replace each SwiftData cache in one transaction only after every configured
+  endpoint for that source succeeds. A failed or partial fetch retains the previous cache and does
+  not advance `lastSyncDate`.
 - Shared storage uses Team-ID App Group `569WLL4Q5F.com.crossdashboard`; legacy
   `group.com.crossdashboard` remains only for preference migration and the XPC service name.
   Put new shared data in the Team-ID group.

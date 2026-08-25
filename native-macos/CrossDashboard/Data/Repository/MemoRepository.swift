@@ -23,35 +23,42 @@ final class MemoRepository {
     // ─── DB ───────────────────────────────────────────────────────────────────
 
     func loadFromDB() {
-        let models = (try? context.fetch(FetchDescriptor<MemosModel>())) ?? []
+        var descriptor = FetchDescriptor<MemosModel>()
+        descriptor.includePendingChanges = false
+        let models = (try? context.fetch(descriptor)) ?? []
         allMemos = models.map { $0.toDomain() }.sorted { $0.displayTime > $1.displayTime }
     }
 
     // ─── Sync ─────────────────────────────────────────────────────────────────
 
-    func syncMemos() async {
-        guard client.baseUrl() != nil else { return }
+    @discardableResult
+    func syncMemos() async -> Bool {
+        guard client.baseUrl() != nil else { return true }
         var fetched: [MemosMemo] = []
 
         for state in [MemoState.normal, .archived] {
             var pageToken: String? = nil
             repeat {
-                let result = await client.listMemos(pageToken: pageToken, state: state)
+                guard let result = await client.listMemosForSync(
+                    pageToken: pageToken,
+                    state: state
+                ) else { return false }
                 fetched.append(contentsOf: result.memos)
                 pageToken = result.nextPageToken
             } while pageToken != nil
         }
 
-        guard !fetched.isEmpty else { return }
         do {
-            try context.delete(model: MemosModel.self)
-            try context.save()
-        } catch { return }
-        do {
-            fetched.forEach { context.insert(MemosModel(from: $0)) }
-            try context.save()
-        } catch { return }
+            try context.transaction {
+                try context.delete(model: MemosModel.self)
+                fetched.forEach { context.insert(MemosModel(from: $0)) }
+            }
+        } catch {
+            context.rollback()
+            return false
+        }
         loadFromDB()
+        return true
     }
 
     // ─── Create ───────────────────────────────────────────────────────────────

@@ -23,36 +23,33 @@ final class IssueRepository {
     }
 
     func loadFromDB() {
-        let models = (try? context.fetch(FetchDescriptor<IssueModel>())) ?? []
+        var descriptor = FetchDescriptor<IssueModel>()
+        descriptor.includePendingChanges = false
+        let models = (try? context.fetch(descriptor)) ?? []
         allIssues = models.map { $0.toDomain() }.sorted { $0.updatedAt > $1.updatedAt }
     }
 
-    func sync(repositories: [String]) async {
-        guard !repositories.isEmpty else { return }
-        async let openFetch   = client.fetchIssues(repositories: repositories, state: "open")
-        async let closedFetch = client.fetchIssues(repositories: repositories, state: "closed")
+    @discardableResult
+    func sync(repositories: [String]) async -> Bool {
+        guard !repositories.isEmpty else { return true }
+        async let openFetch = client.fetchIssuesForSync(repositories: repositories, state: "open")
+        async let closedFetch = client.fetchIssuesForSync(repositories: repositories, state: "closed")
         let (open, closed) = await (openFetch, closedFetch)
+        guard let open, let closed else { return false }
         let all = open + closed
-        guard !all.isEmpty else { return }
 
-        // Mirror Android's deleteAll() + upsertAll() pattern:
-        // Commit deletions first so SwiftData's in-memory context is fully cleared
-        // before inserting new records, avoiding unique-constraint conflicts on issueId.
         do {
-            try context.delete(model: IssueModel.self)
-            try context.save()
+            try context.transaction {
+                try context.delete(model: IssueModel.self)
+                all.forEach { context.insert(IssueModel(from: $0)) }
+            }
         } catch {
-            print("[IssueRepository] Failed to clear issues: \(error)")
-            return
-        }
-        do {
-            all.forEach { context.insert(IssueModel(from: $0)) }
-            try context.save()
-        } catch {
-            print("[IssueRepository] Failed to save issues: \(error)")
-            return
+            context.rollback()
+            print("[IssueRepository] Failed to replace issues: \(error)")
+            return false
         }
         loadFromDB()
+        return true
     }
 
     func update(

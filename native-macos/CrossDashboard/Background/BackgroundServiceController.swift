@@ -52,6 +52,9 @@ final class BackgroundServiceController {
             lastError = error.localizedDescription
         }
         refreshStatus()
+        if isEnabled {
+            reloadSchedule()
+        }
     }
 
     func unregister() {
@@ -68,7 +71,7 @@ final class BackgroundServiceController {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    func ping() async -> Bool {
+    nonisolated func ping() async -> Bool {
         await withCheckedContinuation { continuation in
             let result = PingResult(continuation: continuation)
             let connection = NSXPCConnection(
@@ -101,6 +104,72 @@ final class BackgroundServiceController {
             }
         }
     }
+
+    nonisolated func syncNow() async -> BackgroundSyncReport? {
+        await withCheckedContinuation { continuation in
+            let result = SyncResult(continuation: continuation)
+            let connection = makeConnection()
+            connection.invalidationHandler = {
+                result.resume(returning: nil)
+            }
+            connection.interruptionHandler = {
+                connection.invalidate()
+                result.resume(returning: nil)
+            }
+            connection.resume()
+
+            guard let proxy = connection.remoteObjectProxyWithErrorHandler({ _ in
+                connection.invalidate()
+                result.resume(returning: nil)
+            }) as? BackgroundAgentXPCProtocol else {
+                connection.invalidate()
+                result.resume(returning: nil)
+                return
+            }
+            proxy.syncNow { data in
+                connection.invalidate()
+                result.resume(returning: try? JSONDecoder().decode(BackgroundSyncReport.self, from: data))
+            }
+        }
+    }
+
+    nonisolated func reloadSchedule() {
+        let connection = makeConnection()
+        connection.resume()
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler { _ in
+            connection.invalidate()
+        } as? BackgroundAgentXPCProtocol else {
+            connection.invalidate()
+            return
+        }
+        proxy.reloadSchedule {
+            connection.invalidate()
+        }
+    }
+
+    nonisolated func reloadPomodoro() {
+        let connection = makeConnection()
+        connection.resume()
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler { _ in
+            connection.invalidate()
+        } as? BackgroundAgentXPCProtocol else {
+            connection.invalidate()
+            return
+        }
+        proxy.reloadPomodoro {
+            connection.invalidate()
+        }
+    }
+
+    nonisolated private func makeConnection() -> NSXPCConnection {
+        let connection = NSXPCConnection(
+            machServiceName: BackgroundServiceContract.machServiceName,
+            options: []
+        )
+        connection.remoteObjectInterface = NSXPCInterface(with: BackgroundAgentXPCProtocol.self)
+        connection.invalidationHandler = nil
+        return connection
+    }
 }
 
 private final class PingResult: @unchecked Sendable {
@@ -112,6 +181,23 @@ private final class PingResult: @unchecked Sendable {
     }
 
     func resume(returning value: Bool) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: value)
+    }
+}
+
+private final class SyncResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<BackgroundSyncReport?, Never>?
+
+    init(continuation: CheckedContinuation<BackgroundSyncReport?, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: BackgroundSyncReport?) {
         lock.lock()
         let pending = continuation
         continuation = nil

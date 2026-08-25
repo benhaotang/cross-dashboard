@@ -24,13 +24,19 @@ final class GiteaClient: Sendable {
     // ─── Issues ───────────────────────────────────────────────────────────────
 
     func fetchIssues(repositories: [String], state: String = "open") async -> [GiteaIssue] {
-        guard let base = instanceUrl() else { return [] }
+        await fetchIssuesForSync(repositories: repositories, state: state) ?? []
+    }
+
+    /// Returns nil when any configured repository fails, so synchronization never
+    /// mistakes a transport or decoding error for an authoritative empty result.
+    func fetchIssuesForSync(repositories: [String], state: String = "open") async -> [GiteaIssue]? {
+        guard let base = instanceUrl() else { return nil }
         var results: [GiteaIssue] = []
         for repo in repositories {
             var page = 1
             while true {
                 let url = "\(base)/api/v1/repos/\(repo)/issues?state=\(state)&type=issues&limit=50&page=\(page)"
-                guard let data = await get(url) else { break }
+                guard let data = await get(url) else { return nil }
                 do {
                     let dtos = try decoder.decode([GiteaIssueDto].self, from: data)
                     if dtos.isEmpty { break }
@@ -38,7 +44,7 @@ final class GiteaClient: Sendable {
                     page += 1
                     if dtos.count < 50 { break }
                 } catch {
-                    break
+                    return nil
                 }
             }
         }

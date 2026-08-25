@@ -32,6 +32,7 @@ final class AppContainer {
     let noteRepository: NoteRepository
     let issueRepository: IssueRepository
     let memoRepository: MemoRepository
+    private var backgroundSyncObserver: NSObjectProtocol?
 
     // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -54,23 +55,55 @@ final class AppContainer {
         noteRepository  = NoteRepository(context: ctx, client: calDavClient)
         issueRepository = IssueRepository(context: ctx, client: giteaClient, statsRepo: statsRepository)
         memoRepository  = MemoRepository(context: ctx, client: memosClient)
+
+        backgroundSyncObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name(BackgroundServiceContract.syncDidCompleteNotification),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.reloadFromPersistence()
+            }
+        }
     }
 
     // ─── Sync all ─────────────────────────────────────────────────────────────
 
     /// Called by SyncScheduler and on app launch.
     func syncAll() async {
+        let service = BackgroundServiceController.shared
+        service.refreshStatus()
+        if service.isEnabled, await service.syncNow() != nil {
+            reloadFromPersistence()
+            return
+        }
+
+        await syncLocally()
+    }
+
+    func reloadFromPersistence() {
+        preferences.refreshFromStore()
+        persistence.container.mainContext.rollback()
+        persistence.container.mainContext.processPendingChanges()
+        eventRepository.loadFromDB()
+        taskRepository.loadFromDB()
+        noteRepository.loadFromDB()
+        issueRepository.loadFromDB()
+        memoRepository.loadFromDB()
+    }
+
+    private func syncLocally() async {
         let calendarHrefs = selectedCalendarHrefs()
         let repositories  = giteaRepositories()
 
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.eventRepository.sync(calendarHrefs: calendarHrefs) }
-            group.addTask { await self.taskRepository.sync(calendarHrefs: calendarHrefs) }
-            group.addTask { await self.noteRepository.sync(calendarHrefs: calendarHrefs) }
-            group.addTask { await self.issueRepository.sync(repositories: repositories) }
-            group.addTask { await self.memoRepository.syncMemos() }
+        let eventsOK = await eventRepository.sync(calendarHrefs: calendarHrefs)
+        let tasksOK = await taskRepository.sync(calendarHrefs: calendarHrefs)
+        let notesOK = await noteRepository.sync(calendarHrefs: calendarHrefs)
+        let issuesOK = await issueRepository.sync(repositories: repositories)
+        let memosOK = await memoRepository.syncMemos()
+        if eventsOK && tasksOK && notesOK && issuesOK && memosOK {
+            preferences.lastSyncDate = Date()
         }
-        preferences.lastSyncDate = Date()
         writeWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
         await DesktopBackgroundManager.shared.refreshIfEnabled()

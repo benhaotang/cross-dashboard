@@ -55,8 +55,8 @@ final class CalDavClient: Sendable {
         calendarHrefs: [String],
         from: Date,
         to: Date
-    ) async -> [CalendarEvent] {
-        guard let server = serverUrl() else { return [] }
+    ) async -> [CalendarEvent]? {
+        guard let server = serverUrl() else { return nil }
         var results: [CalendarEvent] = []
         for href in calendarHrefs {
             let url = href.hasPrefix("http") ? href : "\(server)\(href)"
@@ -66,7 +66,7 @@ final class CalDavClient: Sendable {
                 url: url,
                 body: report,
                 headers: ["Depth": "1", "Content-Type": "application/xml"]
-            ) else { continue }
+            ) else { return nil }
             for resource in extractCalendarResources(xml) {
                 let absHref = resource.href.map { $0.hasPrefix("http") ? $0 : "\(server)\($0)" }
                 results += ICalParser.parseEvents(icalText: resource.icalData, calendarHref: href, resourceHref: absHref, resourceEtag: resource.etag)
@@ -77,8 +77,8 @@ final class CalDavClient: Sendable {
 
     // ─── Task fetching (REPORT) ───────────────────────────────────────────────
 
-    func fetchTasks(calendarHrefs: [String]) async -> [CalDavTask] {
-        guard let server = serverUrl() else { return [] }
+    func fetchTasks(calendarHrefs: [String]) async -> [CalDavTask]? {
+        guard let server = serverUrl() else { return nil }
         var results: [CalDavTask] = []
         for href in calendarHrefs {
             let url = href.hasPrefix("http") ? href : "\(server)\(href)"
@@ -88,7 +88,7 @@ final class CalDavClient: Sendable {
                 url: url,
                 body: report,
                 headers: ["Depth": "1", "Content-Type": "application/xml"]
-            ) else { continue }
+            ) else { return nil }
             for resource in extractCalendarResources(xml) {
                 let absHref = resource.href.map { $0.hasPrefix("http") ? $0 : "\(server)\($0)" }
                 results += ICalParser.parseTasks(icalText: resource.icalData, calendarHref: href, resourceHref: absHref, resourceEtag: resource.etag)
@@ -99,8 +99,8 @@ final class CalDavClient: Sendable {
 
     // ─── Note fetching (REPORT) ───────────────────────────────────────────────
 
-    func fetchNotes(calendarHrefs: [String]) async -> [Note] {
-        guard let server = serverUrl() else { return [] }
+    func fetchNotes(calendarHrefs: [String]) async -> [Note]? {
+        guard let server = serverUrl() else { return nil }
         var results: [Note] = []
         for href in calendarHrefs {
             let url = href.hasPrefix("http") ? href : "\(server)\(href)"
@@ -110,7 +110,7 @@ final class CalDavClient: Sendable {
                 url: url,
                 body: report,
                 headers: ["Depth": "1", "Content-Type": "application/xml"]
-            ) else { continue }
+            ) else { return nil }
             for resource in extractCalendarResources(xml) {
                 let absHref = resource.href.map { $0.hasPrefix("http") ? $0 : "\(server)\($0)" }
                 results += ICalParser.parseNotes(icalText: resource.icalData, calendarHref: href, resourceHref: absHref, resourceEtag: resource.etag)

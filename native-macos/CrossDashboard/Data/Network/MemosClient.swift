@@ -36,7 +36,23 @@ final class MemosClient: Sendable {
         orderBy: String = "display_time desc",
         pageSize: Int = 50
     ) async -> (memos: [MemosMemo], nextPageToken: String?) {
-        guard let base = baseUrl() else { return ([], nil) }
+        await listMemosForSync(
+            pageToken: pageToken,
+            filter: filter,
+            state: state,
+            orderBy: orderBy,
+            pageSize: pageSize
+        ) ?? ([], nil)
+    }
+
+    func listMemosForSync(
+        pageToken: String? = nil,
+        filter: String? = nil,
+        state: MemoState = .normal,
+        orderBy: String = "display_time desc",
+        pageSize: Int = 50
+    ) async -> (memos: [MemosMemo], nextPageToken: String?)? {
+        guard let base = baseUrl() else { return nil }
         var comps = URLComponents(string: "\(base)/api/v1/memos")!
         var items: [URLQueryItem] = [
             URLQueryItem(name: "pageSize", value: "\(pageSize)"),
@@ -46,9 +62,9 @@ final class MemosClient: Sendable {
         if let f = filter  { items.append(URLQueryItem(name: "filter", value: f)) }
         if let t = pageToken { items.append(URLQueryItem(name: "pageToken", value: t)) }
         comps.queryItems = items
-        guard let url = comps.url else { return ([], nil) }
-        guard let data = await get(url.absoluteString) else { return ([], nil) }
-        guard let dto = try? decoder.decode(MemoListDto.self, from: data) else { return ([], nil) }
+        guard let url = comps.url else { return nil }
+        guard let data = await get(url.absoluteString) else { return nil }
+        guard let dto = try? decoder.decode(MemoListDto.self, from: data) else { return nil }
         let memos = dto.memos.compactMap { $0.toDomain() }
         return (memos, dto.nextPageToken.flatMap { $0.isEmpty ? nil : $0 })
     }

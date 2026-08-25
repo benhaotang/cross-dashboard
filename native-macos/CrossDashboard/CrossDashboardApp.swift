@@ -138,7 +138,11 @@ struct CrossDashboardApp: App {
                 appViewModel.presentPomodoroPicker(initialName: request.name ?? "")
                 return
             }
-            pomodoroViewModel.startForIssue(title: issue.title, minutes: request.minutes)
+            pomodoroViewModel.startForIssue(
+                title: issue.title,
+                id: String(issue.id),
+                minutes: request.minutes
+            )
         }
     }
 

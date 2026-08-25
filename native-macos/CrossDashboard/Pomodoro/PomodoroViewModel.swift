@@ -27,8 +27,21 @@ final class PomodoroViewModel {
 
     private var timer: Timer?
     private let container = AppContainer.shared
+    private var serviceObserver: NSObjectProtocol?
 
-    private init() {}
+    private init() {
+        serviceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name(BackgroundServiceContract.pomodoroDidChangeNotification),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshFromServiceStore() }
+        }
+        if let session = PomodoroSessionStore.load() {
+            apply(session)
+            scheduleServiceDisplayTimer()
+        }
+    }
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -43,15 +56,43 @@ final class PomodoroViewModel {
     }
 
     @discardableResult
-    func startForIssue(title: String, minutes: Int? = nil) -> Bool {
-        start(title: title, task: nil, minutes: minutes)
+    func startForIssue(title: String, id: String = "", minutes: Int? = nil) -> Bool {
+        start(title: title, task: nil, issueID: id, minutes: minutes)
     }
 
-    private func start(title: String, task: CalDavTask?, minutes: Int?) -> Bool {
+    private func start(
+        title: String,
+        task: CalDavTask?,
+        issueID: String = "",
+        minutes: Int?
+    ) -> Bool {
         guard !state.active else { return false }
         let settings = container.preferences.pomodoroSettings
         let focusMinutes = min(max(minutes ?? settings.workMinutes, 1), 24 * 60)
         currentTask = task
+        if backgroundServiceEnabled {
+            let now = Date()
+            let session = PersistedPomodoroSession(
+                phase: .work,
+                targetKind: task != nil ? .task : (issueID.isEmpty ? .none : .issue),
+                targetID: task?.uid ?? issueID,
+                title: title,
+                phaseStartedAt: now,
+                deadline: now.addingTimeInterval(TimeInterval(focusMinutes * 60)),
+                isPaused: false,
+                settings: settings
+            )
+            do {
+                try PomodoroSessionStore.save(session)
+            } catch {
+                return false
+            }
+            apply(session)
+            scheduleServiceDisplayTimer()
+            BackgroundServiceController.shared.reloadPomodoro()
+            PomodoroStatusItem.shared.show()
+            return true
+        }
         state = PomodoroState(
             phase: .work,
             secondsLeft: focusMinutes * 60,
@@ -69,6 +110,15 @@ final class PomodoroViewModel {
 
     func pause() {
         guard state.running else { return }
+        if backgroundServiceEnabled, var session = PomodoroSessionStore.load() {
+            session.pausedSecondsRemaining = session.secondsRemaining(at: Date())
+            session.deadline = nil
+            session.isPaused = true
+            try? PomodoroSessionStore.save(session)
+            apply(session)
+            BackgroundServiceController.shared.reloadPomodoro()
+            return
+        }
         timer?.invalidate()
         timer = nil
         state.running = false
@@ -76,11 +126,27 @@ final class PomodoroViewModel {
 
     func resume() {
         guard !state.running, state.active else { return }
+        if backgroundServiceEnabled, var session = PomodoroSessionStore.load() {
+            let remaining = max(1, session.pausedSecondsRemaining ?? 0)
+            session.phaseStartedAt = Date()
+            session.deadline = Date().addingTimeInterval(TimeInterval(remaining))
+            session.isPaused = false
+            session.pausedSecondsRemaining = nil
+            try? PomodoroSessionStore.save(session)
+            apply(session)
+            scheduleServiceDisplayTimer()
+            BackgroundServiceController.shared.reloadPomodoro()
+            return
+        }
         state.running = true
         scheduleTimer()
     }
 
     func stop() {
+        if backgroundServiceEnabled {
+            PomodoroSessionStore.clear()
+            BackgroundServiceController.shared.reloadPomodoro()
+        }
         timer?.invalidate()
         timer = nil
         state = PomodoroState()
@@ -89,6 +155,14 @@ final class PomodoroViewModel {
     }
 
     func skip() {
+        if backgroundServiceEnabled, let session = PomodoroSessionStore.load() {
+            let next = skipped(session)
+            try? PomodoroSessionStore.save(next)
+            apply(next)
+            scheduleServiceDisplayTimer()
+            BackgroundServiceController.shared.reloadPomodoro()
+            return
+        }
         advancePhase()
     }
 
@@ -102,6 +176,75 @@ final class PomodoroViewModel {
             }
         }
         RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    private func scheduleServiceDisplayTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshFromServiceStore() }
+        }
+        if let timer { RunLoop.main.add(timer, forMode: .common) }
+    }
+
+    private func refreshFromServiceStore() {
+        guard let session = PomodoroSessionStore.load() else {
+            timer?.invalidate()
+            timer = nil
+            state = PomodoroState()
+            currentTask = nil
+            PomodoroStatusItem.shared.hide()
+            return
+        }
+        apply(session)
+        if state.active { PomodoroStatusItem.shared.show() }
+    }
+
+    private func apply(_ session: PersistedPomodoroSession) {
+        if session.targetKind == .task {
+            currentTask = container.taskRepository.allTasks.first { $0.uid == session.targetID }
+        } else {
+            currentTask = nil
+        }
+        state = PomodoroState(
+            phase: session.phase,
+            secondsLeft: session.secondsRemaining(at: Date()),
+            running: !session.isPaused,
+            currentSession: session.completedSessions + 1,
+            completedSessions: session.completedSessions,
+            itemTitle: session.title,
+            active: true,
+            settings: session.settings
+        )
+    }
+
+    private func skipped(_ session: PersistedPomodoroSession) -> PersistedPomodoroSession {
+        var next = session
+        let duration: Int
+        switch session.phase {
+        case .work:
+            if session.completedSessions > 0 &&
+                session.completedSessions % max(1, session.settings.sessionsUntilLongBreak) == 0 {
+                next.phase = .longBreak
+                duration = session.settings.longBreakMinutes * 60
+            } else {
+                next.phase = .shortBreak
+                duration = session.settings.shortBreakMinutes * 60
+            }
+        case .shortBreak, .longBreak:
+            next.phase = .work
+            duration = session.settings.workMinutes * 60
+        }
+        next.phaseStartedAt = Date()
+        next.deadline = Date().addingTimeInterval(TimeInterval(duration))
+        next.isPaused = false
+        next.pausedSecondsRemaining = nil
+        return next
+    }
+
+    private var backgroundServiceEnabled: Bool {
+        let service = BackgroundServiceController.shared
+        service.refreshStatus()
+        return service.isEnabled
     }
 
     private func tick() {

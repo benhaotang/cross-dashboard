@@ -19,20 +19,26 @@ final class NoteRepository {
     }
 
     func loadFromDB() {
-        let models = (try? context.fetch(FetchDescriptor<NoteModel>())) ?? []
+        var descriptor = FetchDescriptor<NoteModel>()
+        descriptor.includePendingChanges = false
+        let models = (try? context.fetch(descriptor)) ?? []
         notes = models.map { $0.toDomain() }.sorted { $0.lastModified > $1.lastModified }
     }
 
-    func sync(calendarHrefs: [String]) async {
-        guard !calendarHrefs.isEmpty else { return }
-        let fresh = await client.fetchNotes(calendarHrefs: calendarHrefs)
-        await MainActor.run {
-            if !fresh.isEmpty || !notes.isEmpty {
-                try? context.delete(model: NoteModel.self)
+    @discardableResult
+    func sync(calendarHrefs: [String]) async -> Bool {
+        guard !calendarHrefs.isEmpty else { return true }
+        guard let fresh = await client.fetchNotes(calendarHrefs: calendarHrefs) else { return false }
+        do {
+            try context.transaction {
+                try context.delete(model: NoteModel.self)
                 fresh.forEach { context.insert(NoteModel(from: $0)) }
-                try? context.save()
-                loadFromDB()
             }
+            loadFromDB()
+            return true
+        } catch {
+            context.rollback()
+            return false
         }
     }
 
